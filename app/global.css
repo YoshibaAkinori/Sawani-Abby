@@ -1,0 +1,858 @@
+/* SalonBoard Global CSS */
+
+/* Base styles */
+.salon-board {
+  min-height: 100vh;
+  background-color: #f3f4f6;
+}
+
+/* Header styles */
+.salon-board__header {
+  background: linear-gradient(to right, #3b82f6, #2563eb);
+  color: white;
+  padding: 1rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.salon-board__header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.salon-board__header-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.salon-board__header-logo {
+  background-color: white;
+  color: #2563eb;
+  padding: 0.5rem;
+  border-radius: 0.375rem;
+}
+
+.salon-board__header-logo svg {
+  height: 1.5rem;
+  width: 1.5rem;
+}
+
+.salon-board__header-title h1 {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.salon-board__header-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.salon-board__date-navigation {
+  display: flex;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+}
+
+.salon-board__date-nav-btn {
+  padding: 0.25rem;
+  border-radius: 0.25rem;
+  transition: background-color 0.2s;
+}
+
+.salon-board__date-nav-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.salon-board__date-nav-btn svg {
+  height: 1.25rem;
+  width: 1.25rem;
+}
+
+.salon-board__date-display {
+  margin: 0 1rem;
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+
+.salon-board__settings-btn {
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  transition: background-color 0.2s;
+}
+
+.salon-board__settings-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.salon-board__settings-btn svg {
+  height: 1.25rem;
+  width: 1.25rem;
+}
+
+/* Content area */
+.salon-board__content {
+  padding: 1rem;
+}
+
+/* Scrollable container */
+.salon-board__scrollable-container {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+}
+
+.salon-board__scrollable-container::-webkit-scrollbar {
+  height: 8px;
+}
+
+.salon-board__scrollable-container::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.salon-board__scrollable-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.salon-board__scrollable-container::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Time header */
+.salon-board__time-header {
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  margin-bottom: 0.5rem;
+  overflow-x: auto;
+}
+
+.salon-board__time-header-row {
+  display: flex;
+}
+
+.salon-board__time-header-label {
+  width: 10rem;
+  padding: 0.75rem;
+  background-color: #f9fafb;
+  border-right: 1px solid #e5e7eb;
+  font-weight: 500;
+  text-align: center;
+}
+
+.salon-board__time-header-slots {
+  flex: 1;
+}
+
+.salon-board__time-slots {
+  display: flex;
+}
+
+.salon-board__time-slot {
+  min-width: 60px;
+  padding: 0.5rem;
+  text-align: center;
+  font-size: 0.875rem;
+  border-right: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+}
+
+/* Database info */
+.salon-board__db-info {
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  padding: 1rem;
+  margin-bottom: 1rem;
+}
+
+.salon-board__db-info-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+.salon-board__db-info-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.salon-board__db-info-item svg {
+  height: 1rem;
+  width: 1rem;
+}
+
+/* Schedule grids */
+.salon-board__schedule-grids {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.salon-board__section {
+  /* Base section styles */
+}
+
+.salon-board__section-title {
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.salon-board__section-title svg {
+  height: 1.25rem;
+  width: 1.25rem;
+}
+
+.salon-board__rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.salon-board__row {
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.salon-board__row-content {
+  display: flex;
+}
+
+.salon-board__row-label {
+  width: 10rem;
+  padding: 1rem;
+  background-color: #f9fafb;
+  border-right: 1px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+}
+
+.salon-board__label-content {
+  /* Base label content styles */
+}
+
+.salon-board__label-main {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.salon-board__color-indicator {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+}
+
+.salon-board__label-text {
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.salon-board__label-sub {
+  font-size: 0.75rem;
+  color: #4b5563;
+}
+
+.salon-board__timeline {
+  flex: 1;
+  position: relative;
+  height: 60px;
+}
+
+.salon-board__grid-lines {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+
+.salon-board__grid-line {
+  border-right: 1px solid #e5e7eb;
+  min-width: 60px;
+}
+
+.salon-board__grid-line--even {
+  background-color: #f9fafb;
+}
+
+.salon-board__grid-line--odd {
+  background-color: white;
+}
+
+.salon-board__booking {
+  position: absolute;
+  top: 0.1rem;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  border-left: 4px solid;
+  cursor: pointer;
+  height: 56px;
+  transition: box-shadow 0.2s;
+}
+
+.salon-board__booking:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.salon-board__booking-content {
+  padding: 0.1rem;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.salon-board__booking-service {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.salon-board__booking-service--with-icon {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.salon-board__booking-client {
+  font-size: 0.75rem;
+  color: #4b5563;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.salon-board__booking-time {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.salon-board__booking-note {
+  font-size: 0.75rem;
+  color: #2563eb;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.salon-board__small-color-indicator {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+}
+
+/* Database management panel */
+.salon-board__db-panel {
+  margin-top: 1.5rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .salon-board__db-panel {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.salon-board__db-section {
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  padding: 1rem;
+}
+
+.salon-board__db-section-title {
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.75rem;
+}
+
+.salon-board__staff-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.salon-board__staff-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem;
+  background-color: #f9fafb;
+  border-radius: 0.25rem;
+}
+
+.salon-board__staff-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.salon-board__staff-name {
+  font-size: 0.875rem;
+}
+
+.salon-board__staff-status {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+}
+
+.salon-board__staff-status--active {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.salon-board__staff-status--inactive {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.salon-board__stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.salon-board__stat-item {
+  display: flex;
+  justify-content: space-between;
+}
+
+.salon-board__stat-label {
+  font-size: 0.875rem;
+  color: #4b5563;
+}
+
+.salon-board__stat-value {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* Utility classes for dynamic styling */
+.salon-board__booking--facial {
+  background-color: rgba(255, 105, 180, 0.125);
+  border-left-color: #ff69b4;
+}
+
+.salon-board__booking--body-treatment {
+  background-color: rgba(50, 205, 50, 0.125);
+  border-left-color: #32cd32;
+}
+
+.salon-board__booking--other {
+  background-color: rgba(147, 112, 219, 0.125);
+  border-left-color: #9370db;
+}
+
+
+
+/* ヘッダーとして使う行の特別スタイル */
+.salon-board__row--is-header {
+  background-color: #f9fafb;
+  box-shadow: none;
+  min-height: auto;
+  border-bottom: 1px solid #e5e7eb;
+  border-radius: 0;
+}
+
+.salon-board__row--is-header .salon-board__row-label {
+  background-color: #f9fafb;
+}
+
+/* ヘッダー行のタイムラインは、中の要素がはみ出ても表示されるように */
+.salon-board__row--is-header .salon-board__timeline {
+  overflow: visible;
+}
+
+/* ヘッダーコンテンツのコンテナ（グリッドの上に重ねる） */
+.time-header-content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 上段と下段の共通スタイル */
+.time-header__top-row,
+.time-header__bottom-row {
+  display: flex;
+}
+
+/* ヘッダーの全セル共通のスタイル */
+.time-header__cell {
+  min-width: 60px; /* グリッド線と全く同じ幅 */
+  border-right: 1px solid transparent; /* 線は下のグリッド線を使うので透明に */
+  flex-shrink: 0;
+  box-sizing: border-box;
+  padding: 0.25rem 0;
+}
+
+/* 上段のセルの個別スタイル */
+.time-header__cell--hour {
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-align: left;
+  padding-left: 0.5rem;
+  height: 28px; /* 高さを指定 */
+}
+
+/* 下段のセルの個別スタイル */
+.time-header__cell--minute {
+  font-size: 0.75rem;
+  color: #6b7280;
+  background-color: rgba(255, 255, 255, 0.7); /* 少しだけ背景を白くして下の線を薄める */
+  text-align: center;
+  height: 28px; /* 高さを指定 */
+}
+
+/* 予約ブロックの位置計算の修正 */
+/* 枠線(1px)を考慮した計算式に対応 */
+.salon-board__grid-line {
+  min-width: 60px;
+  border-right: 1px solid #e5e7eb;
+  flex-shrink: 0; /* ★重要：縮まないようにする */
+  box-sizing: border-box;
+}
+
+.salon-board__booking {
+  /* ...元のスタイル... */
+  box-sizing: border-box; /* 枠線を含めて幅を計算 */
+}
+
+
+/* 休日行のスタイル */
+.salon-board__row--holiday {
+  background-color: #f0f0f0;
+  border-radius: 8px;
+}
+
+.salon-board__row--holiday .salon-board__timeline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.salon-board__row--holiday .salon-board__timeline::after {
+  content: 'お休み';
+  font-size: 18px;
+  font-weight: bold;
+  color: #EF4444;
+  letter-spacing: 4px;
+}
+
+/* 新しいdev用の横スクロール対応CSS */
+
+/* メインスクロールコンテナ */
+.salon-board__main-scroll-container {
+  overflow-x: auto;
+  overflow-y: visible;
+  width: 100%;
+  padding-bottom: 12px; /* スクロールバー用の余白 */
+}
+
+/* スクロールバーのスタイリング */
+.salon-board__main-scroll-container::-webkit-scrollbar {
+  height: 10px;
+}
+
+.salon-board__main-scroll-container::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 6px;
+  margin: 0 10px; /* 両端に余白 */
+}
+
+.salon-board__main-scroll-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+
+.salon-board__main-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* スクロール可能エリア全体の最小幅設定 */
+.salon-board__scrollable-content {
+  min-width: 1800px; /* 28スロット * 60px + 余白 */
+  width: max-content;
+}
+
+/* 時間ヘッダー専用のスタイル */
+.salon-board__time-header-fixed {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  margin-bottom: 16px;
+  border: 1px solid #e5e7eb;
+}
+
+.salon-board__time-header-row {
+  display: flex;
+  align-items: stretch;
+  min-height: 60px;
+}
+
+.salon-board__time-header-label-fixed {
+  width: 160px; /* スタッフラベルと同じ幅 */
+  min-width: 160px;
+  padding: 16px;
+  background-color: #f9fafb;
+  border-right: 2px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+  color: #374151;
+}
+
+.salon-board__time-slots-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.salon-board__time-slots-top {
+  display: flex;
+  height: 30px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.salon-board__time-slots-bottom {
+  display: flex;
+  height: 29px;
+}
+
+.salon-board__time-slot-hour {
+  min-width: 60px;
+  width: 60px;
+  padding: 4px 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #1f2937;
+  border-right: 1px solid #e5e7eb;
+  background-color: #f9fafb;
+  display: flex;
+  align-items: center;
+  text-align: left;
+}
+
+.salon-board__time-slot-minute {
+  min-width: 60px;
+  width: 60px;
+  padding: 2px;
+  font-size: 11px;
+  color: #6b7280;
+  border-right: 1px solid #e5e7eb;
+  background-color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* スケジュールセクションの調整 */
+.salon-board__schedule-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.salon-board__section-in-scroll {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.salon-board__section-title-in-scroll {
+  padding: 16px 20px;
+  background-color: #f8fafc;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 行のスタイル調整 */
+.salon-board__row-in-scroll {
+  display: flex;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background-color 0.2s;
+}
+
+.salon-board__row-in-scroll:last-child {
+  border-bottom: none;
+}
+
+.salon-board__row-in-scroll:hover {
+  background-color: #f9fafb;
+}
+
+.salon-board__row-label-in-scroll {
+  width: 160px;
+  min-width: 160px;
+  padding: 16px;
+  background-color: #fafbfc;
+  border-right: 2px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+}
+
+.salon-board__timeline-in-scroll {
+  flex: 1;
+  position: relative;
+  height: 60px;
+  background-color: white;
+}
+
+/* グリッドラインの調整 */
+.salon-board__grid-lines-in-scroll {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+}
+
+.salon-board__grid-line-in-scroll {
+  min-width: 60px;
+  width: 60px;
+  border-right: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+
+.salon-board__grid-line-in-scroll:nth-child(even) {
+  background-color: #fafafa;
+}
+
+.salon-board__grid-line-in-scroll:nth-child(odd) {
+  background-color: white;
+}
+
+/* 予約ブロックの調整 */
+.salon-board__booking-in-scroll {
+  position: absolute;
+  top: 2px;
+  height: 56px;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+  border-left: 4px solid;
+  cursor: pointer;
+  transition: all 0.2s;
+  z-index: 1;
+}
+
+.salon-board__booking-in-scroll:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.salon-board__booking-content-in-scroll {
+  padding: 6px 8px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.salon-board__booking-client-in-scroll {
+  font-size: 12px;
+  font-weight: 500;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.salon-board__booking-service-in-scroll {
+  font-size: 11px;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* カラーインジケーター */
+.salon-board__staff-color-in-scroll {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.salon-board__small-color-in-scroll {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* 休日表示のスタイル */
+.salon-board__holiday-row {
+  background-color: #f3f4f6;
+}
+
+.salon-board__holiday-timeline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f9fafb;
+  color: #ef4444;
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 2px;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+  .salon-board__time-header-label-fixed,
+  .salon-board__row-label-in-scroll {
+    width: 120px;
+    min-width: 120px;
+    font-size: 12px;
+    padding: 12px;
+  }
+  
+  .salon-board__scrollable-content {
+    min-width: 1500px;
+  }
+}
