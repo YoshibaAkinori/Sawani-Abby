@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, UserCog, ClipboardList, Sparkles, Settings2, Calculator } from 'lucide-react';
+import { X, UserCog, ClipboardList, Sparkles, Settings2, Calculator, Send } from 'lucide-react';
 
 const SettingsSidebar = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
@@ -39,6 +39,11 @@ const SettingsSidebar = ({ isOpen, onClose }) => {
           <button className="salon-board__sidebar-item">
             <Calculator className="salon-board__sidebar-icon" />
             <span>レジ締め管理</span>
+          </button>
+          
+          <button className="salon-board__sidebar-item">
+            <Send className="salon-board__sidebar-icon" />
+            <span>クーポン送信管理</span>
           </button>
         </div>
       </div>
