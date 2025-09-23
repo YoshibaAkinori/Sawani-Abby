@@ -288,14 +288,6 @@
   min-width: 60px;
 }
 
-.salon-board__grid-line--even {
-  background-color: #f9fafb;
-}
-
-.salon-board__grid-line--odd {
-  background-color: white;
-}
-
 .salon-board__booking {
   position: absolute;
   top: 0.1rem;
@@ -429,28 +421,6 @@
   background-color: #fee2e2;
   color: #991b1b;
 }
-
-.salon-board__stats-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-}
-
-.salon-board__stat-item {
-  display: flex;
-  justify-content: space-between;
-}
-
-.salon-board__stat-label {
-  font-size: 0.875rem;
-  color: #4b5563;
-}
-
-.salon-board__stat-value {
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
 /* Utility classes for dynamic styling */
 .salon-board__booking--facial {
   background-color: rgba(255, 105, 180, 0.125);
@@ -854,5 +824,796 @@
   
   .salon-board__scrollable-content {
     min-width: 1500px;
+  }
+}
+
+/* モーダル関連のスタイル */
+.salon-board__modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.salon-board__modal {
+  background: white;
+  border-radius: 12px;
+  max-width: 500px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.salon-board__modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.salon-board__modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.salon-board__modal-close {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 4px;
+  color: #6b7280;
+  transition: color 0.2s;
+}
+
+.salon-board__modal-close:hover {
+  color: #374151;
+}
+
+.salon-board__modal-content {
+  padding: 20px 24px 24px;
+}
+
+/* 顧客情報表示 */
+.salon-board__customer-info h4 {
+  margin: 0 0 16px 0;
+  font-size: 20px;
+  color: #1f2937;
+  text-align: center;
+}
+
+.salon-board__info-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.salon-board__info-grid div {
+  padding: 8px 12px;
+  background-color: #f9fafb;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+/* 新規予約フォーム */
+.salon-board__booking-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.salon-board__form-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.salon-board__form-row label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+}
+
+.salon-board__form-row input,
+.salon-board__form-row select,
+.salon-board__form-row textarea {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: border-color 0.2s;
+}
+
+.salon-board__form-row input:focus,
+.salon-board__form-row select:focus,
+.salon-board__form-row textarea:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.salon-board__form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.salon-board__btn-cancel,
+.salon-board__btn-save {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.salon-board__btn-cancel {
+  background: #f9fafb;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.salon-board__btn-cancel:hover {
+  background: #f3f4f6;
+}
+
+.salon-board__btn-save {
+  background: #3b82f6;
+  color: white;
+  border: 1px solid #3b82f6;
+}
+
+.salon-board__btn-save:hover {
+  background: #2563eb;
+}
+
+/* クリック可能スロット */
+.salon-board__clickable-slot:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+/* データベース管理パネル（元の位置でカード表示） */
+.salon-board__db-panel {
+  margin-top: 1.5rem;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 1024px) {
+  .salon-board__db-panel {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.salon-board__db-section {
+  background-color: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  padding: 1rem;
+}
+
+.salon-board__db-section-title {
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.75rem;
+}
+
+/* アクションカードのスタイル（高さ統一版） */
+.salon-board__card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  align-items: stretch; /* カードの高さを統一 */
+}
+
+.salon-board__action-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: white;
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-align: left;
+  height: 120px;
+  box-sizing: border-box; /* 追加：paddingを含めた計算 */
+}
+
+.salon-board__action-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.salon-board__action-card--customers {
+  border-left: 4px solid #3b82f6;
+}
+
+.salon-board__action-card--analytics {
+  border-left: 4px solid #10b981;
+}
+
+.salon-board__action-card--register {
+  border-left: 4px solid #f59e0b;
+}
+
+.salon-board__card-icon {
+  width: 2rem;
+  height: 2rem;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+.salon-board__action-card--customers .salon-board__card-icon {
+  color: #3b82f6;
+}
+
+.salon-board__action-card--analytics .salon-board__card-icon {
+  color: #10b981;
+}
+
+.salon-board__action-card--register .salon-board__card-icon {
+  color: #f59e0b;
+}
+
+.salon-board__card-content h4 {
+  margin: 0 0 0.25rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.salon-board__card-content p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+/* 統計情報カード（高さ統一版） */
+.salon-board__stats-card {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 1.5rem;
+  border: 1px solid #e2e8f0;
+  height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  box-sizing: border-box; /* 追加：paddingとborderを含めた計算 */
+}
+
+.salon-board__stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.salon-board__stat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.salon-board__stat-label {
+  font-size: 0.75rem;
+  color: #4b5563;
+}
+
+.salon-board__stat-value {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #1f2937;
+}
+
+/* サイドバーのスタイル */
+        .salon-board__sidebar-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.5);
+          z-index: 998;
+        }
+
+        .salon-board__settings-sidebar {
+          position: fixed;
+          top: 0;
+          right: 0;
+          width: 320px;
+          height: 100vh;
+          background: white;
+          box-shadow: -4px 0 20px rgba(0, 0, 0, 0.1);
+          z-index: 999;
+          transform: translateX(0);
+          animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+          from {
+            transform: translateX(100%);
+          }
+          to {
+            transform: translateX(0);
+          }
+        }
+
+        .salon-board__sidebar-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 1.5rem 2rem;
+          border-bottom: 1px solid #e5e7eb;
+        }
+
+        .salon-board__sidebar-header h3 {
+          margin: 0;
+          font-size: 1.25rem;
+          font-weight: 600;
+          color: #1f2937;
+        }
+
+        .salon-board__sidebar-close {
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 0.5rem;
+          color: #6b7280;
+          border-radius: 4px;
+        }
+
+        .salon-board__sidebar-close:hover {
+          background: #f3f4f6;
+          color: #374151;
+        }
+
+        .salon-board__sidebar-content {
+          padding: 1rem 0;
+        }
+
+        .salon-board__sidebar-item {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          width: 100%;
+          padding: 1rem 2rem;
+          background: none;
+          border: none;
+          cursor: pointer;
+          font-size: 1rem;
+          color: #374151;
+          text-align: left;
+          transition: background-color 0.2s;
+        }
+
+        .salon-board__sidebar-item:hover {
+          background: #f9fafb;
+        }
+
+        .salon-board__sidebar-icon {
+          width: 1.25rem;
+          height: 1.25rem;
+          color: #6b7280;
+        }
+
+        /* クリック可能スロットのスタイル */
+        .salon-board__clickable-slot {
+          transition: background-color 0.2s;
+        }
+
+        .salon-board__clickable-slot:hover {
+          background-color: rgba(59, 130, 246, 0.1) !important;
+        }
+
+        /* レスポンシブ対応 */
+        @media (max-width: 768px) {
+          .salon-board__card-grid {
+            grid-template-columns: 1fr;
+            gap: 1rem;
+          }
+
+          .salon-board__booking-type-selection {
+            grid-template-columns: 1fr;
+            padding: 1.5rem;
+          }
+
+          .salon-board__settings-sidebar {
+            width: 280px;
+          }
+
+          .salon-board__action-card {
+            padding: 1rem;
+          }
+
+          .salon-board__card-icon {
+            width: 2rem;
+            height: 2rem;
+          }
+        }
+
+        /* モバイルでのモーダル対応 */
+        @media (max-width: 640px) {
+          .salon-board__modal-content {
+            margin: 0.5rem;
+            border-radius: 8px;
+          }
+
+          .salon-board__modal-header {
+            padding: 1rem 1.5rem;
+          }
+
+          .salon-board__booking-type-selection,
+          .salon-board__modal-body {
+            padding: 1.5rem;
+          }
+
+          .salon-board__booking-type-btn {
+            padding: 1rem;
+          }
+
+          .salon-board__sidebar-header {
+            padding: 1rem 1.5rem;
+          }
+
+          .salon-board__sidebar-item {
+            padding: 0.75rem 1.5rem;
+          }
+        }
+/* モーダルコンテンツ */
+        .salon-board__modal-content {
+          background: white;
+          border-radius: 12px;
+          margin: 1rem 0;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .salon-board__modal-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 1.5rem 2rem;
+          border-bottom: 1px solid #e5e7eb;
+        }
+
+        .salon-board__modal-header h3 {
+          margin: 0;
+          font-size: 1.25rem;
+          font-weight: 600;
+          color: #1f2937;
+        }
+
+        .salon-board__modal-close {
+          background: none;
+          border: none;
+          cursor: pointer;
+          padding: 0.5rem;
+          color: #6b7280;
+          border-radius: 4px;
+        }
+
+        .salon-board__modal-close:hover {
+          background: #f3f4f6;
+          color: #374151;
+        }
+
+        .salon-board__modal-body {
+          padding: 2rem;
+        }
+
+        .salon-board__booking-type-selection {
+          padding: 2rem;
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 1rem;
+        }
+
+        .salon-board__booking-type-btn {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          padding: 1.5rem;
+          background: white;
+          border: 2px solid #e5e7eb;
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.2s;
+          text-align: left;
+        }
+
+        .salon-board__booking-type-btn:hover {
+          border-color: #3b82f6;
+          background: #f8faff;
+        }
+
+        .salon-board__booking-type-btn--reservation:hover {
+          border-color: #3b82f6;
+        }
+
+        .salon-board__booking-type-btn--schedule:hover {
+          border-color: #10b981;
+        }
+
+        .salon-board__booking-type-icon {
+          width: 2rem;
+          height: 2rem;
+          color: #6b7280;
+          flex-shrink: 0;
+        }
+
+        .salon-board__booking-type-btn h4 {
+          margin: 0 0 0.25rem 0;
+          font-size: 1rem;
+          font-weight: 600;
+          color: #1f2937;
+        }
+
+        .salon-board__booking-type-btn p {
+          margin: 0;
+          font-size: 0.875rem;
+          color: #6b7280;
+        }
+
+        /* カレンダーボタンのスタイル */
+/* カレンダーボタンのスタイル */
+.salon-board__calendar-btn {
+  background-color: white;
+  border: 1px solid #e5e7eb;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.salon-board__calendar-btn:hover {
+  background-color: #3b82f6;
+  border-color: #3b82f6;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.3);
+}
+
+.salon-board__calendar-btn:hover svg {
+  color: white;
+}
+
+.salon-board__calendar-btn svg {
+  color: #3b82f6;
+}
+
+/* カレンダーモーダルのスタイル */
+.calendar-modal__overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.calendar-modal__content {
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  max-width: 400px;
+  width: 90%;
+  max-height: 90vh;
+  overflow: hidden;
+}
+
+.calendar-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.calendar-modal__title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0;
+}
+
+.calendar-modal__close-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  color: #6b7280;
+  transition: all 0.2s;
+}
+
+.calendar-modal__close-btn:hover {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.calendar-modal__nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.calendar-modal__nav-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  color: #6b7280;
+  transition: all 0.2s;
+}
+
+.calendar-modal__nav-btn:hover {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.calendar-modal__month-year {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.calendar-modal__calendar {
+  padding: 20px 24px;
+}
+
+.calendar-modal__weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.calendar-modal__weekday {
+  text-align: center;
+  padding: 8px 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+}
+
+.calendar-modal__dates {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.calendar-modal__date {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 12px 4px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.calendar-modal__date:hover {
+  background-color: #f3f4f6;
+}
+
+.calendar-modal__date--other-month {
+  color: #d1d5db;
+}
+
+.calendar-modal__date--today {
+  background-color: #dbeafe;
+  color: #1d4ed8;
+  font-weight: 700;
+}
+
+.calendar-modal__date--today:hover {
+  background-color: #bfdbfe;
+}
+
+.calendar-modal__date--selected {
+  background-color: #3b82f6;
+  color: white;
+}
+
+.calendar-modal__date--selected:hover {
+  background-color: #2563eb;
+}
+
+.calendar-modal__date--past {
+  color: #d1d5db;
+  cursor: default;
+}
+
+.calendar-modal__date--past:hover {
+  background-color: #f3f4f6;
+}
+
+.calendar-modal__footer {
+  padding: 16px 24px 20px;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.calendar-modal__today-btn {
+  background-color: #f3f4f6;
+  border: none;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  transition: all 0.2s;
+}
+
+.calendar-modal__today-btn:hover {
+  background-color: #e5e7eb;
+}
+
+.calendar-modal__availability-btn {
+  background-color: #f3f4f6;
+  border: none;
+  cursor: pointer;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #374151;
+  transition: all 0.2s;
+}
+
+.calendar-modal__availability-btn:hover {
+  background-color: #e5e7eb;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 480px) {
+  .calendar-modal__content {
+    width: 95%;
+    margin: 20px;
+  }
+  
+  .calendar-modal__header,
+  .calendar-modal__nav,
+  .calendar-modal__calendar,
+  .calendar-modal__footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  
+  .calendar-modal__date {
+    padding: 10px 2px;
+    font-size: 13px;
   }
 }

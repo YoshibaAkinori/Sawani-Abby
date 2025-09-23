@@ -1,26 +1,32 @@
 "use client";
 import React, { useState } from 'react';
-import { Calendar, ChevronLeft, ChevronRight, Settings, User, Clock } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, Settings, User, Clock, Users, BarChart3, CreditCard } from 'lucide-react';
+import BookingModal from './components/BookingModal';
+import SettingsSidebar from './components/SettingsSidebar';
+import CalendarModal from './components/CalendarModal';
 import './global.css';
 
 const SalonBoard = () => {
-  const [selectedDate, setSelectedDate] = useState('2024-09-20');
+  const [selectedDate, setSelectedDate] = useState('2025-09-20');
+  const [activeModal, setActiveModal] = useState(null); // 'booking', 'new-reservation', 'new-schedule', 'calendar'
+  const [selectedSlot, setSelectedSlot] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // 設定DB（担当者マスタ）
+  // 設定DBスタッフマスタ
   const [staffDatabase, setStaffDatabase] = useState([
     { id: '0001', name: '佐野 智里', color: '#FF69B4', isActive: true, holidays: [] },
-    { id: '0002', name: '星野 加奈恵', color: '#9370DB', isActive: true, holidays: [] },
+    { id: '0002', name: '星野 加奈江', color: '#9370DB', isActive: true, holidays: [] },
     { id: '0003', name: '吉羽 顕功', color: '#4169E1', isActive: true, holidays: [] },
-    { id: '0004', name: '吉羽 皓紀', color: '#32CD32', isActive: true, holidays: ['2024-09-20', '2024-09-21'] },
+    { id: '0004', name: '吉羽 皐紀', color: '#32CD32', isActive: true, holidays: ['2025-09-20', '2025-09-21'] },
   ]);
 
   // 予約DB（予約マスタ）
   const [bookingsDatabase, setBookingsDatabase] = useState([
-    { id: 1, staffId: '0001', bed: 'ベッド2', date: '2024-09-20', startTime: '11:00', endTime: '13:00', service: 'フェイシャル', client: '田中 花子', serviceType: 'フェイシャル', status: 'confirmed', phoneNumber: '090-1234-5678', note: '初回のお客様' },
-    { id: 2, staffId: '0001', bed: 'ベッド2', date: '2024-09-20', startTime: '14:00', endTime: '16:00', service: 'ボディトリート', client: '山田 太郎', serviceType: 'ボディトリート', status: 'confirmed', phoneNumber: '080-9876-5432', note: 'リピーター' },
-    { id: 3, staffId: '0002', bed: 'ベッド1', date: '2024-09-20', startTime: '10:00', endTime: '12:00', service: 'フェイシャル', client: '鈴木 美香', serviceType: 'フェイシャル', status: 'confirmed', phoneNumber: '070-2468-1357', note: '' },
-    { id: 4, staffId: '0002', bed: 'ベッド1', date: '2024-09-20', startTime: '15:00', endTime: '17:30', service: 'ボディトリート', client: '佐藤 恵子', serviceType: 'ボディトリート', status: 'confirmed', phoneNumber: '090-3691-2584', note: '肩こりがひどいとのこと' },
-    { id: 5, staffId: '0003', bed: 'ベッド2', date: '2024-09-20', startTime: '18:30', endTime: '19:30', service: 'フェイシャル', client: '高橋 さくら', serviceType: 'フェイシャル', status: 'confirmed', phoneNumber: '080-7531-9642', note: '敏感肌' },
+    { id: 1, staffId: '0001', bed: 'ベッド2', date: '2025-09-20', startTime: '11:00', endTime: '13:00', service: 'フェイシャル', client: '田中 花子', serviceType: 'フェイシャル', status: 'confirmed', phoneNumber: '090-1234-5678', note: '初回のお客様' },
+    { id: 2, staffId: '0001', bed: 'ベッド2', date: '2025-09-20', startTime: '14:00', endTime: '16:00', service: 'ボディトリート', client: '山田 太郎', serviceType: 'ボディトリート', status: 'confirmed', phoneNumber: '080-9876-5432', note: 'リピーター' },
+    { id: 3, staffId: '0002', bed: 'ベッド1', date: '2025-09-20', startTime: '10:00', endTime: '12:00', service: 'フェイシャル', client: '鈴木 美香', serviceType: 'フェイシャル', status: 'confirmed', phoneNumber: '070-2468-1357', note: '' },
+    { id: 4, staffId: '0002', bed: 'ベッド1', date: '2025-09-20', startTime: '15:00', endTime: '17:30', service: 'ボディトリート', client: '佐藤 恵子', serviceType: 'ボディトリート', status: 'confirmed', phoneNumber: '090-3691-2584', note: '肩こりがひどいとのこと' },
+    { id: 5, staffId: '0003', bed: 'ベッド2', date: '2025-09-20', startTime: '18:30', endTime: '19:30', service: 'フェイシャル', client: '高橋 さくら', serviceType: 'フェイシャル', status: 'confirmed', phoneNumber: '080-7531-9642', note: '敏感肌' },
   ]);
 
   const bedCount = 2;
@@ -78,18 +84,69 @@ const SalonBoard = () => {
     setSelectedDate(currentDate.toISOString().split('T')[0]);
   };
 
+  // 空きスロットクリック処理
+  const handleSlotClick = (staffId, timeSlot, slotIndex) => {
+    const staff = activeStaff.find(s => s.id === staffId);
+    if (!staff) return;
+    
+    setSelectedSlot({
+      staffId,
+      staffName: staff.name,
+      timeSlot,
+      slotIndex,
+      date: selectedDate
+    });
+    setActiveModal('booking');
+  };
+
+  // モーダルを閉じる
+  const closeModal = () => {
+    setActiveModal(null);
+    setSelectedSlot(null);
+  };
+
+  // 設定サイドバーの開閉
+  const toggleSettings = () => {
+    setSidebarOpen(!sidebarOpen);
+  };
+
+  // カレンダーモーダルを開く
+  const openCalendarModal = () => {
+    setActiveModal('calendar');
+  };
+
+  // カレンダーから日付を選択
+  const handleDateSelect = (date) => {
+    setSelectedDate(date);
+    setActiveModal(null);
+  };
+
+  // 空きスロットの判定（簡易版）
+  const isSlotAvailable = (staffId, timeSlot) => {
+    const slotMinutes = timeToMinutes(timeSlot);
+    return !bookings.some(booking => {
+      if (booking.staffId !== staffId) return false;
+      const startMinutes = timeToMinutes(booking.startTime);
+      const endMinutes = timeToMinutes(booking.endTime);
+      return slotMinutes >= startMinutes && slotMinutes < endMinutes;
+    });
+  };
+
   return (
     <div className="salon-board">
       <header className="salon-board__header">
         <div className="salon-board__header-content">
           <div className="salon-board__header-title">
-            <div className="salon-board__header-logo">
-              <Calendar />
-            </div>
             <h1>ABBY 予約一覧</h1>
           </div>
           
           <div className="salon-board__header-controls">
+            <button 
+              className="salon-board__header-logo salon-board__calendar-btn"
+              onClick={openCalendarModal}
+            >
+              <Calendar />
+            </button>
             <div className="salon-board__date-navigation">
               <button
                 onClick={() => changeDate(-1)}
@@ -112,7 +169,10 @@ const SalonBoard = () => {
                 <ChevronRight />
               </button>
             </div>
-            <button className="salon-board__settings-btn">
+            <button 
+              className="salon-board__settings-btn"
+              onClick={toggleSettings}
+            >
               <Settings />
             </button>
           </div>
@@ -170,9 +230,19 @@ const SalonBoard = () => {
                           </div>
                           <div className="salon-board__timeline">
                             <div className="salon-board__grid-lines">
-                              {timeSlots.map(time => (
-                                <div key={time} className="salon-board__grid-line" />
-                              ))}
+                              {timeSlots.map((time, slotIndex) => {
+                                const isAvailable = !isHeader && !isHoliday && isSlotAvailable(staff.id, time);
+                                return (
+                                  <div 
+                                    key={time} 
+                                    className={`salon-board__grid-line ${
+                                      isAvailable ? 'salon-board__clickable-slot' : ''
+                                    }`}
+                                    onClick={() => isAvailable && handleSlotClick(staff.id, time, slotIndex)}
+                                    style={{ cursor: isAvailable ? 'pointer' : 'default' }}
+                                  />
+                                );
+                              })}
                             </div>
                             
                             {isHeader ? (
@@ -215,134 +285,172 @@ const SalonBoard = () => {
                   })}
                 </div>
               </div>
-              
-              {/* ベッド別セクション */}
-              <div className="salon-board__section">
-                <h3 className="salon-board__section-title">
-                  ベッド別スケジュール
-                </h3>
-                <div className="salon-board__rows">
-                  {beds.map(bed => (
-                    <div key={`bed-${bed}`} className="salon-board__row">
-                      <div className="salon-board__row-content">
-                        <div className="salon-board__row-label">
-                          <div className="salon-board__label-content">
-                            <div className="salon-board__label-main">
-                              <span className="salon-board__label-text">{bed}</span>
+            </div>
+          </div>
+
+          {/* 予約/予定登録モーダル（スタッフスケジュールの下に表示） */}
+          <BookingModal 
+            activeModal={activeModal}
+            selectedSlot={selectedSlot}
+            onClose={closeModal}
+            onModalChange={setActiveModal}
+          />
+
+          {/* カレンダーモーダル */}
+          <CalendarModal 
+            isOpen={activeModal === 'calendar'}
+            selectedDate={selectedDate}
+            onDateSelect={handleDateSelect}
+            onClose={closeModal}
+          />
+
+          {/* モーダルが開いていない場合のみベッド別スケジュールを表示 */}
+          {!activeModal && (
+            <div className="salon-board__scrollable-content">
+              <div className="salon-board__schedule-grids">
+                
+                {/* ベッド別セクション */}
+                <div className="salon-board__section">
+                  <h3 className="salon-board__section-title">
+                    ベッド別スケジュール
+                  </h3>
+                  <div className="salon-board__rows">
+                    {beds.map(bed => (
+                      <div key={`bed-${bed}`} className="salon-board__row">
+                        <div className="salon-board__row-content">
+                          <div className="salon-board__row-label">
+                            <div className="salon-board__label-content">
+                              <div className="salon-board__label-main">
+                                <span className="salon-board__label-text">{bed}</span>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="salon-board__timeline">
-                          <div className="salon-board__grid-lines">
-                            {timeSlots.map((time, index) => (
-                              <div 
-                                key={time}
-                                className={`salon-board__grid-line ${
-                                  index % 2 === 0 
-                                    ? 'salon-board__grid-line--even' 
-                                    : 'salon-board__grid-line--odd'
-                                }`}
-                              ></div>
-                            ))}
-                          </div>
-                          {bookings
-                            .filter(booking => booking.bed === bed)
-                            .map(booking => {
-                              const { left, width } = calculateBookingPosition(booking.startTime, booking.endTime);
-                              const serviceColorClass = getServiceColorClass(booking.serviceType);
-                              const staff = activeStaff.find(s => s.id === booking.staffId);
-                              
-                              return (
-                                <div
-                                  key={booking.id}
-                                  className={`salon-board__booking ${serviceColorClass}`}
-                                  style={{
-                                    left: `${left}px`,
-                                    width: `${width}px`,
-                                  }}
-                                >
-                                  <div className="salon-board__booking-content">
-                                    <div className="salon-board__booking-client">
-                                      {booking.serviceType} {booking.client + " 様"}
-                                    </div>
-                                    <div className="salon-board__booking-service salon-board__booking-service--with-icon">
-                                      {staff && (
-                                        <div 
-                                          className="salon-board__small-color-indicator"
-                                          style={{ backgroundColor: staff.color }}
-                                        ></div>
-                                      )}
-                                      {staff?.name}
+                          <div className="salon-board__timeline">
+                            <div className="salon-board__grid-lines">
+                              {timeSlots.map((time, index) => (
+                                <div 
+                                  key={time}
+                                  className={`salon-board__grid-line ${
+                                    index % 2 === 0 
+                                      ? 'salon-board__grid-line--even' 
+                                      : 'salon-board__grid-line--odd'
+                                  }`}
+                                ></div>
+                              ))}
+                            </div>
+                            {bookings
+                              .filter(booking => booking.bed === bed)
+                              .map(booking => {
+                                const { left, width } = calculateBookingPosition(booking.startTime, booking.endTime);
+                                const serviceColorClass = getServiceColorClass(booking.serviceType);
+                                const staff = activeStaff.find(s => s.id === booking.staffId);
+                                
+                                return (
+                                  <div
+                                    key={booking.id}
+                                    className={`salon-board__booking ${serviceColorClass}`}
+                                    style={{
+                                      left: `${left}px`,
+                                      width: `${width}px`,
+                                    }}
+                                  >
+                                    <div className="salon-board__booking-content">
+                                      <div className="salon-board__booking-client">
+                                        {booking.serviceType} {booking.client + " 様"}
+                                      </div>
+                                      <div className="salon-board__booking-service salon-board__booking-service--with-icon">
+                                        {staff && (
+                                          <div 
+                                            className="salon-board__small-color-indicator"
+                                            style={{ backgroundColor: staff.color }}
+                                          ></div>
+                                        )}
+                                        {staff?.name}
+                                      </div>
                                     </div>
                                   </div>
-                                </div>
-                              );
-                            })}
+                                );
+                              })}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
 
-        {/* データベース管理パネル */}
+        {/* データベース管理パネル（カード形式に変更） */}
         <div className="salon-board__db-panel">
           <div className="salon-board__db-section">
-            <h3 className="salon-board__db-section-title">スタッフDB</h3>
-            <div className="salon-board__staff-list">
-              {staffDatabase.map(staff => (
-                <div key={staff.id} className="salon-board__staff-item">
-                  <div className="salon-board__staff-info">
-                    <div 
-                      className="salon-board__color-indicator"
-                      style={{ backgroundColor: staff.color }}
-                    ></div>
-                    <span className="salon-board__staff-name">{staff.name}</span>
-                  </div>
-                  <span 
-                    className={`salon-board__staff-status ${
-                      staff.isActive 
-                        ? 'salon-board__staff-status--active' 
-                        : 'salon-board__staff-status--inactive'
-                    }`}
-                  >
-                    {staff.isActive ? '有効' : '無効'}
-                  </span>
+            <h3 className="salon-board__db-section-title">スタッフ業務</h3>
+            <div className="salon-board__card-grid">
+              <button className="salon-board__action-card salon-board__action-card--customers">
+                <Users className="salon-board__card-icon" />
+                <div className="salon-board__card-content">
+                  <h4>顧客情報</h4>
+                  <p>顧客一覧・詳細情報</p>
                 </div>
-              ))}
+              </button>
+
+              <button className="salon-board__action-card salon-board__action-card--register">
+                <CreditCard className="salon-board__card-icon" />
+                <div className="salon-board__card-content">
+                  <h4>レジ/お会計</h4>
+                  <p>お会計処理・決済</p>
+                </div>
+              </button>
             </div>
           </div>
 
           <div className="salon-board__db-section">
-            <h3 className="salon-board__db-section-title">予約DB統計</h3>
-            <div className="salon-board__stats-list">
-              <div className="salon-board__stat-item">
-                <span className="salon-board__stat-label">総予約数</span>
-                <span className="salon-board__stat-value">{bookingsDatabase.length}件</span>
-              </div>
-              <div className="salon-board__stat-item">
-                <span className="salon-board__stat-label">本日の予約</span>
-                <span className="salon-board__stat-value">{bookings.length}件</span>
-              </div>
-              <div className="salon-board__stat-item">
-                <span className="salon-board__stat-label">フェイシャル</span>
-                <span className="salon-board__stat-value">
-                  {bookings.filter(b => b.serviceType === 'フェイシャル').length}件
-                </span>
-              </div>
-              <div className="salon-board__stat-item">
-                <span className="salon-board__stat-label">ボディトリート</span>
-                <span className="salon-board__stat-value">
-                  {bookings.filter(b => b.serviceType === 'ボディトリート').length}件
-                </span>
+            <h3 className="salon-board__db-section-title">売上分析</h3>
+            <div className="salon-board__card-grid">
+              <button className="salon-board__action-card salon-board__action-card--analytics">
+                <BarChart3 className="salon-board__card-icon" />
+                <div className="salon-board__card-content">
+                  <h4>売上分析</h4>
+                  <p>売上レポート・統計</p>
+                </div>
+              </button>
+              
+              {/* 統計情報 */}
+              <div className="salon-board__stats-card">
+                <div className="salon-board__stats-list">
+                  <div className="salon-board__stat-item">
+                    <span className="salon-board__stat-label">総予約数</span>
+                    <span className="salon-board__stat-value">{bookingsDatabase.length}件</span>
+                  </div>
+                  <div className="salon-board__stat-item">
+                    <span className="salon-board__stat-label">本日の予約</span>
+                    <span className="salon-board__stat-value">{bookings.length}件</span>
+                  </div>
+                  <div className="salon-board__stat-item">
+                    <span className="salon-board__stat-label">フェイシャル</span>
+                    <span className="salon-board__stat-value">
+                      {bookings.filter(b => b.serviceType === 'フェイシャル').length}件
+                    </span>
+                  </div>
+                  <div className="salon-board__stat-item">
+                    <span className="salon-board__stat-label">ボディトリート</span>
+                    <span className="salon-board__stat-value">
+                      {bookings.filter(b => b.serviceType === 'ボディトリート').length}件
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* 設定サイドバー */}
+      <SettingsSidebar 
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
     </div>
   );
 };
