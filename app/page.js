@@ -3,7 +3,6 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Calendar, ChevronLeft, ChevronRight, Settings, User, Clock, Users, BarChart3, CreditCard } from 'lucide-react';
 import BookingModal from './components/BookingModal';
-import SettingsSidebar from './components/SettingsSidebar';
 import CalendarModal from './components/CalendarModal';
 import './global.css';
 
@@ -562,12 +561,6 @@ const SalonBoard = () => {
           onClose={closeModal}
         />
       </div>
-
-      {/* 設定サイドバー */}
-      <SettingsSidebar 
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-      />
     </div>
   );
 };

@@ -1,7 +1,8 @@
 "use client";
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Settings, Users, Clock, Sparkles, Settings2, Calculator, Gift, Database,FileText } from 'lucide-react';
+import { ArrowLeft, Settings, Users, Clock, Sparkles, Settings2, Calculator, Gift, Database, FileText } from 'lucide-react';
+import StaffManagement from './set_component/StaffManagement';
 import './settings.css';
 
 const SettingsPage = () => {
@@ -24,10 +25,10 @@ const SettingsPage = () => {
         return (
           <div>
             <h2 className="settings__content-title">スタッフ管理</h2>
-            <div className="settings__content-card">
-              <p className="settings__content-description">スタッフの基本情報の設定を行います。新規スタッフの登録から既存スタッフの情報編集まで一元管理できます。</p>
-              <div className="settings__content-status">※ 機能実装中</div>
-            </div>
+            <p className="settings__content-description">
+              スタッフの基本情報の設定を行います。新規スタッフの登録から既存スタッフの情報編集まで一元管理できます。
+            </p>
+            <StaffManagement />
           </div>
         );
       case 'shift':

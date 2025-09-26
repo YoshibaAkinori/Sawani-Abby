@@ -39,3 +39,21 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 環境変数
+.env
+
+# データベースファイル
+/docker/mysql/data/
+
+# バックアップファイル
+/backups/
+*.sql.gz
+*.dump
+
+# ログファイル
+*.log
+
+# OS生成ファイル
+.DS_Store
+Thumbs.db
