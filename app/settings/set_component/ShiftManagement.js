@@ -10,11 +10,8 @@ const ShiftManagement = () => {
   const [staff, setStaff] = useState([]);
   const [shifts, setShifts] = useState({});
   const [editingDay, setEditingDay] = useState(null);
-  const [hourlyWage, setHourlyWage] = useState(900);
-  const [transportAllowance, setTransportAllowance] = useState(313);
-  const [isEditingSettings, setIsEditingSettings] = useState(false);
-  const [tempHourlyWage, setTempHourlyWage] = useState(900);
-  const [tempTransportAllowance, setTempTransportAllowance] = useState(313);
+  const [hourlyWage, setHourlyWage] = useState(1500);
+  const [transportAllowance, setTransportAllowance] = useState(900);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [savedShifts, setSavedShifts] = useState({}); // DBに保存されているデータ
@@ -32,13 +29,18 @@ const ShiftManagement = () => {
     fetchStaff();
   }, []);
 
-  // スタッフが選択されたらシフトと給与設定を読み込み
+  // スタッフが選択されたらシフトを読み込み
   useEffect(() => {
     if (selectedStaff) {
       fetchShifts();
-      fetchWageSettings();
+      // staffテーブルから時給・交通費を取得
+      const selectedStaffData = staff.find(s => s.staff_id === selectedStaff);
+      if (selectedStaffData) {
+        setHourlyWage(selectedStaffData.hourly_wage || 1500);
+        setTransportAllowance(selectedStaffData.transport_allowance || 900);
+      }
     }
-  }, [selectedStaff, selectedMonth]);
+  }, [selectedStaff, selectedMonth, staff]);
 
   // 変更があるかチェック
   useEffect(() => {
@@ -52,16 +54,16 @@ const ShiftManagement = () => {
       const response = await fetch(`/api/staff-wages?staffId=${selectedStaff}`);
       if (response.ok) {
         const data = await response.json();
-        setHourlyWage(data.data.hourly_wage || 900);
-        setTransportAllowance(data.data.transport_allowance || 313);
-        setTempHourlyWage(data.data.hourly_wage || 900);
-        setTempTransportAllowance(data.data.transport_allowance || 313);
+        setHourlyWage(data.data.hourly_wage || 1500);
+        setTransportAllowance(data.data.transport_allowance || 900);
+        setTempHourlyWage(data.data.hourly_wage || 1500);
+        setTempTransportAllowance(data.data.transport_allowance || 900);
       }
     } catch (err) {
       console.error('給与設定取得エラー:', err);
       // デフォルト値を使用
-      setHourlyWage(900);
-      setTransportAllowance(313);
+      setHourlyWage(1500);
+      setTransportAllowance(900);
     }
   };
 
@@ -75,19 +77,32 @@ const ShiftManagement = () => {
       if (response.ok) {
         const data = await response.json();
         
+        console.log('取得したシフトデータ:', data);
+        console.log('shifts配列:', data.data.shifts);
+        
         // APIデータをコンポーネントの形式に変換
         const shiftData = {};
         data.data.shifts.forEach(record => {
-          const dateKey = record.date.split('T')[0];
+          console.log('処理中のレコード:', record);
+          
+          // 日付を文字列として使用（タイムゾーン変換なし）
+          const dateKey = record.date; // すでにYYYY-MM-DD形式の文字列
+          
+          console.log('dateKey:', dateKey);
+          
           shiftData[dateKey] = {
-            startTime: record.start_time,
-            endTime: record.end_time,
-            transportCost: record.transport_cost
+            startTime: record.start_time || '',
+            endTime: record.end_time || '',
+            transportCost: record.transport_cost || transportAllowance
           };
+          
+          console.log('変換後:', shiftData[dateKey]);
         });
         
+        console.log('最終的なshiftData:', shiftData);
+        
         setShifts(shiftData);
-        setSavedShifts(shiftData); // 保存済みデータとして記録
+        setSavedShifts(JSON.parse(JSON.stringify(shiftData))); // 深いコピーを保存
       }
     } catch (err) {
       console.error('シフト取得エラー:', err);
@@ -137,12 +152,18 @@ const ShiftManagement = () => {
     return '';
   };
 
-  // 日付キーを生成
+  // 日付キーを生成（タイムゾーン考慮）
   const getDateKey = (day) => {
     const year = selectedMonth.getFullYear();
-    const month = String(selectedMonth.getMonth() + 1).padStart(2, '0');
-    const dayStr = String(day).padStart(2, '0');
-    return `${year}-${month}-${dayStr}`;
+    const month = selectedMonth.getMonth(); // 0-indexed
+    const date = new Date(year, month, day);
+    
+    // ローカル日付をYYYY-MM-DD形式で取得
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    
+    return `${y}-${m}-${d}`;
   };
 
   // 勤務時間を計算
@@ -262,8 +283,7 @@ const ShiftManagement = () => {
     setFormData({ startTime: '', endTime: '', transportCost: 0 });
   };
 
-  // ★★★ 修正箇所 ★★★
-  // 一括保存（月単位での保存に修正）
+  // シフト変更処理
   const handleShiftChange = (day, field, value) => {
     const dateKey = getDateKey(day);
     const currentShift = shifts[dateKey] || {};
@@ -294,42 +314,57 @@ const ShiftManagement = () => {
       }));
     }
   };
+
+  // 一括保存
   const handleBulkSave = async () => {
     setIsSaving(true);
     const year = selectedMonth.getFullYear();
     const month = selectedMonth.getMonth() + 1;
 
-    // APIに送信するため、現在のシフトデータを配列形式に変換
-    const shiftsPayload = Object.entries(shifts).map(([date, shift]) => ({
-      date: date,
-      start_time: shift.startTime,
-      end_time: shift.endTime,
-      transport_cost: shift.transportCost || 0
-    }));
+    // APIに送信するため、現在のシフトデータをオブジェクト形式に変換
+    const shiftsPayload = {};
+    Object.entries(shifts).forEach(([date, shift]) => {
+      shiftsPayload[date] = {
+        start_time: shift.startTime,
+        end_time: shift.endTime,
+        type: 'work'
+      };
+    });
 
     try {
-      // 1ヶ月分のデータをまとめて送信する新しいAPIエンドポイントを想定
-      const response = await fetch('/api/shifts/bulk', {
-        method: 'POST',
+      console.log('送信データ:', {
+        staff_id: selectedStaff,
+        year: year,
+        month: month,
+        shifts: shiftsPayload
+      });
+
+      // /api/shifts の PUT メソッドを使用（月次一括登録）
+      const response = await fetch('/api/shifts', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           staff_id: selectedStaff,
           year: year,
           month: month,
-          shifts: shiftsPayload // その月の全てのシフトデータを配列で渡す
+          shifts: shiftsPayload
         })
       });
 
+      const data = await response.json();
+      console.log('APIレスポンス:', data);
+
       if (!response.ok) {
-        // レスポンスが正常でない場合にエラーを投げる
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'サーバーでの保存に失敗しました。');
+        throw new Error(data.error || 'サーバーでの保存に失敗しました。');
       }
 
       // 保存が成功したら、ローカルの保存済みデータを現在のシフト状態で更新
       setSavedShifts(shifts);
       setHasUnsavedChanges(false);
       showMessage('success', '1ヶ月分のシフトをまとめて保存しました');
+      
+      // 保存後、データを再取得して最新状態を反映
+      await fetchShifts();
 
     } catch (err) {
       console.error('一括保存エラー:', err);
@@ -372,6 +407,8 @@ const ShiftManagement = () => {
       newDate.setMonth(newDate.getMonth() + delta);
       return newDate;
     });
+    // 月変更後、データを再取得
+    setHasUnsavedChanges(false);
   };
 
   const monthlyTotals = calculateMonthlyTotals();
@@ -387,77 +424,6 @@ const ShiftManagement = () => {
         </div>
       )}
 
-      {/* 給与設定パネル */}
-      <div className="shift-settings-panel">
-        <div className="shift-settings-header">
-          <h3>給与・交通費設定</h3>
-          {!isEditingSettings ? (
-            <button 
-              onClick={() => setIsEditingSettings(true)} 
-              className="shift-btn shift-btn-edit-settings"
-            >
-              <Edit2 size={16} />
-              編集
-            </button>
-          ) : (
-            <div className="shift-settings-actions">
-              <button 
-                onClick={cancelWageSettings} 
-                className="shift-btn shift-btn-cancel"
-              >
-                キャンセル
-              </button>
-              <button 
-                onClick={saveWageSettings} 
-                className="shift-btn shift-btn-save"
-              >
-                <Save size={16} />
-                保存
-              </button>
-            </div>
-          )}
-        </div>
-        
-        <div className="shift-settings-content">
-          <div className="shift-setting-item">
-            <label>時給（円）</label>
-            {!isEditingSettings ? (
-              <div className="shift-setting-display">¥ {hourlyWage.toLocaleString()}</div>
-            ) : (
-              <input
-                type="number"
-                value={tempHourlyWage || ''}
-                onChange={(e) => setTempHourlyWage(e.target.value === '' ? 0 : Number(e.target.value))}
-                className="shift-input-setting"
-              />
-            )}
-          </div>
-          
-          <div className="shift-setting-item">
-            <label>デフォルト交通費（円）</label>
-            {!isEditingSettings ? (
-              <div className="shift-setting-display">¥ {transportAllowance.toLocaleString()}</div>
-            ) : (
-              <input
-                type="number"
-                value={tempTransportAllowance || ''}
-                onChange={(e) => setTempTransportAllowance(e.target.value === '' ? 0 : Number(e.target.value))}
-                className="shift-input-setting"
-              />
-            )}
-          </div>
-          
-          {selectedStaff && (
-            <div className="shift-setting-item">
-              <label>対象スタッフ</label>
-              <div className="shift-setting-display">
-                {staff.find(s => s.staff_id === selectedStaff)?.name || '-'}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* ヘッダー */}
       <div className="shift-header">
         <div className="shift-controls">
@@ -470,6 +436,8 @@ const ShiftManagement = () => {
                   return;
                 }
                 setSelectedStaff(e.target.value);
+                setHasUnsavedChanges(false);
+                // スタッフ変更時、useEffectが自動的にfetchShifts()を呼び出すのでリセット不要
               }}
               className="shift-select"
             >
@@ -506,7 +474,7 @@ const ShiftManagement = () => {
         </div>
       </div>
       
-      {/* ★★★ シフト表の構造を修正 ★★★ */}
+      {/* シフト表 */}
       <div className="shift-table-container">
         <table className="shift-table">
           <thead>
@@ -518,7 +486,6 @@ const ShiftManagement = () => {
               <th className="shift-th-hours">時間</th>
               <th className="shift-th-transport">交通費</th>
               <th className="shift-th-wage">日当 (時給{hourlyWage}円)</th>
-              {/* 「操作」列を削除 */}
             </tr>
           </thead>
           <tbody>

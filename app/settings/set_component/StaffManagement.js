@@ -16,7 +16,9 @@ const StaffManagement = () => {
     name: '',
     color: '#FF69B4',
     role: 'セラピスト',
-    is_active: true
+    is_active: true,
+    hourly_wage: 1500,
+    transport_allowance: 900
   });
 
   // カラーパレット
@@ -51,10 +53,10 @@ const StaffManagement = () => {
       console.error('スタッフデータの取得に失敗:', err);
       // デモデータを使用
       setStaff([
-        { staff_id: '1', name: '佐野 智里', color: '#FF69B4', role: 'セラピスト', is_active: true },
-        { staff_id: '2', name: '星野 加奈恵', color: '#9370DB', role: 'セラピスト', is_active: true },
-        { staff_id: '3', name: '吉羽 顕功', color: '#4169E1', role: 'マネージャー', is_active: true },
-        { staff_id: '4', name: '吉羽 皓紀', color: '#32CD32', role: 'セラピスト', is_active: false },
+        { staff_id: '1', name: '佐野 智里', color: '#FF69B4', role: 'セラピスト', is_active: true, hourly_wage: 1500, transport_allowance: 900 },
+        { staff_id: '2', name: '星野 加奈恵', color: '#9370DB', role: 'セラピスト', is_active: true, hourly_wage: 1500, transport_allowance: 900 },
+        { staff_id: '3', name: '吉羽 顕功', color: '#4169E1', role: 'マネージャー', is_active: true, hourly_wage: 1500, transport_allowance: 900 },
+        { staff_id: '4', name: '吉羽 皓紀', color: '#32CD32', role: 'セラピスト', is_active: false, hourly_wage: 1500, transport_allowance: 900 },
       ]);
     } finally {
       setIsLoading(false);
@@ -120,7 +122,9 @@ const StaffManagement = () => {
       name: staffMember.name,
       color: staffMember.color,
       role: staffMember.role,
-      is_active: staffMember.is_active
+      is_active: staffMember.is_active,
+      hourly_wage: staffMember.hourly_wage || 1500,
+      transport_allowance: staffMember.transport_allowance || 900
     });
   };
 
@@ -136,10 +140,13 @@ const StaffManagement = () => {
     setError('');
 
     try {
-      const response = await fetch(`/api/staff/${staffId}`, {
+      const response = await fetch(`/api/staff`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          staff_id: staffId,
+          ...formData
+        })
       });
 
       if (response.ok) {
@@ -172,7 +179,7 @@ const StaffManagement = () => {
     setError('');
 
     try {
-      const response = await fetch(`/api/staff/${staffId}`, {
+      const response = await fetch(`/api/staff?id=${staffId}`, {
         method: 'DELETE'
       });
 
@@ -198,7 +205,9 @@ const StaffManagement = () => {
       name: '',
       color: '#FF69B4',
       role: 'セラピスト',
-      is_active: true
+      is_active: true,
+      hourly_wage: 1500,
+      transport_allowance: 900
     });
   };
 
@@ -272,6 +281,30 @@ const StaffManagement = () => {
             </div>
 
             <div className="settings__form-group">
+              <label className="settings__form-label">時給（円）</label>
+              <input
+                type="number"
+                name="hourly_wage"
+                value={formData.hourly_wage}
+                onChange={handleInputChange}
+                className="settings__form-input"
+                placeholder="1500"
+              />
+            </div>
+
+            <div className="settings__form-group">
+              <label className="settings__form-label">交通費（円）</label>
+              <input
+                type="number"
+                name="transport_allowance"
+                value={formData.transport_allowance}
+                onChange={handleInputChange}
+                className="settings__form-input"
+                placeholder="900"
+              />
+            </div>
+
+            <div className="settings__form-group">
               <label className="settings__form-label">カラー</label>
               <div className="settings__color-picker">
                 {colorOptions.map(color => (
@@ -328,6 +361,8 @@ const StaffManagement = () => {
               <th>カラー</th>
               <th>スタッフ名</th>
               <th>役職</th>
+              <th>時給</th>
+              <th>交通費</th>
               <th>ステータス</th>
               <th>操作</th>
             </tr>
@@ -370,6 +405,26 @@ const StaffManagement = () => {
                         <option value="研修生">研修生</option>
                         <option value="受付">受付</option>
                       </select>
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        name="hourly_wage"
+                        value={formData.hourly_wage}
+                        onChange={handleInputChange}
+                        className="settings__form-input settings__form-input--inline"
+                        placeholder="1500"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        type="number"
+                        name="transport_allowance"
+                        value={formData.transport_allowance}
+                        onChange={handleInputChange}
+                        className="settings__form-input settings__form-input--inline"
+                        placeholder="900"
+                      />
                     </td>
                     <td>
                       <label className="settings__form-label--checkbox">
@@ -415,6 +470,8 @@ const StaffManagement = () => {
                       {member.name}
                     </td>
                     <td>{member.role}</td>
+                    <td>¥{(member.hourly_wage || 1500).toLocaleString()}</td>
+                    <td>¥{(member.transport_allowance || 900).toLocaleString()}</td>
                     <td>
                       <span className={`settings__status-badge ${member.is_active ? 'settings__status-badge--active' : 'settings__status-badge--inactive'}`}>
                         {member.is_active ? '有効' : '無効'}

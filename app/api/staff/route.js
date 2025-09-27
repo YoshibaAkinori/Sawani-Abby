@@ -13,6 +13,8 @@ export async function GET(request) {
         name,
         color,
         role,
+        hourly_wage,
+        transport_allowance,
         is_active,
         created_at
       FROM staff
@@ -42,6 +44,8 @@ export async function POST(request) {
       name,
       color,
       role,
+      hourly_wage = 1500,
+      transport_allowance = 900,
       is_active = true
     } = body;
 
@@ -73,9 +77,11 @@ export async function POST(request) {
         name,
         color,
         role,
+        hourly_wage,
+        transport_allowance,
         is_active
-      ) VALUES (UUID(), ?, ?, ?, ?)`,
-      [name, color, role, is_active]
+      ) VALUES (UUID(), ?, ?, ?, ?, ?, ?)`,
+      [name, color, role, hourly_wage, transport_allowance, is_active]
     );
 
     return NextResponse.json({
@@ -85,6 +91,84 @@ export async function POST(request) {
     });
   } catch (error) {
     console.error('スタッフ登録エラー:', error);
+    return NextResponse.json(
+      { success: false, error: 'データベースエラー' },
+      { status: 500 }
+    );
+  }
+}
+
+// スタッフ更新
+export async function PUT(request) {
+  try {
+    const pool = await getConnection();
+    const body = await request.json();
+
+    const {
+      staff_id,
+      name,
+      color,
+      role,
+      hourly_wage,
+      transport_allowance,
+      is_active
+    } = body;
+
+    // バリデーション
+    if (!staff_id || !name || !color || !role) {
+      return NextResponse.json(
+        { success: false, error: '必須項目を入力してください' },
+        { status: 400 }
+      );
+    }
+
+    // 更新
+    await pool.execute(
+      `UPDATE staff 
+       SET name = ?, color = ?, role = ?, 
+           hourly_wage = ?, transport_allowance = ?, is_active = ?
+       WHERE staff_id = ?`,
+      [name, color, role, hourly_wage, transport_allowance, is_active, staff_id]
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: 'スタッフ情報を更新しました'
+    });
+  } catch (error) {
+    console.error('スタッフ更新エラー:', error);
+    return NextResponse.json(
+      { success: false, error: 'データベースエラー' },
+      { status: 500 }
+    );
+  }
+}
+
+// スタッフ削除
+export async function DELETE(request) {
+  try {
+    const pool = await getConnection();
+    const { searchParams } = new URL(request.url);
+    const staffId = searchParams.get('id');
+
+    if (!staffId) {
+      return NextResponse.json(
+        { success: false, error: 'スタッフIDが必要です' },
+        { status: 400 }
+      );
+    }
+
+    await pool.execute(
+      'DELETE FROM staff WHERE staff_id = ?',
+      [staffId]
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: 'スタッフを削除しました'
+    });
+  } catch (error) {
+    console.error('スタッフ削除エラー:', error);
     return NextResponse.json(
       { success: false, error: 'データベースエラー' },
       { status: 500 }
