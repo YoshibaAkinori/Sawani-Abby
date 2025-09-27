@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Settings, Users, Clock, Sparkles, Settings2, Calculator, Gift, Database, FileText } from 'lucide-react';
 import StaffManagement from './set_component/StaffManagement';
+import ShiftManagement from './set_component/ShiftManagement';
 import './settings.css';
 
 const SettingsPage = () => {
@@ -26,8 +27,7 @@ const SettingsPage = () => {
           <div>
             <h2 className="settings__content-title">スタッフ管理</h2>
             <p className="settings__content-description">
-              スタッフの基本情報の設定を行います。新規スタッフの登録から既存スタッフの情報編集まで一元管理できます。
-            </p>
+              スタッフの基本情報の設定を行います。新規スタッフの登録から既存スタッフの情報編集まで一元管理できます。</p>
             <StaffManagement />
           </div>
         );
@@ -37,7 +37,8 @@ const SettingsPage = () => {
             <h2 className="settings__content-title">シフト管理</h2>
             <div className="settings__content-card">
               <p className="settings__content-description">スタッフのシフトスケジュール、勤務時間の設定・管理を行います。週間・月間シフトの作成から勤務実績の確認まで対応します。</p>
-              <div className="settings__content-status">※ 機能実装中</div>
+                <ShiftManagement/>
+              
             </div>
           </div>
         );
