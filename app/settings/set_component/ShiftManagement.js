@@ -93,6 +93,7 @@ const ShiftManagement = () => {
           shiftData[dateKey] = {
             startTime: record.start_time || '',
             endTime: record.end_time || '',
+            breakMinutes: record.break_minutes || 0,
             transportCost: record.transport_cost || transportAllowance
           };
           
@@ -166,8 +167,8 @@ const ShiftManagement = () => {
     return `${y}-${m}-${d}`;
   };
 
-  // 勤務時間を計算
-  const calculateWorkHours = (startTime, endTime) => {
+  // 勤務時間を計算（休憩時間を考慮）
+  const calculateWorkHours = (startTime, endTime, breakMinutes = 0) => {
     if (!startTime || !endTime) return 0;
     
     const [startHour, startMin] = startTime.split(':').map(Number);
@@ -176,10 +177,36 @@ const ShiftManagement = () => {
     const startMinutes = startHour * 60 + startMin;
     const endMinutes = endHour * 60 + endMin;
     
-    return (endMinutes - startMinutes) / 60;
+    return ((endMinutes - startMinutes) - breakMinutes) / 60;
   };
 
-  // 時給を計算
+  // 分を時:分形式に変換
+  const formatMinutesToHHMM = (minutes) => {
+    if (!minutes || minutes <= 0) return '';
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    if (h > 0) {
+      return `${h}:${String(m).padStart(2, '0')}`;
+    }
+    return `0:${String(m).padStart(2, '0')}`;
+  };
+
+  // 時:分形式を分に変換
+  const parseHHMMToMinutes = (timeStr) => {
+    if (!timeStr) return 0;
+    const [h, m] = timeStr.split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
+  };
+
+  // 時間を時:分形式に変換
+  const formatHoursToHHMM = (hours) => {
+    if (hours <= 0) return '0:00';
+    const h = Math.floor(hours);
+    const m = Math.round((hours - h) * 60);
+    return `${h}:${String(m).padStart(2, '0')}`;
+  };
+
+  // 時給を計算（休憩時間を考慮）
   const calculateDailyWage = (hours) => {
     return Math.floor(hours * hourlyWage);
   };
@@ -195,7 +222,7 @@ const ShiftManagement = () => {
       const dateKey = getDateKey(day);
       const shift = shifts[dateKey];
       if (shift) {
-        const hours = calculateWorkHours(shift.startTime, shift.endTime);
+        const hours = calculateWorkHours(shift.startTime, shift.endTime, shift.breakMinutes || 0);
         const wage = calculateDailyWage(hours);
         totalHours += hours;
         totalTransport += shift.transportCost || 0;
@@ -295,7 +322,7 @@ const ShiftManagement = () => {
       newShiftData.transportCost = transportAllowance;
     }
 
-    // transportCostを数値に変換
+    // transportCostを数値に変換（breakMinutesは既に数値として渡される）
     if (field === 'transportCost') {
       newShiftData.transportCost = value === '' ? 0 : Number(value);
     }
@@ -327,6 +354,8 @@ const ShiftManagement = () => {
       shiftsPayload[date] = {
         start_time: shift.startTime,
         end_time: shift.endTime,
+        break_minutes: shift.breakMinutes || 0,
+        transport_cost: shift.transportCost || 0,
         type: 'work'
       };
     });
@@ -483,6 +512,7 @@ const ShiftManagement = () => {
               <th className="shift-th-weekday">曜日</th>
               <th className="shift-th-time">出勤</th>
               <th className="shift-th-time">退勤</th>
+              <th className="shift-th-hours">休憩</th>
               <th className="shift-th-hours">時間</th>
               <th className="shift-th-transport">交通費</th>
               <th className="shift-th-wage">日当 (時給{hourlyWage}円)</th>
@@ -493,7 +523,7 @@ const ShiftManagement = () => {
               const dateKey = getDateKey(day);
               const shift = shifts[dateKey];
               const isChanged = JSON.stringify(shift) !== JSON.stringify(savedShifts[dateKey]);
-              const workHours = calculateWorkHours(shift?.startTime, shift?.endTime);
+              const workHours = calculateWorkHours(shift?.startTime, shift?.endTime, shift?.breakMinutes || 0);
               const dailyWage = calculateDailyWage(workHours);
 
               return (
@@ -506,7 +536,18 @@ const ShiftManagement = () => {
                   <td>
                     <input type="time" value={shift?.endTime || ''} onChange={(e) => handleShiftChange(day, 'endTime', e.target.value)} className="shift-input-time" />
                   </td>
-                  <td>{workHours > 0 ? workHours.toFixed(2) : '0.00'}</td>
+                  <td>
+                    <input 
+                      type="time" 
+                      value={formatMinutesToHHMM(shift?.breakMinutes || 0)} 
+                      onChange={(e) => {
+                        const minutes = parseHHMMToMinutes(e.target.value);
+                        handleShiftChange(day, 'breakMinutes', minutes);
+                      }} 
+                      className="shift-input-time" 
+                    />
+                  </td>
+                  <td>{workHours > 0 ? formatHoursToHHMM(workHours) : '0:00'}</td>
                   <td>
                     <input type="number" value={shift?.transportCost ?? ''} onChange={(e) => handleShiftChange(day, 'transportCost', e.target.value)} className="shift-input-transport" placeholder={transportAllowance} />
                   </td>
@@ -517,13 +558,13 @@ const ShiftManagement = () => {
           </tbody>
           <tfoot>
             <tr className="shift-total-row">
-              <td colSpan="4" className="shift-total-label">合計時間</td>
-              <td>{monthlyTotals.totalHours.toFixed(2)}</td>
+              <td colSpan="5" className="shift-total-label">合計時間</td>
+              <td>{formatHoursToHHMM(monthlyTotals.totalHours)}</td>
               <td className="shift-total-label">交通費</td>
               <td>¥ {monthlyTotals.totalTransport.toLocaleString()}</td>
             </tr>
             <tr className="shift-total-row">
-              <td colSpan="6" className="shift-total-label">合計金額 (交通費込)</td>
+              <td colSpan="7" className="shift-total-label">合計金額 (交通費込)</td>
               <td className="shift-total-final">¥ {monthlyTotals.grandTotal.toLocaleString()}</td>
             </tr>
           </tfoot>

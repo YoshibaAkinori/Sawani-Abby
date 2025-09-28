@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Calendar, ChevronLeft, ChevronRight, Settings, User, Clock, Users, BarChart3, CreditCard } from 'lucide-react';
 import BookingModal from './components/BookingModal';
@@ -9,25 +9,67 @@ import './global.css';
 const SalonBoard = () => {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState('2025-09-20');
-  const [activeModal, setActiveModal] = useState(null); // 'booking', 'new-reservation', 'new-schedule', 'calendar'
+  const [activeModal, setActiveModal] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  // シフトとスタッフのデータ
+  const [staffShifts, setStaffShifts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // 設定DBスタッフマスタ
-  const [staffDatabase, setStaffDatabase] = useState([
-    { id: '0001', name: '佐野 智里', color: '#FF69B4', isActive: true, holidays: [] },
-    { id: '0002', name: '星野 加奈江', color: '#9370DB', isActive: true, holidays: [] },
-    { id: '0003', name: '吉羽 顕功', color: '#4169E1', isActive: true, holidays: [] },
-    { id: '0004', name: '吉羽 皓紀', color: '#32CD32', isActive: true, holidays: ['2025-09-20', '2025-09-21'] },
-  ]);
+
+  // シフトデータを取得
+  useEffect(() => {
+    fetchShifts();
+  }, [selectedDate]);
+
+  const fetchShifts = async () => {
+    setIsLoading(true);
+    try {
+      const [year, month] = selectedDate.split('-');
+      
+      // 全スタッフを取得
+      const staffResponse = await fetch('/api/staff');
+      const staffData = await staffResponse.json();
+      const allStaff = staffData.data || [];
+      
+      // 各スタッフのシフトを取得
+      const shiftsPromises = allStaff.map(async (staff) => {
+        const shiftResponse = await fetch(`/api/shifts?staffId=${staff.staff_id}&year=${year}&month=${month}`);
+        const shiftData = await shiftResponse.json();
+        
+        // その日のシフトを探す
+        const dayShift = shiftData.data?.shifts?.find(s => s.date === selectedDate);
+        
+        return {
+          ...staff,
+          shift: dayShift || null,
+          hasShift: !!dayShift
+        };
+      });
+      
+      const staffWithShifts = await Promise.all(shiftsPromises);
+      setStaffShifts(staffWithShifts);
+    } catch (err) {
+      console.error('シフト取得エラー:', err);
+      // エラー時はデモデータを使用
+      setStaffShifts(staffDatabase.map(s => ({
+        ...s,
+        shift: null,
+        hasShift: false
+      })));
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // 予約DB（予約マスタ）
-  const [bookingsDatabase, setBookingsDatabase] = useState([
-    { id: 1, staffId: '0001', bed: 'ベッド2', date: '2025-09-20', startTime: '11:00', endTime: '13:00', service: 'フェイシャル', client: '田中 花子', serviceType: 'フェイシャル', status: 'confirmed', phoneNumber: '090-1234-5678', note: '初回のお客様' },
-    { id: 2, staffId: '0001', bed: 'ベッド2', date: '2025-09-20', startTime: '14:00', endTime: '16:00', service: 'ボディトリート', client: '山田 太郎', serviceType: 'ボディトリート', status: 'confirmed', phoneNumber: '080-9876-5432', note: 'リピーター' },
-    { id: 3, staffId: '0002', bed: 'ベッド1', date: '2025-09-20', startTime: '10:00', endTime: '12:00', service: 'フェイシャル', client: '鈴木 美香', serviceType: 'フェイシャル', status: 'confirmed', phoneNumber: '070-2468-1357', note: '' },
-    { id: 4, staffId: '0002', bed: 'ベッド1', date: '2025-09-20', startTime: '15:00', endTime: '17:30', service: 'ボディトリート', client: '佐藤 恵子', serviceType: 'ボディトリート', status: 'confirmed', phoneNumber: '090-3691-2584', note: '肩こりがひどいとのこと' },
-    { id: 5, staffId: '0003', bed: 'ベッド2', date: '2025-09-20', startTime: '18:30', endTime: '19:30', service: 'フェイシャル', client: '高橋 さくら', serviceType: 'フェイシャル', status: 'confirmed', phoneNumber: '080-7531-9642', note: '敏感肌' },
+  const [bookingsDatabase] = useState([
+    { id: 1, staffId: '0001', bed: 'ベッド2', date: '2025-09-20', startTime: '11:00', endTime: '13:00', service: 'フェイシャル', client: '田中 花子', serviceType: 'フェイシャル', status: 'confirmed' },
+    { id: 2, staffId: '0001', bed: 'ベッド2', date: '2025-09-20', startTime: '14:00', endTime: '16:00', service: 'ボディトリート', client: '山田 太郎', serviceType: 'ボディトリート', status: 'confirmed' },
+    { id: 3, staffId: '0002', bed: 'ベッド1', date: '2025-09-20', startTime: '10:00', endTime: '12:00', service: 'フェイシャル', client: '鈴木 美香', serviceType: 'フェイシャル', status: 'confirmed' },
+    { id: 4, staffId: '0002', bed: 'ベッド1', date: '2025-09-20', startTime: '15:00', endTime: '17:30', service: 'ボディトリート', client: '佐藤 恵子', serviceType: 'ボディトリート', status: 'confirmed' },
+    { id: 5, staffId: '0003', bed: 'ベッド2', date: '2025-09-20', startTime: '18:30', endTime: '19:30', service: 'フェイシャル', client: '高橋 さくら', serviceType: 'フェイシャル', status: 'confirmed' },
   ]);
 
   const bedCount = 2;
@@ -42,19 +84,17 @@ const SalonBoard = () => {
   }
 
   const getBookingsByDate = (date) => bookingsDatabase.filter(booking => booking.date === date);
-  const getActiveStaff = () => staffDatabase.filter(staff => staff.isActive);
 
   // 時間ヘッダー用の無記名スタッフデータ
   const headerRowData = {
     id: 'HEADER_ROW',
-    name: '', // 空欄
-    color: 'transparent',
-    holidays: [],
+    staff_id: 'HEADER_ROW',
+    name: '',
+    color: 'transparent'
   };
   
-  const displayStaff = [headerRowData, ...getActiveStaff()];
+  const displayStaff = [headerRowData, ...staffShifts.filter(s => s.is_active)];
   const bookings = getBookingsByDate(selectedDate);
-  const activeStaff = getActiveStaff();
 
   const timeToMinutes = (time) => {
     const [hours, minutes] = time.split(':').map(Number);
@@ -85,9 +125,34 @@ const SalonBoard = () => {
     setSelectedDate(currentDate.toISOString().split('T')[0]);
   };
 
+  // スロットがシフト時間内かチェック（マネージャーは常にtrue）
+  const isSlotInShiftTime = (staff, timeSlot) => {
+    // マネージャーは常に予約可能
+    if (staff.role === 'マネージャー') return true;
+    
+    if (!staff.shift || !staff.shift.start_time || !staff.shift.end_time) return false;
+    
+    const slotMinutes = timeToMinutes(timeSlot);
+    const startMinutes = timeToMinutes(staff.shift.start_time);
+    const endMinutes = timeToMinutes(staff.shift.end_time);
+    
+    return slotMinutes >= startMinutes && slotMinutes < endMinutes;
+  };
+
+  // 空きスロットの判定
+  const isSlotAvailable = (staffId, timeSlot) => {
+    const slotMinutes = timeToMinutes(timeSlot);
+    return !bookings.some(booking => {
+      if (booking.staffId !== staffId) return false;
+      const startMinutes = timeToMinutes(booking.startTime);
+      const endMinutes = timeToMinutes(booking.endTime);
+      return slotMinutes >= startMinutes && slotMinutes < endMinutes;
+    });
+  };
+
   // 空きスロットクリック処理
   const handleSlotClick = (staffId, timeSlot, slotIndex) => {
-    const staff = activeStaff.find(s => s.id === staffId);
+    const staff = staffShifts.find(s => s.staff_id === staffId);
     if (!staff) return;
     
     setSelectedSlot({
@@ -108,7 +173,6 @@ const SalonBoard = () => {
 
   // 設定サイドバーの開閉
   const toggleSettings = () => {
-    // 設定ページに遷移
     router.push('/settings');
   };
 
@@ -123,23 +187,9 @@ const SalonBoard = () => {
     setActiveModal(null);
   };
 
-  // 空きスロットの判定（簡易版）
-  const isSlotAvailable = (staffId, timeSlot) => {
-    const slotMinutes = timeToMinutes(timeSlot);
-    return !bookings.some(booking => {
-      if (booking.staffId !== staffId) return false;
-      const startMinutes = timeToMinutes(booking.startTime);
-      const endMinutes = timeToMinutes(booking.endTime);
-      return slotMinutes >= startMinutes && slotMinutes < endMinutes;
-    });
-  };
-
   // ページ遷移ハンドラー
   const handlePageChange = (page) => {
-    // Next.js App Router を使用してページ遷移
     router.push(`/${page}`);
-    
-    // モーダルとサイドバーを閉じる
     setActiveModal(null);
     setSidebarOpen(false);
   };
@@ -160,10 +210,7 @@ const SalonBoard = () => {
               <Calendar />
             </button>
             <div className="salon-board__date-navigation">
-              <button
-                onClick={() => changeDate(-1)}
-                className="salon-board__date-nav-btn"
-              >
+              <button onClick={() => changeDate(-1)} className="salon-board__date-nav-btn">
                 <ChevronLeft />
               </button>
               <span className="salon-board__date-display">
@@ -174,17 +221,11 @@ const SalonBoard = () => {
                   weekday: 'short' 
                 })}
               </span>
-              <button
-                onClick={() => changeDate(1)}
-                className="salon-board__date-nav-btn"
-              >
+              <button onClick={() => changeDate(1)} className="salon-board__date-nav-btn">
                 <ChevronRight />
               </button>
             </div>
-            <button 
-              className="salon-board__settings-btn"
-              onClick={toggleSettings}
-            >
+            <button className="salon-board__settings-btn" onClick={toggleSettings}>
               <Settings />
             </button>
           </div>
@@ -196,7 +237,7 @@ const SalonBoard = () => {
           <div className="salon-board__db-info-content">
             <div className="salon-board__db-info-item">
               <User />
-              <span>スタッフ: {activeStaff.length}名</span>
+              <span>スタッフ: {staffShifts.filter(s => s.is_active).length}名</span>
             </div>
             <div className="salon-board__db-info-item">
               <Clock />
@@ -207,7 +248,6 @@ const SalonBoard = () => {
 
         {/* スケジュール表示エリア */}
         <div className="salon-board__schedule-area">
-          {/* モーダル表示時：スタッフスケジュールのみ・独立スクロール */}
           {activeModal && (
             <>
               <div className="salon-board__staff-schedule-container">
@@ -221,14 +261,15 @@ const SalonBoard = () => {
                       <div className="salon-board__rows">
                         {displayStaff.map(staff => {
                           const isHeader = staff.id === 'HEADER_ROW';
-                          const isHoliday = !isHeader && staff.holidays?.includes(selectedDate);
+                          // マネージャーは常に勤務扱い
+                          const isHoliday = !isHeader && staff.role !== 'マネージャー' && !staff.hasShift;
                           
                           const rowClassName = `salon-board__row ${
                             isHeader ? 'salon-board__row--is-header' : ''
                           } ${isHoliday ? 'salon-board__row--holiday' : ''}`;
 
                           return (
-                            <div key={staff.id} className={rowClassName}>
+                            <div key={staff.staff_id || staff.id} className={rowClassName}>
                               <div className="salon-board__row-content">
                                 <div className="salon-board__row-label">
                                   {!isHeader && (
@@ -243,15 +284,21 @@ const SalonBoard = () => {
                                 <div className="salon-board__timeline">
                                   <div className="salon-board__grid-lines">
                                     {timeSlots.map((time, slotIndex) => {
-                                      const isAvailable = !isHeader && !isHoliday && isSlotAvailable(staff.id, time);
+                                      const isInShiftTime = !isHeader && !isHoliday && isSlotInShiftTime(staff, time);
+                                      const isAvailable = isInShiftTime && isSlotAvailable(staff.staff_id, time);
+                                      const isOutOfShift = !isHeader && !isHoliday && !isInShiftTime;
+                                      
                                       return (
                                         <div 
                                           key={time} 
                                           className={`salon-board__grid-line ${
                                             isAvailable ? 'salon-board__clickable-slot' : ''
                                           }`}
-                                          onClick={() => isAvailable && handleSlotClick(staff.id, time, slotIndex)}
-                                          style={{ cursor: isAvailable ? 'pointer' : 'default' }}
+                                          onClick={() => isAvailable && handleSlotClick(staff.staff_id, time, slotIndex)}
+                                          style={{ 
+                                            cursor: isAvailable ? 'pointer' : 'default',
+                                            backgroundColor: isOutOfShift ? '#f5f5f5' : 'transparent'
+                                          }}
                                         />
                                       );
                                     })}
@@ -268,7 +315,7 @@ const SalonBoard = () => {
                                       </div>
                                       <div className="time-header__bottom-row">
                                         {timeSlots.map(time => (
-                                          <div key={`bottom-${time}`} className="time-header__cell time-header__cell--minute" >
+                                          <div key={`bottom-${time}`} className="time-header__cell time-header__cell--minute">
                                             {time.split(':')[1]}
                                           </div>
                                         ))}
@@ -276,7 +323,7 @@ const SalonBoard = () => {
                                     </div>
                                   ) : (
                                     !isHoliday && bookings
-                                      .filter(booking => booking.staffId === staff.id)
+                                      .filter(booking => booking.staffId === staff.staff_id)
                                       .map(booking => {
                                         const { left, width } = calculateBookingPosition(booking.startTime, booking.endTime);
                                         const serviceColorClass = getServiceColorClass(booking.serviceType);
@@ -301,7 +348,6 @@ const SalonBoard = () => {
                 </div>
               </div>
 
-              {/* モーダル表示エリア - 固定位置 */}
               <div className="salon-board__modal-area">
                 <BookingModal 
                   activeModal={activeModal}
@@ -313,14 +359,11 @@ const SalonBoard = () => {
             </>
           )}
 
-          {/* モーダル非表示時：スタッフとベッドスケジュールを一体でスクロール */}
           {!activeModal && (
             <div className="salon-board__unified-schedule-container">
               <div className="salon-board__main-scroll-container">
                 <div className="salon-board__scrollable-content">
                   <div className="salon-board__schedule-grids">
-                    
-                    {/* スタッフ別セクション */}
                     <div className="salon-board__section">
                       <h3 className="salon-board__section-title">
                         <User />
@@ -329,14 +372,15 @@ const SalonBoard = () => {
                       <div className="salon-board__rows">
                         {displayStaff.map(staff => {
                           const isHeader = staff.id === 'HEADER_ROW';
-                          const isHoliday = !isHeader && staff.holidays?.includes(selectedDate);
+                          // マネージャーは常に勤務扱い
+                          const isHoliday = !isHeader && staff.role !== 'マネージャー' && !staff.hasShift;
                           
                           const rowClassName = `salon-board__row ${
                             isHeader ? 'salon-board__row--is-header' : ''
                           } ${isHoliday ? 'salon-board__row--holiday' : ''}`;
 
                           return (
-                            <div key={staff.id} className={rowClassName}>
+                            <div key={staff.staff_id || staff.id} className={rowClassName}>
                               <div className="salon-board__row-content">
                                 <div className="salon-board__row-label">
                                   {!isHeader && (
@@ -351,15 +395,21 @@ const SalonBoard = () => {
                                 <div className="salon-board__timeline">
                                   <div className="salon-board__grid-lines">
                                     {timeSlots.map((time, slotIndex) => {
-                                      const isAvailable = !isHeader && !isHoliday && isSlotAvailable(staff.id, time);
+                                      const isInShiftTime = !isHeader && !isHoliday && isSlotInShiftTime(staff, time);
+                                      const isAvailable = isInShiftTime && isSlotAvailable(staff.staff_id, time);
+                                      const isOutOfShift = !isHeader && !isHoliday && !isInShiftTime;
+                                      
                                       return (
                                         <div 
                                           key={time} 
                                           className={`salon-board__grid-line ${
                                             isAvailable ? 'salon-board__clickable-slot' : ''
                                           }`}
-                                          onClick={() => isAvailable && handleSlotClick(staff.id, time, slotIndex)}
-                                          style={{ cursor: isAvailable ? 'pointer' : 'default' }}
+                                          onClick={() => isAvailable && handleSlotClick(staff.staff_id, time, slotIndex)}
+                                          style={{ 
+                                            cursor: isAvailable ? 'pointer' : 'default',
+                                            backgroundColor: isOutOfShift ? '#f5f5f5' : 'transparent'
+                                          }}
                                         />
                                       );
                                     })}
@@ -376,7 +426,7 @@ const SalonBoard = () => {
                                       </div>
                                       <div className="time-header__bottom-row">
                                         {timeSlots.map(time => (
-                                          <div key={`bottom-${time}`} className="time-header__cell time-header__cell--minute" >
+                                          <div key={`bottom-${time}`} className="time-header__cell time-header__cell--minute">
                                             {time.split(':')[1]}
                                           </div>
                                         ))}
@@ -384,7 +434,7 @@ const SalonBoard = () => {
                                     </div>
                                   ) : (
                                     !isHoliday && bookings
-                                      .filter(booking => booking.staffId === staff.id)
+                                      .filter(booking => booking.staffId === staff.staff_id)
                                       .map(booking => {
                                         const { left, width } = calculateBookingPosition(booking.startTime, booking.endTime);
                                         const serviceColorClass = getServiceColorClass(booking.serviceType);
@@ -406,7 +456,6 @@ const SalonBoard = () => {
                       </div>
                     </div>
 
-                    {/* ベッド別セクション */}
                     <div className="salon-board__section">
                       <h3 className="salon-board__section-title">
                         ベッド別スケジュール
@@ -440,7 +489,7 @@ const SalonBoard = () => {
                                   .map(booking => {
                                     const { left, width } = calculateBookingPosition(booking.startTime, booking.endTime);
                                     const serviceColorClass = getServiceColorClass(booking.serviceType);
-                                    const staff = activeStaff.find(s => s.id === booking.staffId);
+                                    const staff = staffShifts.find(s => s.staff_id === booking.staffId);
                                     
                                     return (
                                       <div
@@ -481,7 +530,6 @@ const SalonBoard = () => {
           )}
         </div>
 
-        {/* データベース管理パネル */}
         <div className="salon-board__db-panel">
           <div className="salon-board__db-section">
             <h3 className="salon-board__db-section-title">スタッフ業務</h3>
@@ -524,7 +572,6 @@ const SalonBoard = () => {
                 </div>
               </button>
               
-              {/* 統計情報 */}
               <div className="salon-board__stats-card">
                 <div className="salon-board__stats-list">
                   <div className="salon-board__stat-item">
@@ -553,7 +600,6 @@ const SalonBoard = () => {
           </div>
         </div>
 
-        {/* カレンダーモーダル - 固定位置 */}
         <CalendarModal 
           isOpen={activeModal === 'calendar'}
           selectedDate={selectedDate}
