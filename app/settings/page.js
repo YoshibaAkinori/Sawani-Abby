@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { ArrowLeft, Settings, Users, Clock, Sparkles, Settings2, Calculator, Gift, Database, FileText } from 'lucide-react';
 import StaffManagement from './set_component/StaffManagement';
 import ShiftManagement from './set_component/ShiftManagement';
+import ServicesManagement from './set_component/ServicesManagement';
+import OptionsManagement from './set_component/OptionsManagement';
 import './settings.css';
 
 const SettingsPage = () => {
@@ -48,7 +50,7 @@ const SettingsPage = () => {
             <h2 className="settings__content-title">施術コース管理</h2>
             <div className="settings__content-card">
               <p className="settings__content-description">フェイシャル、ボディトリートメントなどの施術コースの登録・編集を行います。料金設定、施術時間、説明文なども管理できます。</p>
-              <div className="settings__content-status">※ 機能実装中</div>
+                <ServicesManagement />
             </div>
           </div>
         );
@@ -58,7 +60,7 @@ const SettingsPage = () => {
             <h2 className="settings__content-title">オプション管理</h2>
             <div className="settings__content-card">
               <p className="settings__content-description">施術に追加可能なオプションメニューの管理を行います。追加料金、所要時間の設定から、組み合わせ可能なコースとの関連付けまで設定できます。</p>
-              <div className="settings__content-status">※ 機能実装中</div>
+                <OptionsManagement />
             </div>
           </div>
         );
