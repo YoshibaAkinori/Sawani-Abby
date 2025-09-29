@@ -35,7 +35,7 @@ const ServicesManagement = () => {
   const [ticketForm, setTicketForm] = useState({
     service_id: '',
     name: '',
-    gender: 'all', // all/male/female
+    gender_restriction: 'all', // all/male/female
     total_sessions: 5,
     price: '',
     validity_days: 180
@@ -45,9 +45,11 @@ const ServicesManagement = () => {
   const [couponForm, setCouponForm] = useState({
     name: '',
     description: '',
-    discount_type: 'percentage', // percentage/amount
-    discount_value: '',
-    valid_until: '',
+    base_service_id: '',
+    included_options: [], // [{ option_id, option_name, quantity }]
+    free_option_count: 0,
+    total_price: '',
+    validity_days: 180,
     usage_limit: '',
     is_active: true
   });
@@ -56,39 +58,80 @@ const ServicesManagement = () => {
   const [limitedForm, setLimitedForm] = useState({
     name: '',
     description: '',
-    original_price: '',
+    service_name: '',
+    total_sessions: 5,
+    regular_price: '',
     special_price: '',
-    start_date: '',
-    end_date: '',
-    max_bookings: '',
+    validity_days: 180,
+    sale_end_date: '',
+    max_sales: '',
     is_active: true
   });
 
   // カテゴリオプション
-  const categories = ['新規', '既存', 'その他'];
+  const categories = ['フェイシャル', 'ボディトリート', 'その他'];
 
   // 初期データ読み込み
   useEffect(() => {
     fetchServices();
     fetchTicketPlans();
+    fetchCoupons();
+    fetchLimitedOffers();
   }, []);
 
   // サービス一覧取得
   const fetchServices = async () => {
-  const response = await fetch('/api/services');
-  if (response.ok) {
-    const data = await response.json();
-    setServices(data.data || []);
-  }
-};
+    try {
+      const response = await fetch('/api/services');
+      if (response.ok) {
+        const data = await response.json();
+        setServices(data.data || []);
+      }
+    } catch (err) {
+      console.error('サービス取得エラー:', err);
+    }
+  };
 
-const fetchTicketPlans = async () => {
-  const response = await fetch('/api/ticket-plans');
-  if (response.ok) {
-    const data = await response.json();
-    setTicketPlans(data.data || []);
-  }
-};
+  // 回数券プラン取得
+  const fetchTicketPlans = async () => {
+    try {
+      const response = await fetch('/api/ticket-plans');
+      if (response.ok) {
+        const data = await response.json();
+        setTicketPlans(data.data || []);
+      }
+    } catch (err) {
+      console.error('回数券プラン取得エラー:', err);
+    }
+  };
+
+  // クーポン取得
+  const fetchCoupons = async () => {
+    try {
+      const response = await fetch('/api/coupons');
+      if (response.ok) {
+        const data = await response.json();
+        setCoupons(data.data || []);
+      }
+    } catch (err) {
+      console.error('クーポン取得エラー:', err);
+      setCoupons([]);
+    }
+  };
+
+  // 期間限定オファー取得
+  const fetchLimitedOffers = async () => {
+    try {
+      const response = await fetch('/api/limited-offers');
+      if (response.ok) {
+        const data = await response.json();
+        setLimitedOffers(data.data || []);
+      }
+    } catch (err) {
+      console.error('期間限定オファー取得エラー:', err);
+      setLimitedOffers([]);
+    }
+  };
 
   // サービスフォーム入力処理
   const handleServiceInputChange = (e) => {
@@ -105,19 +148,19 @@ const fetchTicketPlans = async () => {
     if (name === 'service_id') {
       const selectedService = services.find(s => s.service_id === value);
       if (selectedService) {
-        const genderText = ticketForm.gender === 'male' ? '男性' : 
-                          ticketForm.gender === 'female' ? '女性' : '';
+        const genderText = ticketForm.gender_restriction === 'male' ? '男性' : 
+                          ticketForm.gender_restriction === 'female' ? '女性' : '';
         setTicketForm(prev => ({
           ...prev,
           service_id: value,
           name: `${selectedService.name}${prev.total_sessions}回券${genderText ? `（${genderText}）` : ''}`
         }));
       }
-    } else if (name === 'total_sessions' || name === 'gender') {
+    } else if (name === 'total_sessions' || name === 'gender_restriction') {
       const selectedService = services.find(s => s.service_id === ticketForm.service_id);
-      const genderText = name === 'gender' ? 
+      const genderText = name === 'gender_restriction' ? 
         (value === 'male' ? '男性' : value === 'female' ? '女性' : '') :
-        (ticketForm.gender === 'male' ? '男性' : ticketForm.gender === 'female' ? '女性' : '');
+        (ticketForm.gender_restriction === 'male' ? '男性' : ticketForm.gender_restriction === 'female' ? '女性' : '');
       const sessions = name === 'total_sessions' ? value : ticketForm.total_sessions;
       
       setTicketForm(prev => ({
@@ -356,6 +399,72 @@ const fetchTicketPlans = async () => {
     }
   };
 
+  // クーポン追加
+  const handleAddCoupon = async () => {
+    if (!couponForm.coupon_code || !couponForm.name || !couponForm.base_service_id || !couponForm.total_price) {
+      setError('必須項目を入力してください');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/coupons', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(couponForm)
+      });
+
+      if (response.ok) {
+        setSuccess('クーポンを登録しました');
+        fetchCoupons();
+        setShowCouponForm(false);
+        resetCouponForm();
+      } else {
+        const data = await response.json();
+        throw new Error(data.error || '登録に失敗しました');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => { setSuccess(''); setError(''); }, 3000);
+    }
+  };
+
+  // 期間限定オファー追加
+  const handleAddLimitedOffer = async () => {
+    if (!limitedForm.name || !limitedForm.service_name || !limitedForm.regular_price || !limitedForm.special_price) {
+      setError('必須項目を入力してください');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/limited-offers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(limitedForm)
+      });
+
+      if (response.ok) {
+        setSuccess('期間限定オファーを登録しました');
+        fetchLimitedOffers();
+        setShowLimitedForm(false);
+        resetLimitedForm();
+      } else {
+        const data = await response.json();
+        throw new Error(data.error || '登録に失敗しました');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => { setSuccess(''); setError(''); }, 3000);
+    }
+  };
+
   // フォームリセット
   const resetServiceForm = () => {
     setServiceForm({
@@ -374,7 +483,7 @@ const fetchTicketPlans = async () => {
     setTicketForm({
       service_id: '',
       name: '',
-      gender: 'all',
+      gender_restriction: 'all',
       total_sessions: 5,
       price: '',
       validity_days: 180
@@ -383,12 +492,14 @@ const fetchTicketPlans = async () => {
 
   const resetCouponForm = () => {
     setCouponForm({
+      coupon_code: '',
       name: '',
       description: '',
-      discount_type: 'percentage',
-      discount_value: '',
-      valid_from: '',
-      valid_until: '',
+      base_service_id: '',
+      included_options: [],
+      free_option_count: 1,
+      total_price: '',
+      validity_days: 180,
       usage_limit: '',
       is_active: true
     });
@@ -398,11 +509,13 @@ const fetchTicketPlans = async () => {
     setLimitedForm({
       name: '',
       description: '',
-      original_price: '',
+      service_name: '',
+      total_sessions: 5,
+      regular_price: '',
       special_price: '',
-      start_date: '',
-      end_date: '',
-      max_bookings: '',
+      validity_days: 180,
+      sale_end_date: '',
+      max_sales: '',
       is_active: true
     });
   };
@@ -815,8 +928,8 @@ const fetchTicketPlans = async () => {
                 <div className="services-form-group">
                   <label>対象 *</label>
                   <select
-                    name="gender"
-                    value={ticketForm.gender}
+                    name="gender_restriction"
+                    value={ticketForm.gender_restriction}
                     onChange={handleTicketInputChange}
                   >
                     <option value="all">全員</option>
@@ -936,27 +1049,23 @@ const fetchTicketPlans = async () => {
                     <td>{plan.service_name}</td>
                     <td className="services-table-name">{plan.name}</td>
                     <td>
-                      {plan.gender === 'female' && (
+                      {plan.gender_restriction === 'female' && (
                         <span className="services-gender-badge services-gender-badge--female">
                           <Users size={14} /> 女性
                         </span>
                       )}
-                      {plan.gender === 'male' && (
+                      {plan.gender_restriction === 'male' && (
                         <span className="services-gender-badge services-gender-badge--male">
                           <Users size={14} /> 男性
                         </span>
                       )}
-                      {(!plan.gender || plan.gender === 'all') && (
+                      {(!plan.gender_restriction || plan.gender_restriction === 'all') && (
                         <span className="services-text-muted">全員</span>
                       )}
                     </td>
                     <td>{plan.total_sessions}回</td>
-                    <td>
-                        ¥{Number(plan.price || 0).toLocaleString()}
-                    </td>
-                    <td>
-                        ¥{Number(plan.price_per_session || 0).toLocaleString()}
-                    </td>
+                    <td>¥{Number(plan.price || 0).toLocaleString()}</td>
+                    <td>¥{Number(plan.price_per_session || 0).toLocaleString()}</td>
                     <td>
                       {plan.discount_rate > 0 && (
                         <span className="services-discount-badge">
@@ -1012,47 +1121,80 @@ const fetchTicketPlans = async () => {
               <h4>新規クーポン登録</h4>
               <div className="services-form-grid">
                 <div className="services-form-group services-form-group--full">
+                  <label>クーポンコード *</label>
+                  <input
+                    type="text"
+                    name="coupon_code"
+                    value={couponForm.coupon_code}
+                    onChange={handleCouponInputChange}
+                    placeholder="例: SPECIAL2025"
+                  />
+                </div>
+
+                <div className="services-form-group services-form-group--full">
                   <label>クーポン名 *</label>
                   <input
                     type="text"
                     name="name"
                     value={couponForm.name}
                     onChange={handleCouponInputChange}
-                    placeholder="例: 新規限定20%OFFクーポン"
+                    placeholder="例: 【男女共通人気NO.1】上半身ケア+小顔コルギ+背中コルギ80分"
                   />
                 </div>
 
                 <div className="services-form-group">
-                  <label>割引タイプ *</label>
+                  <label>ベース施術 *</label>
                   <select
-                    name="discount_type"
-                    value={couponForm.discount_type}
+                    name="base_service_id"
+                    value={couponForm.base_service_id}
                     onChange={handleCouponInputChange}
                   >
-                    <option value="percentage">割引率（％）</option>
-                    <option value="amount">割引額（円）</option>
+                    <option value="">選択してください</option>
+                    {services.filter(s => s.is_active).map(service => (
+                      <option key={service.service_id} value={service.service_id}>
+                        {service.name} ({service.duration_minutes}分)
+                      </option>
+                    ))}
                   </select>
                 </div>
 
                 <div className="services-form-group">
-                  <label>割引値 *</label>
+                  <label>パック価格（円） *</label>
                   <input
                     type="number"
-                    name="discount_value"
-                    value={couponForm.discount_value}
+                    name="total_price"
+                    value={couponForm.total_price}
                     onChange={handleCouponInputChange}
-                    placeholder={couponForm.discount_type === 'percentage' ? "20" : "1000"}
+                    placeholder="6000"
                   />
                 </div>
 
                 <div className="services-form-group">
-                  <label>有効期限終了</label>
-                  <input
-                    type="date"
-                    name="valid_until"
-                    value={couponForm.valid_until}
+                  <label>自由選択オプション数</label>
+                  <select
+                    name="free_option_count"
+                    value={couponForm.free_option_count}
                     onChange={handleCouponInputChange}
-                  />
+                  >
+                    <option value="0">なし</option>
+                    <option value="1">1つ</option>
+                    <option value="2">2つ</option>
+                    <option value="3">3つ</option>
+                  </select>
+                </div>
+
+                <div className="services-form-group">
+                  <label>有効期限（日数）</label>
+                  <select
+                    name="validity_days"
+                    value={couponForm.validity_days}
+                    onChange={handleCouponInputChange}
+                  >
+                    <option value="30">1ヶ月</option>
+                    <option value="90">3ヶ月</option>
+                    <option value="180">6ヶ月</option>
+                    <option value="365">1年</option>
+                  </select>
                 </div>
 
                 <div className="services-form-group">
@@ -1088,13 +1230,7 @@ const fetchTicketPlans = async () => {
                   キャンセル
                 </button>
                 <button
-                  onClick={() => {
-                    // クーポン保存処理
-                    setSuccess('クーポンを登録しました');
-                    setShowCouponForm(false);
-                    resetCouponForm();
-                    setTimeout(() => setSuccess(''), 3000);
-                  }}
+                  onClick={handleAddCoupon}
                   className="services-btn services-btn--primary"
                   disabled={isLoading}
                 >
@@ -1105,10 +1241,69 @@ const fetchTicketPlans = async () => {
             </div>
           )}
 
-          {/* クーポン一覧（仮） */}
-          <div className="services-empty-state">
-            <Tag size={48} />
-            <p>クーポンが登録されていません</p>
+          {/* クーポン一覧テーブル */}
+          <div className="services-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>クーポンコード</th>
+                  <th>クーポン名</th>
+                  <th>ベース施術</th>
+                  <th>パック価格</th>
+                  <th>無料オプション</th>
+                  <th>有効期限</th>
+                  <th>使用状況</th>
+                  <th>ステータス</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {coupons.map(coupon => (
+                  <tr key={coupon.coupon_id}>
+                    <td className="services-table-name">
+                      <Tag size={14} />
+                      {coupon.coupon_code}
+                    </td>
+                    <td>{coupon.name}</td>
+                    <td>{coupon.service_name}</td>
+                    <td>¥{coupon.total_price.toLocaleString()}</td>
+                    <td>{coupon.free_option_count}個選択可</td>
+                    <td>{coupon.validity_days}日</td>
+                    <td>
+                      {coupon.used_count || 0} / {coupon.usage_limit || '∞'}
+                    </td>
+                    <td>
+                      <span className={`services-status-badge ${coupon.is_active ? 'services-status-badge--active' : 'services-status-badge--inactive'}`}>
+                        {coupon.is_active ? '有効' : '無効'}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        onClick={() => console.log('編集:', coupon.coupon_id)}
+                        className="services-btn-icon services-btn-icon--primary"
+                        disabled={isLoading}
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {coupons.length === 0 && !isLoading && (
+              <div className="services-empty-state">
+                <Tag size={48} />
+                <p>クーポンが登録されていません</p>
+                <button
+                  onClick={() => setShowCouponForm(true)}
+                  className="services-btn services-btn--primary"
+                >
+                  <Plus size={16} />
+                  最初のクーポンを追加
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1117,7 +1312,7 @@ const fetchTicketPlans = async () => {
       {activeTab === 'limited' && (
         <div className="services-content">
           <div className="services-header">
-            <h3 className="services-title">期間限定メニュー一覧</h3>
+            <h3 className="services-title">期間限定オファー一覧</h3>
             {!showLimitedForm && (
               <button
                 onClick={() => setShowLimitedForm(true)}
@@ -1125,7 +1320,7 @@ const fetchTicketPlans = async () => {
                 disabled={isLoading}
               >
                 <Plus size={16} />
-                新規期間限定追加
+                新規オファー追加
               </button>
             )}
           </div>
@@ -1133,27 +1328,52 @@ const fetchTicketPlans = async () => {
           {/* 新規期間限定追加フォーム */}
           {showLimitedForm && (
             <div className="services-form-card">
-              <h4>新規期間限定メニュー登録</h4>
+              <h4>新規期間限定オファー登録</h4>
               <div className="services-form-grid">
                 <div className="services-form-group services-form-group--full">
-                  <label>メニュー名 *</label>
+                  <label>オファー名 *</label>
                   <input
                     type="text"
                     name="name"
                     value={limitedForm.name}
                     onChange={handleLimitedInputChange}
-                    placeholder="例: 夏季限定クールダウンコース"
+                    placeholder="例: 【朝割/女性限定】上半身ケア+小顔コルギ50分"
                   />
+                </div>
+
+                <div className="services-form-group">
+                  <label>サービス名 *</label>
+                  <input
+                    type="text"
+                    name="service_name"
+                    value={limitedForm.service_name}
+                    onChange={handleLimitedInputChange}
+                    placeholder="例: 上半身ケア+小顔コルギ50分"
+                  />
+                </div>
+
+                <div className="services-form-group">
+                  <label>回数 *</label>
+                  <select
+                    name="total_sessions"
+                    value={limitedForm.total_sessions}
+                    onChange={handleLimitedInputChange}
+                  >
+                    <option value="5">5回</option>
+                    <option value="10">10回</option>
+                    <option value="15">15回</option>
+                    <option value="20">20回</option>
+                  </select>
                 </div>
 
                 <div className="services-form-group">
                   <label>通常価格 *</label>
                   <input
                     type="number"
-                    name="original_price"
-                    value={limitedForm.original_price}
+                    name="regular_price"
+                    value={limitedForm.regular_price}
                     onChange={handleLimitedInputChange}
-                    placeholder="10000"
+                    placeholder="50000"
                   />
                 </div>
 
@@ -1164,41 +1384,44 @@ const fetchTicketPlans = async () => {
                     name="special_price"
                     value={limitedForm.special_price}
                     onChange={handleLimitedInputChange}
-                    placeholder="7000"
+                    placeholder="30000"
                   />
-                  {limitedForm.original_price && limitedForm.special_price && (
+                  {limitedForm.regular_price && limitedForm.special_price && (
                     <span className="services-discount-badge">
-                      {calculateDiscountRate(limitedForm.original_price, limitedForm.special_price)}%OFF
+                      {calculateDiscountRate(limitedForm.regular_price, limitedForm.special_price)}%OFF
                     </span>
                   )}
                 </div>
 
                 <div className="services-form-group">
-                  <label>開始日 *</label>
+                  <label>有効期限（日数） *</label>
+                  <select
+                    name="validity_days"
+                    value={limitedForm.validity_days}
+                    onChange={handleLimitedInputChange}
+                  >
+                    <option value="90">3ヶ月</option>
+                    <option value="180">6ヶ月</option>
+                    <option value="365">1年</option>
+                  </select>
+                </div>
+
+                <div className="services-form-group">
+                  <label>販売終了日</label>
                   <input
                     type="date"
-                    name="start_date"
-                    value={limitedForm.start_date}
+                    name="sale_end_date"
+                    value={limitedForm.sale_end_date}
                     onChange={handleLimitedInputChange}
                   />
                 </div>
 
                 <div className="services-form-group">
-                  <label>終了日 *</label>
-                  <input
-                    type="date"
-                    name="end_date"
-                    value={limitedForm.end_date}
-                    onChange={handleLimitedInputChange}
-                  />
-                </div>
-
-                <div className="services-form-group">
-                  <label>最大予約数</label>
+                  <label>最大販売数</label>
                   <input
                     type="number"
-                    name="max_bookings"
-                    value={limitedForm.max_bookings}
+                    name="max_sales"
+                    value={limitedForm.max_sales}
                     onChange={handleLimitedInputChange}
                     placeholder="50"
                   />
@@ -1211,7 +1434,7 @@ const fetchTicketPlans = async () => {
                     value={limitedForm.description}
                     onChange={handleLimitedInputChange}
                     rows="3"
-                    placeholder="期間限定メニューの説明"
+                    placeholder="期間限定オファーの説明"
                   />
                 </div>
               </div>
@@ -1226,13 +1449,7 @@ const fetchTicketPlans = async () => {
                   キャンセル
                 </button>
                 <button
-                  onClick={() => {
-                    // 期間限定メニュー保存処理
-                    setSuccess('期間限定メニューを登録しました');
-                    setShowLimitedForm(false);
-                    resetLimitedForm();
-                    setTimeout(() => setSuccess(''), 3000);
-                  }}
+                  onClick={handleAddLimitedOffer}
                   className="services-btn services-btn--primary"
                   disabled={isLoading}
                 >
@@ -1243,10 +1460,77 @@ const fetchTicketPlans = async () => {
             </div>
           )}
 
-          {/* 期間限定一覧（仮） */}
-          <div className="services-empty-state">
-            <Clock size={48} />
-            <p>期間限定メニューが登録されていません</p>
+          {/* 期間限定一覧テーブル */}
+          <div className="services-table">
+            <table>
+              <thead>
+                <tr>
+                  <th>オファー名</th>
+                  <th>サービス</th>
+                  <th>回数</th>
+                  <th>通常価格</th>
+                  <th>特別価格</th>
+                  <th>割引率</th>
+                  <th>販売終了</th>
+                  <th>販売状況</th>
+                  <th>ステータス</th>
+                  <th>操作</th>
+                </tr>
+              </thead>
+              <tbody>
+                {limitedOffers.map(offer => (
+                  <tr key={offer.offer_id}>
+                    <td className="services-table-name">
+                      <Clock size={14} />
+                      {offer.name}
+                    </td>
+                    <td>{offer.service_name}</td>
+                    <td>{offer.total_sessions}回</td>
+                    <td>¥{offer.regular_price.toLocaleString()}</td>
+                    <td>¥{offer.special_price.toLocaleString()}</td>
+                    <td>
+                      <span className="services-discount-badge">
+                        {offer.discount_rate}%OFF
+                      </span>
+                    </td>
+                    <td>
+                      {offer.sale_end_date ? new Date(offer.sale_end_date).toLocaleDateString('ja-JP') : '無期限'}
+                    </td>
+                    <td>
+                      {offer.current_sales || 0} / {offer.max_sales || '∞'}
+                    </td>
+                    <td>
+                      <span className={`services-status-badge ${offer.is_active ? 'services-status-badge--active' : 'services-status-badge--inactive'}`}>
+                        {offer.is_active ? '有効' : '無効'}
+                      </span>
+                    </td>
+                    <td>
+                      <button
+                        onClick={() => console.log('編集:', offer.offer_id)}
+                        className="services-btn-icon services-btn-icon--primary"
+                        disabled={isLoading}
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {limitedOffers.length === 0 && !isLoading && (
+              <div className="services-empty-state">
+                <Clock size={48} />
+                <p>期間限定オファーが登録されていません</p>
+                <button
+                  onClick={() => setShowLimitedForm(true)}
+                  className="services-btn services-btn--primary"
+                >
+                  <Plus size={16} />
+                  最初のオファーを追加
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
