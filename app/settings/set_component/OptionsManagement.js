@@ -25,6 +25,12 @@ const OptionsManagement = () => {
   // カテゴリ選択
   const categories = ['フェイシャル', 'ボディ', 'その他'];
 
+  // カテゴリ別にオプションをグループ化
+  const groupedOptions = categories.map(category => ({
+    category,
+    options: options.filter(opt => opt.category === category)
+  })).filter(group => group.options.length > 0);
+
   // 実際のメニューに基づくオプションテンプレート
   const optionTemplates = [
     // フェイシャルメニュー
@@ -125,7 +131,7 @@ const OptionsManagement = () => {
         duration_minutes: Number(formData.duration_minutes) || 0
       };
       setOptions(prev => [...prev, newOption]);
-      setSuccess('オプションを登録しました（ローカル保存）');
+      setSuccess('オプションを登録しました(ローカル保存)');
       setShowAddForm(false);
       resetForm();
     } finally {
@@ -139,6 +145,7 @@ const OptionsManagement = () => {
     setEditingId(option.option_id);
     setFormData({
       name: option.name,
+      category: option.category || 'その他',
       duration_minutes: option.duration_minutes || 0,
       price: option.price,
       is_active: option.is_active
@@ -185,7 +192,7 @@ const OptionsManagement = () => {
             } 
           : opt
       ));
-      setSuccess('更新しました（ローカル保存）');
+      setSuccess('更新しました(ローカル保存)');
       setEditingId(null);
     } finally {
       setIsLoading(false);
@@ -195,7 +202,7 @@ const OptionsManagement = () => {
 
   // 削除
   const handleDelete = async (optionId) => {
-    if (!window.confirm('このオプションを削除してもよろしいですか？')) {
+    if (!window.confirm('このオプションを削除してもよろしいですか?')) {
       return;
     }
 
@@ -215,7 +222,7 @@ const OptionsManagement = () => {
     } catch (err) {
       // デモモード
       setOptions(prev => prev.filter(opt => opt.option_id !== optionId));
-      setSuccess('削除しました（ローカル保存）');
+      setSuccess('削除しました(ローカル保存)');
     } finally {
       setIsLoading(false);
       setTimeout(() => setSuccess(''), 3000);
@@ -291,7 +298,7 @@ const OptionsManagement = () => {
           
           {/* テンプレート選択 */}
           <div className="options-templates">
-            <span className="options-template-label"></span>
+            <span className="options-template-label">よく使うメニューから選択</span>
             
             {/* フェイシャルメニュー */}
             <div className="options-template-section">
@@ -354,7 +361,7 @@ const OptionsManagement = () => {
             </div>
 
             <div className="options-form-group">
-              <label>追加時間（分）</label>
+              <label>追加時間(分)</label>
               <select
                 name="duration_minutes"
                 value={formData.duration_minutes}
@@ -371,7 +378,7 @@ const OptionsManagement = () => {
             </div>
 
             <div className="options-form-group">
-              <label>追加料金（円） *</label>
+              <label>追加料金(円) *</label>
               <input
                 type="number"
                 name="price"
@@ -429,140 +436,7 @@ const OptionsManagement = () => {
 
       {/* オプション一覧テーブル */}
       <div className="options-table">
-        <table>
-          <thead>
-            <tr>
-              <th>オプション名</th>
-              <th>追加時間</th>
-              <th>追加料金</th>
-              <th>ステータス</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {options.map(option => (
-              <tr key={option.option_id}>
-                {editingId === option.option_id ? (
-                  <>
-                    <td>
-                      <input
-                        type="text"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleInputChange}
-                        className="options-input-inline"
-                      />
-                    </td>
-                    <td>
-                      <select
-                        name="duration_minutes"
-                        value={formData.duration_minutes}
-                        onChange={handleInputChange}
-                        className="options-select-inline"
-                      >
-                        <option value="0">なし</option>
-                        <option value="10">10分</option>
-                        <option value="15">15分</option>
-                        <option value="20">20分</option>
-                        <option value="30">30分</option>
-                        <option value="50">50分</option>
-                        <option value="60">60分</option>
-                      </select>
-                    </td>
-                    <td>
-                      <input
-                        type="number"
-                        name="price"
-                        value={formData.price}
-                        onChange={handleInputChange}
-                        className="options-input-inline options-input-inline--small"
-                        step="100"
-                      />
-                    </td>
-                    <td>
-                      <label className="options-checkbox-label-inline">
-                        <input
-                          type="checkbox"
-                          name="is_active"
-                          checked={formData.is_active}
-                          onChange={handleInputChange}
-                        />
-                        有効
-                      </label>
-                    </td>
-                    <td>
-                      <div className="options-actions">
-                        <button
-                          onClick={() => handleUpdate(option.option_id)}
-                          className="options-btn-icon options-btn-icon--success"
-                          disabled={isLoading}
-                        >
-                          <Save size={16} />
-                        </button>
-                        <button
-                          onClick={handleCancel}
-                          className="options-btn-icon options-btn-icon--secondary"
-                          disabled={isLoading}
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </>
-                ) : (
-                  <>
-                    <td className="options-table-name">
-                      <Settings2 size={14} className="options-icon-inline" />
-                      {option.name}
-                    </td>
-                    <td>
-                      {option.duration_minutes > 0 && (
-                        <span className="options-duration">
-                          <Clock size={14} className="options-icon-inline" />
-                          {formatDuration(option.duration_minutes)}
-                        </span>
-                      )}
-                      {(!option.duration_minutes || option.duration_minutes === 0) && (
-                        <span className="options-text-muted">-</span>
-                      )}
-                    </td>
-                    <td>
-                      <span className="options-price">
-                        <span size={14} className="options-icon-inline" />
-                        ¥{option.price.toLocaleString()}
-                      </span>
-                    </td>
-                    <td>
-                      <span className={`options-status-badge ${option.is_active ? 'options-status-badge--active' : 'options-status-badge--inactive'}`}>
-                        {option.is_active ? '有効' : '無効'}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="options-actions">
-                        <button
-                          onClick={() => startEdit(option)}
-                          className="options-btn-icon options-btn-icon--primary"
-                          disabled={isLoading}
-                        >
-                          <Edit2 size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(option.option_id)}
-                          className="options-btn-icon options-btn-icon--danger"
-                          disabled={isLoading}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {options.length === 0 && !isLoading && (
+        {groupedOptions.length === 0 && !isLoading ? (
           <div className="options-empty-state">
             <Settings2 size={48} />
             <p>オプションが登録されていません</p>
@@ -574,6 +448,147 @@ const OptionsManagement = () => {
               最初のオプションを追加
             </button>
           </div>
+        ) : (
+          groupedOptions.map(group => (
+            <div key={group.category} className="options-category-section">
+              <h4 className="options-category-title">
+                <span size={12} className="options-category-icon" />
+                {group.category}
+              </h4>
+              <table>
+                <thead>
+                  <tr>
+                    <th>オプション名</th>
+                    <th>追加時間</th>
+                    <th>追加料金</th>
+                    <th>ステータス</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {group.options.map(option => (
+                    <tr key={option.option_id}>
+                      {editingId === option.option_id ? (
+                        <>
+                          <td>
+                            <input
+                              type="text"
+                              name="name"
+                              value={formData.name}
+                              onChange={handleInputChange}
+                              className="options-input-inline"
+                            />
+                          </td>
+                          <td>
+                            <select
+                              name="duration_minutes"
+                              value={formData.duration_minutes}
+                              onChange={handleInputChange}
+                              className="options-select-inline"
+                            >
+                              <option value="0">なし</option>
+                              <option value="10">10分</option>
+                              <option value="15">15分</option>
+                              <option value="20">20分</option>
+                              <option value="30">30分</option>
+                              <option value="50">50分</option>
+                              <option value="60">60分</option>
+                            </select>
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              name="price"
+                              value={formData.price}
+                              onChange={handleInputChange}
+                              className="options-input-inline options-input-inline--small"
+                              step="100"
+                            />
+                          </td>
+                          <td>
+                            <label className="options-checkbox-label-inline">
+                              <input
+                                type="checkbox"
+                                name="is_active"
+                                checked={formData.is_active}
+                                onChange={handleInputChange}
+                              />
+                              有効
+                            </label>
+                          </td>
+                          <td>
+                            <div className="options-actions">
+                              <button
+                                onClick={() => handleUpdate(option.option_id)}
+                                className="options-btn-icon options-btn-icon--success"
+                                disabled={isLoading}
+                              >
+                                <Save size={16} />
+                              </button>
+                              <button
+                                onClick={handleCancel}
+                                className="options-btn-icon options-btn-icon--secondary"
+                                disabled={isLoading}
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="options-table-name">
+                            <Settings2 size={14} className="options-icon-inline" />
+                            {option.name}
+                          </td>
+                          <td>
+                            {option.duration_minutes > 0 && (
+                              <span className="options-duration">
+                                <Clock size={14} className="options-icon-inline" />
+                                {formatDuration(option.duration_minutes)}
+                              </span>
+                            )}
+                            {(!option.duration_minutes || option.duration_minutes === 0) && (
+                              <span className="options-text-muted">-</span>
+                            )}
+                          </td>
+                          <td>
+                            <span className="options-price">
+                              <span size={14} className="options-icon-inline" />
+                              ¥{option.price.toLocaleString()}
+                            </span>
+                          </td>
+                          <td>
+                            <span className={`options-status-badge ${option.is_active ? 'options-status-badge--active' : 'options-status-badge--inactive'}`}>
+                              {option.is_active ? '有効' : '無効'}
+                            </span>
+                          </td>
+                          <td>
+                            <div className="options-actions">
+                              <button
+                                onClick={() => startEdit(option)}
+                                className="options-btn-icon options-btn-icon--primary"
+                                disabled={isLoading}
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(option.option_id)}
+                                className="options-btn-icon options-btn-icon--danger"
+                                disabled={isLoading}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))
         )}
       </div>
     </div>

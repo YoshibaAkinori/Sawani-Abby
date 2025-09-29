@@ -11,12 +11,20 @@ export async function GET(request) {
       `SELECT 
         option_id,
         name,
+        category,
         duration_minutes,
         price,
         is_active,
         created_at
       FROM options
-      ORDER BY name`
+      ORDER BY 
+        CASE category
+          WHEN 'フェイシャル' THEN 1
+          WHEN 'ボディ' THEN 2
+          WHEN 'その他' THEN 3
+          ELSE 4
+        END,
+        name`
     );
 
     return NextResponse.json({
@@ -40,6 +48,7 @@ export async function POST(request) {
 
     const {
       name,
+      category = 'その他',
       duration_minutes = 0,
       price,
       is_active = true
@@ -71,11 +80,12 @@ export async function POST(request) {
       `INSERT INTO options (
         option_id,
         name,
+        category,
         duration_minutes,
         price,
         is_active
-      ) VALUES (UUID(), ?, ?, ?, ?)`,
-      [name, duration_minutes, price, is_active]
+      ) VALUES (UUID(), ?, ?, ?, ?, ?)`,
+      [name, category, duration_minutes, price, is_active]
     );
 
     return NextResponse.json({
@@ -100,6 +110,7 @@ export async function PUT(request) {
     const {
       option_id,
       name,
+      category,
       duration_minutes,
       price,
       is_active
@@ -117,11 +128,12 @@ export async function PUT(request) {
     await pool.execute(
       `UPDATE options 
        SET name = ?, 
+           category = ?,
            duration_minutes = ?, 
            price = ?,
            is_active = ?
        WHERE option_id = ?`,
-      [name, duration_minutes || 0, price, is_active, option_id]
+      [name, category || 'その他', duration_minutes || 0, price, is_active, option_id]
     );
 
     return NextResponse.json({

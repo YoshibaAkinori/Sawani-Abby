@@ -14,7 +14,6 @@ export async function GET(request) {
         description,
         service_name,
         total_sessions,
-        regular_price,
         special_price,
         validity_days,
         sale_end_date,
@@ -22,8 +21,7 @@ export async function GET(request) {
         current_sales,
         is_active,
         created_at,
-        ROUND((1 - (special_price / regular_price)) * 100) as discount_rate,
-        FLOOR(special_price / total_sessions) as price_per_session
+        updated_at
       FROM limited_ticket_offers
       ORDER BY created_at DESC`
     );
@@ -52,7 +50,6 @@ export async function POST(request) {
       description,
       service_name,
       total_sessions = 5,
-      regular_price,
       special_price,
       validity_days = 180,
       sale_end_date,
@@ -61,16 +58,9 @@ export async function POST(request) {
     } = body;
 
     // バリデーション
-    if (!name || !service_name || !regular_price || !special_price) {
+    if (!name || !service_name || !special_price) {
       return NextResponse.json(
         { success: false, error: '必須項目を入力してください' },
-        { status: 400 }
-      );
-    }
-
-    if (special_price >= regular_price) {
-      return NextResponse.json(
-        { success: false, error: '特別価格は通常価格より安く設定してください' },
         { status: 400 }
       );
     }
@@ -83,19 +73,18 @@ export async function POST(request) {
         description,
         service_name,
         total_sessions,
-        regular_price,
         special_price,
         validity_days,
         sale_end_date,
         max_sales,
+        current_sales,
         is_active
-      ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
       [
         name,
         description || '',
         service_name,
         total_sessions,
-        regular_price,
         special_price,
         validity_days,
         sale_end_date || null,
@@ -129,7 +118,6 @@ export async function PUT(request) {
       description,
       service_name,
       total_sessions,
-      regular_price,
       special_price,
       validity_days,
       sale_end_date,
@@ -138,16 +126,9 @@ export async function PUT(request) {
     } = body;
 
     // バリデーション
-    if (!offer_id || !name || !service_name || !regular_price || !special_price) {
+    if (!offer_id || !name || !service_name || !special_price) {
       return NextResponse.json(
         { success: false, error: '必須項目を入力してください' },
-        { status: 400 }
-      );
-    }
-
-    if (special_price >= regular_price) {
-      return NextResponse.json(
-        { success: false, error: '特別価格は通常価格より安く設定してください' },
         { status: 400 }
       );
     }
@@ -159,7 +140,6 @@ export async function PUT(request) {
            description = ?,
            service_name = ?,
            total_sessions = ?,
-           regular_price = ?,
            special_price = ?,
            validity_days = ?,
            sale_end_date = ?,
@@ -171,7 +151,6 @@ export async function PUT(request) {
         description || '',
         service_name,
         total_sessions,
-        regular_price,
         special_price,
         validity_days,
         sale_end_date || null,

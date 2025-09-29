@@ -536,3 +536,112 @@
     flex-direction: column;
   }
 }
+/* オプション選択セクション */
+.services-option-selector {
+  margin-top: 0.5rem;
+}
+
+.services-option-dropdown {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  background-color: white;
+}
+
+.services-option-dropdown:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 選択済みオプションリスト */
+.services-selected-options {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.services-option-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.375rem;
+}
+
+.services-option-item span {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.services-option-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.services-option-qty-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #374151;
+  transition: all 0.2s;
+}
+
+.services-option-qty-btn:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.services-option-qty {
+  min-width: 24px;
+  text-align: center;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.services-option-remove {
+  padding: 0.25rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #dc2626;
+  border-radius: 0.25rem;
+  transition: all 0.2s;
+}
+
+.services-option-remove:hover {
+  background: #fee2e2;
+}
+
+/* オプションリスト（テーブル内） */
+.services-option-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.services-option-tag {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  background: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+}

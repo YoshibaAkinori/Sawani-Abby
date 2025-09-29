@@ -1,11 +1,11 @@
-// app/settings/set_component/ServicesManagement.js
 "use client";
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Save, X, Check, Sparkles, Tag, Clock, DollarSign, Package, Users } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, Check, Sparkles, Tag, Clock, Package, Users } from 'lucide-react';
 import './ServicesManagement.css';
 
 const ServicesManagement = () => {
   const [services, setServices] = useState([]);
+  const [options, setOptions] = useState([]); // オプション一覧
   const [ticketPlans, setTicketPlans] = useState([]);
   const [coupons, setCoupons] = useState([]);
   const [limitedOffers, setLimitedOffers] = useState([]);
@@ -18,8 +18,10 @@ const ServicesManagement = () => {
   const [showTicketForm, setShowTicketForm] = useState(false);
   const [showCouponForm, setShowCouponForm] = useState(false);
   const [showLimitedForm, setShowLimitedForm] = useState(false);
+    // 状態に編集用のIDと編集中のフォームを追加
+  const [editingTicketId, setEditingTicketId] = useState(null);
   
-  // サービスフォームデータ
+  // サービスフォームデータ（自由選択オプション追加）
   const [serviceForm, setServiceForm] = useState({
     name: '',
     description: '',
@@ -27,26 +29,28 @@ const ServicesManagement = () => {
     price: '',
     first_time_price: '',
     has_first_time_discount: false,
+    free_option_choices: 0, // 自由選択オプション数
     category: 'フェイシャル',
     is_active: true
   });
 
   // 回数券フォームデータ
-  const [ticketForm, setTicketForm] = useState({
-    service_id: '',
-    name: '',
-    gender_restriction: 'all', // all/male/female
-    total_sessions: 5,
-    price: '',
-    validity_days: 180
-  });
+const [ticketForm, setTicketForm] = useState({
+  service_id: '',
+  name: '',
+  service_category: '新規', // ← 追加
+  gender_restriction: 'all',
+  total_sessions: 5,
+  price: '',
+  validity_days: 180
+});
 
-  // クーポンフォームデータ
+  // クーポンフォームデータ（改良版）
   const [couponForm, setCouponForm] = useState({
     name: '',
     description: '',
     base_service_id: '',
-    included_options: [], // [{ option_id, option_name, quantity }]
+    included_options: [], // [{ option_id, quantity }]
     free_option_count: 0,
     total_price: '',
     validity_days: 180,
@@ -54,14 +58,13 @@ const ServicesManagement = () => {
     is_active: true
   });
 
-  // 期間限定フォームデータ
+  // 期間限定フォームデータ（簡略化）
   const [limitedForm, setLimitedForm] = useState({
     name: '',
     description: '',
     service_name: '',
     total_sessions: 5,
-    regular_price: '',
-    special_price: '',
+    special_price: '', // 販売価格のみ
     validity_days: 180,
     sale_end_date: '',
     max_sales: '',
@@ -74,10 +77,25 @@ const ServicesManagement = () => {
   // 初期データ読み込み
   useEffect(() => {
     fetchServices();
+    fetchOptions(); // オプション一覧を取得
     fetchTicketPlans();
     fetchCoupons();
     fetchLimitedOffers();
   }, []);
+
+  // オプション一覧取得
+  const fetchOptions = async () => {
+    try {
+      const response = await fetch('/api/options');
+      if (response.ok) {
+        const data = await response.json();
+        setOptions(data.data || []);
+      }
+    } catch (err) {
+      console.error('オプション取得エラー:', err);
+      setOptions([]);
+    }
+  };
 
   // サービス一覧取得
   const fetchServices = async () => {
@@ -143,46 +161,100 @@ const ServicesManagement = () => {
   };
 
   // 回数券フォーム入力処理
-  const handleTicketInputChange = (e) => {
-    const { name, value } = e.target;
-    if (name === 'service_id') {
-      const selectedService = services.find(s => s.service_id === value);
-      if (selectedService) {
-        const genderText = ticketForm.gender_restriction === 'male' ? '男性' : 
-                          ticketForm.gender_restriction === 'female' ? '女性' : '';
-        setTicketForm(prev => ({
-          ...prev,
-          service_id: value,
-          name: `${selectedService.name}${prev.total_sessions}回券${genderText ? `（${genderText}）` : ''}`
-        }));
-      }
-    } else if (name === 'total_sessions' || name === 'gender_restriction') {
-      const selectedService = services.find(s => s.service_id === ticketForm.service_id);
-      const genderText = name === 'gender_restriction' ? 
-        (value === 'male' ? '男性' : value === 'female' ? '女性' : '') :
-        (ticketForm.gender_restriction === 'male' ? '男性' : ticketForm.gender_restriction === 'female' ? '女性' : '');
-      const sessions = name === 'total_sessions' ? value : ticketForm.total_sessions;
-      
+const handleTicketInputChange = (e) => {
+  const { name, value } = e.target;
+  
+  if (name === 'service_id') {
+    const selectedService = services.find(s => s.service_id === value);
+    if (selectedService) {
+      const genderText = ticketForm.gender_restriction === 'male' ? '男性' :
+                        ticketForm.gender_restriction === 'female' ? '女性' : '';
       setTicketForm(prev => ({
         ...prev,
-        [name]: value,
-        name: selectedService ? `${selectedService.name}${sessions}回券${genderText ? `（${genderText}）` : ''}` : prev.name
-      }));
-    } else {
-      setTicketForm(prev => ({
-        ...prev,
-        [name]: value
+        service_id: value,
+        // service_categoryはそのまま保持(ユーザーが選択した値を維持)
+        name: `${selectedService.name}${prev.total_sessions}回券${genderText ? `(${genderText})` : ''}`
       }));
     }
-  };
+  } else if (name === 'total_sessions' || name === 'gender_restriction') {
+    const selectedService = services.find(s => s.service_id === ticketForm.service_id);
+    const genderText = name === 'gender_restriction' ?
+      (value === 'male' ? '男性' : value === 'female' ? '女性' : '') :
+      (ticketForm.gender_restriction === 'male' ? '男性' : ticketForm.gender_restriction === 'female' ? '女性' : '');
+    const sessions = name === 'total_sessions' ? value : ticketForm.total_sessions;
+    
+    setTicketForm(prev => ({
+      ...prev,
+      [name]: value,
+      name: selectedService ? `${selectedService.name}${sessions}回券${genderText ? `(${genderText})` : ''}` : prev.name
+    }));
+  } else {
+    // service_categoryを含む他のフィールドはそのまま更新
+    setTicketForm(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  }
+};
 
-  // クーポンフォーム入力処理
+  // クーポンフォーム入力処理（改良版）
   const handleCouponInputChange = (e) => {
     const { name, value, type, checked } = e.target;
     setCouponForm(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+  };
+
+  // 指定オプション追加
+  const addIncludedOption = (optionId) => {
+    const option = options.find(o => o.option_id === optionId);
+    if (!option) return;
+
+    setCouponForm(prev => {
+      const existing = prev.included_options.find(o => o.option_id === optionId);
+      if (existing) {
+        // 数量を増やす
+        return {
+          ...prev,
+          included_options: prev.included_options.map(o =>
+            o.option_id === optionId ? { ...o, quantity: o.quantity + 1 } : o
+          )
+        };
+      } else {
+        // 新規追加
+        return {
+          ...prev,
+          included_options: [...prev.included_options, { 
+            option_id: optionId, 
+            option_name: option.name,
+            quantity: 1 
+          }]
+        };
+      }
+    });
+  };
+
+  // 指定オプション削除
+  const removeIncludedOption = (optionId) => {
+    setCouponForm(prev => ({
+      ...prev,
+      included_options: prev.included_options.filter(o => o.option_id !== optionId)
+    }));
+  };
+
+  // 指定オプション数量変更
+  const updateIncludedOptionQuantity = (optionId, quantity) => {
+    if (quantity <= 0) {
+      removeIncludedOption(optionId);
+    } else {
+      setCouponForm(prev => ({
+        ...prev,
+        included_options: prev.included_options.map(o =>
+          o.option_id === optionId ? { ...o, quantity } : o
+        )
+      }));
+    }
   };
 
   // 期間限定フォーム入力処理
@@ -246,6 +318,7 @@ const ServicesManagement = () => {
       price: service.price,
       first_time_price: service.first_time_price || '',
       has_first_time_discount: service.has_first_time_discount || false,
+      free_option_choices: service.free_option_choices || 0,
       category: service.category,
       is_active: service.is_active
     });
@@ -371,6 +444,56 @@ const ServicesManagement = () => {
     }
   };
 
+// 回数券編集開始
+const startEditTicketPlan = (plan) => {
+  setEditingTicketId(plan.plan_id);
+  setTicketForm({
+    service_id: plan.service_id,
+    name: plan.name,
+    service_category: plan.service_category,
+    gender_restriction: plan.gender_restriction || 'all',
+    total_sessions: plan.total_sessions,
+    price: plan.price,
+    validity_days: plan.validity_days
+  });
+};
+
+// 回数券更新
+const handleUpdateTicketPlan = async (planId) => {
+  if (!ticketForm.service_id || !ticketForm.name || !ticketForm.price) {
+    setError('必須項目を入力してください');
+    setTimeout(() => setError(''), 3000);
+    return;
+  }
+
+  setIsLoading(true);
+  try {
+    const response = await fetch('/api/ticket-plans', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        plan_id: planId,
+        ...ticketForm
+      })
+    });
+
+    if (response.ok) {
+      setSuccess('更新しました');
+      fetchTicketPlans();
+      setEditingTicketId(null);
+      resetTicketForm();
+    } else {
+      const data = await response.json();
+      throw new Error(data.error || '更新に失敗しました');
+    }
+  } catch (err) {
+    setError(err.message);
+  } finally {
+    setIsLoading(false);
+    setTimeout(() => { setSuccess(''); setError(''); }, 3000);
+  }
+};
+
   // 回数券プラン削除
   const handleDeleteTicketPlan = async (planId) => {
     if (!window.confirm('この回数券プランを削除してもよろしいですか？')) {
@@ -399,9 +522,9 @@ const ServicesManagement = () => {
     }
   };
 
-  // クーポン追加
+  // クーポン追加（改良版）
   const handleAddCoupon = async () => {
-    if (!couponForm.coupon_code || !couponForm.name || !couponForm.base_service_id || !couponForm.total_price) {
+    if (!couponForm.name || !couponForm.base_service_id || !couponForm.total_price) {
       setError('必須項目を入力してください');
       setTimeout(() => setError(''), 3000);
       return;
@@ -425,16 +548,27 @@ const ServicesManagement = () => {
         throw new Error(data.error || '登録に失敗しました');
       }
     } catch (err) {
-      setError(err.message);
+      // デモモード
+      const selectedService = services.find(s => s.service_id === couponForm.base_service_id);
+      const newCoupon = {
+        coupon_id: Date.now().toString(),
+        ...couponForm,
+        service_name: selectedService?.name,
+        total_price: Number(couponForm.total_price)
+      };
+      setCoupons(prev => [...prev, newCoupon]);
+      setSuccess('クーポンを登録しました（ローカル保存）');
+      setShowCouponForm(false);
+      resetCouponForm();
     } finally {
       setIsLoading(false);
       setTimeout(() => { setSuccess(''); setError(''); }, 3000);
     }
   };
 
-  // 期間限定オファー追加
+  // 期間限定オファー追加（簡略化版）
   const handleAddLimitedOffer = async () => {
-    if (!limitedForm.name || !limitedForm.service_name || !limitedForm.regular_price || !limitedForm.special_price) {
+    if (!limitedForm.name || !limitedForm.service_name || !limitedForm.special_price) {
       setError('必須項目を入力してください');
       setTimeout(() => setError(''), 3000);
       return;
@@ -458,7 +592,17 @@ const ServicesManagement = () => {
         throw new Error(data.error || '登録に失敗しました');
       }
     } catch (err) {
-      setError(err.message);
+      // デモモード
+      const newOffer = {
+        offer_id: Date.now().toString(),
+        ...limitedForm,
+        special_price: Number(limitedForm.special_price),
+        price_per_session: Math.floor(Number(limitedForm.special_price) / limitedForm.total_sessions)
+      };
+      setLimitedOffers(prev => [...prev, newOffer]);
+      setSuccess('期間限定オファーを登録しました（ローカル保存）');
+      setShowLimitedForm(false);
+      resetLimitedForm();
     } finally {
       setIsLoading(false);
       setTimeout(() => { setSuccess(''); setError(''); }, 3000);
@@ -474,30 +618,33 @@ const ServicesManagement = () => {
       price: '',
       first_time_price: '',
       has_first_time_discount: false,
+      free_option_choices: 0,
       category: 'フェイシャル',
       is_active: true
     });
   };
 
+
+// フォームリセット関数
   const resetTicketForm = () => {
     setTicketForm({
-      service_id: '',
-      name: '',
-      gender_restriction: 'all',
-      total_sessions: 5,
-      price: '',
-      validity_days: 180
-    });
-  };
+    service_id: '',
+    name: '',
+    service_category: '新規', // ← 追加
+    gender_restriction: 'all',
+    total_sessions: 5,
+    price: '',
+    validity_days: 180
+  });
+};
 
   const resetCouponForm = () => {
     setCouponForm({
-      coupon_code: '',
       name: '',
       description: '',
       base_service_id: '',
       included_options: [],
-      free_option_count: 1,
+      free_option_count: 0,
       total_price: '',
       validity_days: 180,
       usage_limit: '',
@@ -511,7 +658,6 @@ const ServicesManagement = () => {
       description: '',
       service_name: '',
       total_sessions: 5,
-      regular_price: '',
       special_price: '',
       validity_days: 180,
       sale_end_date: '',
@@ -523,6 +669,7 @@ const ServicesManagement = () => {
   // キャンセル
   const handleCancel = () => {
     setEditingId(null);
+    setEditingTicketId(null);
     setShowAddForm(false);
     setShowTicketForm(false);
     setShowCouponForm(false);
@@ -656,6 +803,20 @@ const ServicesManagement = () => {
                   />
                 </div>
 
+                <div className="services-form-group">
+                  <label>自由選択オプション数</label>
+                  <select
+                    name="free_option_choices"
+                    value={serviceForm.free_option_choices}
+                    onChange={handleServiceInputChange}
+                  >
+                    <option value="0">なし</option>
+                    <option value="1">1つ選択可</option>
+                    <option value="2">2つ選択可</option>
+                    <option value="3">3つ選択可</option>
+                  </select>
+                </div>
+
                 <div className="services-form-group services-form-group--full">
                   <label className="services-checkbox-label">
                     <input
@@ -736,6 +897,7 @@ const ServicesManagement = () => {
                           <th>時間</th>
                           <th>通常料金</th>
                           <th>初回料金</th>
+                          <th>無料オプション</th>
                           <th>ステータス</th>
                           <th>操作</th>
                         </tr>
@@ -796,6 +958,19 @@ const ServicesManagement = () => {
                                   </div>
                                 </td>
                                 <td>
+                                  <select
+                                    name="free_option_choices"
+                                    value={serviceForm.free_option_choices}
+                                    onChange={handleServiceInputChange}
+                                    className="services-input-inline services-input-inline--small"
+                                  >
+                                    <option value="0">なし</option>
+                                    <option value="1">1個</option>
+                                    <option value="2">2個</option>
+                                    <option value="3">3個</option>
+                                  </select>
+                                </td>
+                                <td>
                                   <label className="services-checkbox-label-inline">
                                     <input
                                       type="checkbox"
@@ -846,6 +1021,13 @@ const ServicesManagement = () => {
                                         {calculateDiscountRate(service.price, service.first_time_price)}%OFF
                                       </span>
                                     </div>
+                                  ) : (
+                                    <span className="services-text-muted">-</span>
+                                  )}
+                                </td>
+                                <td>
+                                  {service.free_option_choices > 0 ? (
+                                    <span>{service.free_option_choices}個選択可</span>
                                   ) : (
                                     <span className="services-text-muted">-</span>
                                   )}
@@ -922,6 +1104,19 @@ const ServicesManagement = () => {
                         {service.name} (¥{service.price.toLocaleString()})
                       </option>
                     ))}
+                  </select>
+                </div>
+
+                <div className="services-form-group">
+                  <label>カテゴリ *</label>
+                  <select
+                    name="service_category"
+                    value={ticketForm.service_category}
+                    onChange={handleTicketInputChange}
+                  >
+                    <option value="新規">新規</option>
+                    <option value="会員">会員</option>
+                    <option value="その他">その他</option>
                   </select>
                 </div>
 
@@ -1027,78 +1222,203 @@ const ServicesManagement = () => {
             </div>
           )}
 
-          {/* 回数券プラン一覧 */}
-          <div className="services-table">
-            <table>
-              <thead>
-                <tr>
-                  <th>対象コース</th>
-                  <th>プラン名</th>
-                  <th>対象</th>
-                  <th>回数</th>
-                  <th>総額</th>
-                  <th>1回あたり</th>
-                  <th>割引率</th>
-                  <th>有効期限</th>
-                  <th>操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ticketPlans.map(plan => (
-                  <tr key={plan.plan_id}>
-                    <td>{plan.service_name}</td>
-                    <td className="services-table-name">{plan.name}</td>
-                    <td>
-                      {plan.gender_restriction === 'female' && (
-                        <span className="services-gender-badge services-gender-badge--female">
-                          <Users size={14} /> 女性
-                        </span>
-                      )}
-                      {plan.gender_restriction === 'male' && (
-                        <span className="services-gender-badge services-gender-badge--male">
-                          <Users size={14} /> 男性
-                        </span>
-                      )}
-                      {(!plan.gender_restriction || plan.gender_restriction === 'all') && (
-                        <span className="services-text-muted">全員</span>
-                      )}
-                    </td>
-                    <td>{plan.total_sessions}回</td>
-                    <td>¥{Number(plan.price || 0).toLocaleString()}</td>
-                    <td>¥{Number(plan.price_per_session || 0).toLocaleString()}</td>
-                    <td>
-                      {plan.discount_rate > 0 && (
-                        <span className="services-discount-badge">
-                          {plan.discount_rate}%OFF
-                        </span>
-                      )}
-                    </td>
-                    <td>{plan.validity_days}日</td>
-                    <td>
-                      <button
-                        onClick={() => handleDeleteTicketPlan(plan.plan_id)}
-                        className="services-btn-icon services-btn-icon--danger"
-                        disabled={isLoading}
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
+{/* 回数券プラン一覧 */}
+<div className="services-table">
+  {(() => {
+    const uniqueCategories = [...new Set(ticketPlans.map(plan => plan.service_category || 'その他'))];
+    
+    return (
+      <>
+        {uniqueCategories.map(category => {
+          const categoryPlans = ticketPlans.filter(plan => (plan.service_category || 'その他') === category);
+          
+          return (
+            <div key={`ticket-category-${category}`} className="ticket-category-section">
+              <h3 className="ticket-category-title">{category}</h3>
+              <table>
+                <thead>
+                  <tr>
+                    <th>対象コース</th>
+                    <th>プラン名</th>
+                    <th>対象</th>
+                    <th>回数</th>
+                    <th>総額</th>
+                    <th>1回あたり</th>
+                    <th>割引率</th>
+                    <th>有効期限</th>
+                    <th>操作</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-
-            {ticketPlans.length === 0 && (
-              <div className="services-empty-state">
-                <Package size={48} />
-                <p>回数券プランが登録されていません</p>
-              </div>
+                </thead>
+                <tbody>
+                  {categoryPlans.map(plan => (
+                    <tr key={plan.plan_id}>
+                      {editingTicketId === plan.plan_id ? (
+                        <>
+                          <td>
+                            <select
+                              name="service_id"
+                              value={ticketForm.service_id}
+                              onChange={handleTicketInputChange}
+                              className="services-input-inline"
+                            >
+                              {services.filter(s => s.is_active).map(service => (
+                                <option key={service.service_id} value={service.service_id}>
+                                  {service.name}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td>
+                            <input
+                              type="text"
+                              name="name"
+                              value={ticketForm.name}
+                              onChange={handleTicketInputChange}
+                              className="services-input-inline"
+                            />
+                          </td>
+                          <td>
+                            <select
+                              name="gender_restriction"
+                              value={ticketForm.gender_restriction}
+                              onChange={handleTicketInputChange}
+                              className="services-input-inline services-input-inline--small"
+                            >
+                              <option value="all">全員</option>
+                              <option value="female">女性</option>
+                              <option value="male">男性</option>
+                            </select>
+                          </td>
+                          <td>
+                            <select
+                              name="total_sessions"
+                              value={ticketForm.total_sessions}
+                              onChange={handleTicketInputChange}
+                              className="services-input-inline services-input-inline--small"
+                            >
+                              <option value="5">5回</option>
+                              <option value="10">10回</option>
+                              <option value="15">15回</option>
+                              <option value="20">20回</option>
+                            </select>
+                          </td>
+                          <td>
+                            <input
+                              type="number"
+                              name="price"
+                              value={ticketForm.price}
+                              onChange={handleTicketInputChange}
+                              className="services-input-inline services-input-inline--medium"
+                            />
+                          </td>
+                          <td>¥{Math.floor(ticketForm.price / ticketForm.total_sessions).toLocaleString()}</td>
+                          <td>-</td>
+                          <td>
+                            <select
+                              name="validity_days"
+                              value={ticketForm.validity_days}
+                              onChange={handleTicketInputChange}
+                              className="services-input-inline services-input-inline--small"
+                            >
+                              <option value="90">90日</option>
+                              <option value="180">180日</option>
+                              <option value="365">365日</option>
+                              <option value="730">730日</option>
+                            </select>
+                          </td>
+                          <td>
+                            <div className="services-actions">
+                              <button
+                                onClick={() => handleUpdateTicketPlan(plan.plan_id)}
+                                className="services-btn-icon services-btn-icon--success"
+                                disabled={isLoading}
+                              >
+                                <Save size={16} />
+                              </button>
+                              <button
+                                onClick={handleCancel}
+                                className="services-btn-icon services-btn-icon--secondary"
+                                disabled={isLoading}
+                              >
+                                <X size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </>
+                      ) : (
+                        <>
+                          <td>{plan.service_name}</td>
+                          <td className="services-table-name">{plan.name}</td>
+                          <td>
+                            {plan.gender_restriction === 'female' && (
+                              <span className="services-gender-badge services-gender-badge--female">
+                                <Users size={14} /> 女性
+                              </span>
+                            )}
+                            {plan.gender_restriction === 'male' && (
+                              <span className="services-gender-badge services-gender-badge--male">
+                                <Users size={14} /> 男性
+                              </span>
+                            )}
+                            {(!plan.gender_restriction || plan.gender_restriction === 'all') && (
+                              <span className="services-text-muted">全員</span>
+                            )}
+                          </td>
+                          <td>{plan.total_sessions}回</td>
+                          <td>¥{Number(plan.price || 0).toLocaleString()}</td>
+                          <td>¥{Number(plan.price_per_session || 0).toLocaleString()}</td>
+                          <td>
+                            {plan.discount_rate > 0 ? (
+                              <span className="services-discount-badge">
+                                {plan.discount_rate}%OFF
+                              </span>
+                            ) : (
+                              <span className="services-text-muted">-</span>
+                            )}
+                          </td>
+                          <td>{plan.validity_days}日</td>
+                          <td>
+                            <div className="services-actions">
+                              <button
+                                onClick={() => startEditTicketPlan(plan)}
+                                className="services-btn-icon services-btn-icon--primary"
+                                disabled={isLoading}
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteTicketPlan(plan.plan_id)}
+                                className="services-btn-icon services-btn-icon--danger"
+                                disabled={isLoading}
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })}
+      </>
+    );
+  })()}
+  
+  {ticketPlans.length === 0 && (
+    <div className="services-empty-state">
+      <Package size={48} />
+      <p>回数券プランが登録されていません</p>
+    </div>
+  )}
+</div>
+            </div>  
             )}
-          </div>
-        </div>
-      )}
-
-      {/* クーポンタブ */}
+      
+            {/* クーポンタブ */}
       {activeTab === 'coupons' && (
         <div className="services-content">
           <div className="services-header">
@@ -1121,17 +1441,6 @@ const ServicesManagement = () => {
               <h4>新規クーポン登録</h4>
               <div className="services-form-grid">
                 <div className="services-form-group services-form-group--full">
-                  <label>クーポンコード *</label>
-                  <input
-                    type="text"
-                    name="coupon_code"
-                    value={couponForm.coupon_code}
-                    onChange={handleCouponInputChange}
-                    placeholder="例: SPECIAL2025"
-                  />
-                </div>
-
-                <div className="services-form-group services-form-group--full">
                   <label>クーポン名 *</label>
                   <input
                     type="text"
@@ -1152,7 +1461,7 @@ const ServicesManagement = () => {
                     <option value="">選択してください</option>
                     {services.filter(s => s.is_active).map(service => (
                       <option key={service.service_id} value={service.service_id}>
-                        {service.name} ({service.duration_minutes}分)
+                        {service.name} ({service.duration_minutes}分) - ¥{service.price.toLocaleString()}
                       </option>
                     ))}
                   </select>
@@ -1169,6 +1478,62 @@ const ServicesManagement = () => {
                   />
                 </div>
 
+                {/* 指定オプション選択セクション */}
+                <div className="services-form-group services-form-group--full">
+                  <label>含まれる指定オプション</label>
+                  <div className="services-option-selector">
+                    <select 
+                      onChange={(e) => e.target.value && addIncludedOption(e.target.value)}
+                      value=""
+                      className="services-option-dropdown"
+                    >
+                      <option value="">オプションを選択して追加...</option>
+                      {options.filter(o => o.is_active && 
+                        !couponForm.included_options.find(io => io.option_id === o.option_id)
+                      ).map(option => (
+                        <option key={option.option_id} value={option.option_id}>
+                          {option.name} ({option.duration_minutes}分) - ¥{option.price.toLocaleString()}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  {/* 選択済みオプションリスト */}
+                  {couponForm.included_options.length > 0 && (
+                    <div className="services-selected-options">
+                      {couponForm.included_options.map(opt => (
+                        <div key={opt.option_id} className="services-option-item">
+                          <span>{opt.option_name}</span>
+                          <div className="services-option-controls">
+                            <button
+                              type="button"
+                              onClick={() => updateIncludedOptionQuantity(opt.option_id, opt.quantity - 1)}
+                              className="services-option-qty-btn"
+                            >
+                              -
+                            </button>
+                            <span className="services-option-qty">{opt.quantity}</span>
+                            <button
+                              type="button"
+                              onClick={() => updateIncludedOptionQuantity(opt.option_id, opt.quantity + 1)}
+                              className="services-option-qty-btn"
+                            >
+                              +
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeIncludedOption(opt.option_id)}
+                              className="services-option-remove"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div className="services-form-group">
                   <label>自由選択オプション数</label>
                   <select
@@ -1177,9 +1542,9 @@ const ServicesManagement = () => {
                     onChange={handleCouponInputChange}
                   >
                     <option value="0">なし</option>
-                    <option value="1">1つ</option>
-                    <option value="2">2つ</option>
-                    <option value="3">3つ</option>
+                    <option value="1">1つ選択可</option>
+                    <option value="2">2つ選択可</option>
+                    <option value="3">3つ選択可</option>
                   </select>
                 </div>
 
@@ -1204,7 +1569,7 @@ const ServicesManagement = () => {
                     name="usage_limit"
                     value={couponForm.usage_limit}
                     onChange={handleCouponInputChange}
-                    placeholder="100"
+                    placeholder="無制限の場合は空欄"
                   />
                 </div>
 
@@ -1214,7 +1579,7 @@ const ServicesManagement = () => {
                     name="description"
                     value={couponForm.description}
                     onChange={handleCouponInputChange}
-                    rows="2"
+                    rows="3"
                     placeholder="クーポンの説明・利用条件"
                   />
                 </div>
@@ -1240,17 +1605,18 @@ const ServicesManagement = () => {
               </div>
             </div>
           )}
+        
 
           {/* クーポン一覧テーブル */}
           <div className="services-table">
             <table>
               <thead>
                 <tr>
-                  <th>クーポンコード</th>
                   <th>クーポン名</th>
                   <th>ベース施術</th>
+                  <th>指定オプション</th>
+                  <th>自由オプション</th>
                   <th>パック価格</th>
-                  <th>無料オプション</th>
                   <th>有効期限</th>
                   <th>使用状況</th>
                   <th>ステータス</th>
@@ -1262,12 +1628,30 @@ const ServicesManagement = () => {
                   <tr key={coupon.coupon_id}>
                     <td className="services-table-name">
                       <Tag size={14} />
-                      {coupon.coupon_code}
+                      {coupon.name}
                     </td>
-                    <td>{coupon.name}</td>
                     <td>{coupon.service_name}</td>
+                    <td>
+                      {coupon.included_options && coupon.included_options.length > 0 ? (
+                        <div className="services-option-list">
+                          {coupon.included_options.map((opt, idx) => (
+                            <span key={idx} className="services-option-tag">
+                              {opt.option_name} x{opt.quantity}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="services-text-muted">-</span>
+                      )}
+                    </td>
+                    <td>
+                      {coupon.free_option_count > 0 ? (
+                        <span>{coupon.free_option_count}個選択可</span>
+                      ) : (
+                        <span className="services-text-muted">-</span>
+                      )}
+                    </td>
                     <td>¥{coupon.total_price.toLocaleString()}</td>
-                    <td>{coupon.free_option_count}個選択可</td>
                     <td>{coupon.validity_days}日</td>
                     <td>
                       {coupon.used_count || 0} / {coupon.usage_limit || '∞'}
@@ -1367,18 +1751,7 @@ const ServicesManagement = () => {
                 </div>
 
                 <div className="services-form-group">
-                  <label>通常価格 *</label>
-                  <input
-                    type="number"
-                    name="regular_price"
-                    value={limitedForm.regular_price}
-                    onChange={handleLimitedInputChange}
-                    placeholder="50000"
-                  />
-                </div>
-
-                <div className="services-form-group">
-                  <label>特別価格 *</label>
+                  <label>販売価格 *</label>
                   <input
                     type="number"
                     name="special_price"
@@ -1386,10 +1759,10 @@ const ServicesManagement = () => {
                     onChange={handleLimitedInputChange}
                     placeholder="30000"
                   />
-                  {limitedForm.regular_price && limitedForm.special_price && (
-                    <span className="services-discount-badge">
-                      {calculateDiscountRate(limitedForm.regular_price, limitedForm.special_price)}%OFF
-                    </span>
+                  {limitedForm.special_price && limitedForm.total_sessions && (
+                    <div className="services-price-info">
+                      <span>1回あたり: ¥{Math.floor(limitedForm.special_price / limitedForm.total_sessions).toLocaleString()}</span>
+                    </div>
                   )}
                 </div>
 
@@ -1423,7 +1796,7 @@ const ServicesManagement = () => {
                     name="max_sales"
                     value={limitedForm.max_sales}
                     onChange={handleLimitedInputChange}
-                    placeholder="50"
+                    placeholder="無制限の場合は空欄"
                   />
                 </div>
 
@@ -1468,9 +1841,8 @@ const ServicesManagement = () => {
                   <th>オファー名</th>
                   <th>サービス</th>
                   <th>回数</th>
-                  <th>通常価格</th>
-                  <th>特別価格</th>
-                  <th>割引率</th>
+                  <th>販売価格</th>
+                  <th>1回あたり</th>
                   <th>販売終了</th>
                   <th>販売状況</th>
                   <th>ステータス</th>
@@ -1486,13 +1858,8 @@ const ServicesManagement = () => {
                     </td>
                     <td>{offer.service_name}</td>
                     <td>{offer.total_sessions}回</td>
-                    <td>¥{offer.regular_price.toLocaleString()}</td>
                     <td>¥{offer.special_price.toLocaleString()}</td>
-                    <td>
-                      <span className="services-discount-badge">
-                        {offer.discount_rate}%OFF
-                      </span>
-                    </td>
+                    <td>¥{offer.price_per_session ? offer.price_per_session.toLocaleString() : Math.floor(offer.special_price / offer.total_sessions).toLocaleString()}</td>
                     <td>
                       {offer.sale_end_date ? new Date(offer.sale_end_date).toLocaleDateString('ja-JP') : '無期限'}
                     </td>

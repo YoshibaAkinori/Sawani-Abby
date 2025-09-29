@@ -18,7 +18,7 @@ export async function GET(request) {
         duration_minutes,
         price,
         first_time_price,
-        has_first_time_discount,
+        free_option_choices,
         category,
         is_active,
         created_at
