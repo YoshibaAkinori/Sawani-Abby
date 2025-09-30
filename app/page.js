@@ -8,69 +8,83 @@ import './global.css';
 
 const SalonBoard = () => {
   const router = useRouter();
-  const [selectedDate, setSelectedDate] = useState('2025-09-20');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); // 本日の日付を初期値に
   const [activeModal, setActiveModal] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   
-  // シフトとスタッフのデータ
+  // データとローディング状態
   const [staffShifts, setStaffShifts] = useState([]);
+  const [bookings, setBookings] = useState([]); // ★★★ APIから取得した予約データを保持するState
   const [isLoading, setIsLoading] = useState(true);
 
-
-  // シフトデータを取得
+  // ★★★ 日付が変更されたらシフトと予約の両方を取得する ★★★
   useEffect(() => {
-    fetchShifts();
+    fetchDataForDate();
   }, [selectedDate]);
 
-  const fetchShifts = async () => {
+  const fetchDataForDate = async () => {
     setIsLoading(true);
     try {
-      const [year, month] = selectedDate.split('-');
+      // 2つのAPI呼び出しを並列で実行
+      const [shiftsPromise, bookingsPromise] = [
+        fetchShifts(selectedDate),
+        fetchBookings(selectedDate)
+      ];
       
-      // 全スタッフを取得
-      const staffResponse = await fetch('/api/staff');
-      const staffData = await staffResponse.json();
-      const allStaff = staffData.data || [];
-      
-      // 各スタッフのシフトを取得
-      const shiftsPromises = allStaff.map(async (staff) => {
-        const shiftResponse = await fetch(`/api/shifts?staffId=${staff.staff_id}&year=${year}&month=${month}`);
-        const shiftData = await shiftResponse.json();
-        
-        // その日のシフトを探す
-        const dayShift = shiftData.data?.shifts?.find(s => s.date === selectedDate);
-        
-        return {
-          ...staff,
-          shift: dayShift || null,
-          hasShift: !!dayShift
-        };
-      });
-      
-      const staffWithShifts = await Promise.all(shiftsPromises);
-      setStaffShifts(staffWithShifts);
+      // 両方の完了を待つ
+      await Promise.all([shiftsPromise, bookingsPromise]);
+
     } catch (err) {
-      console.error('シフト取得エラー:', err);
-      // エラー時はデモデータを使用
-      setStaffShifts(staffDatabase.map(s => ({
-        ...s,
-        shift: null,
-        hasShift: false
-      })));
+      console.error('データ取得エラー:', err);
+      setStaffShifts([]);
+      setBookings([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 予約DB（予約マスタ）
-  const [bookingsDatabase] = useState([
-    { id: 1, staffId: '0001', bed: 'ベッド2', date: '2025-09-20', startTime: '11:20', endTime: '13:00', service: 'フェイシャル', client: '田中 花子', serviceType: 'フェイシャル', status: 'confirmed' },
-    { id: 2, staffId: '0001', bed: 'ベッド2', date: '2025-09-20', startTime: '14:00', endTime: '16:00', service: 'ボディトリート', client: '山田 太郎', serviceType: 'ボディトリート', status: 'confirmed' },
-    { id: 3, staffId: '0002', bed: 'ベッド1', date: '2025-09-20', startTime: '10:00', endTime: '12:00', service: 'フェイシャル', client: '鈴木 美香', serviceType: 'フェイシャル', status: 'confirmed' },
-    { id: 4, staffId: '0002', bed: 'ベッド1', date: '2025-09-20', startTime: '15:00', endTime: '17:30', service: 'ボディトリート', client: '佐藤 恵子', serviceType: 'ボディトリート', status: 'confirmed' },
-    { id: 5, staffId: '0003', bed: 'ベッド2', date: '2025-09-20', startTime: '18:30', endTime: '19:30', service: 'フェイシャル', client: '高橋 さくら', serviceType: 'フェイシャル', status: 'confirmed' },
-  ]);
+  // シフトデータを取得する関数
+  const fetchShifts = async (date) => {
+    const [year, month] = date.split('-');
+    const staffResponse = await fetch('/api/staff');
+    const staffData = await staffResponse.json();
+    const allStaff = staffData.data?.filter(s => s.is_active) || [];
+    
+    const shiftsPromises = allStaff.map(async (staff) => {
+      const shiftResponse = await fetch(`/api/shifts?staffId=${staff.staff_id}&year=${year}&month=${month}`);
+      const shiftData = await shiftResponse.json();
+      const dayShift = shiftData.data?.shifts?.find(s => s.date.startsWith(date));
+      return { ...staff, shift: dayShift || null, hasShift: !!dayShift };
+    });
+    
+    const staffWithShifts = await Promise.all(shiftsPromises);
+    setStaffShifts(staffWithShifts);
+  };
+
+  // ★★★ 予約データを取得する新しい関数 ★★★
+  const fetchBookings = async (date) => {
+    const response = await fetch(`/api/bookings?date=${date}`);
+    const data = await response.json();
+    if (data.success) {
+      // APIのキー(snake_case)をコンポーネントで使う(camelCase)に変換
+      const formattedBookings = data.data.map(b => ({
+        id: b.booking_id,
+        staffId: b.staff_id,
+        bed: b.bed_id ? `ベッド${b.bed_id}` : '',
+        date: b.date.split('T')[0],
+        startTime: b.start_time,
+        endTime: b.end_time,
+        service: b.service_name || b.notes || '予定', // サービス名がなければメモを表示
+        client: `${b.last_name || ''} ${b.first_name || ''}`,
+        serviceType: b.service_category || '予定', // カテゴリがなければ「予定」
+        status: b.status,
+        type: b.type // 'booking' or 'schedule'
+      }));
+      setBookings(formattedBookings);
+    } else {
+      setBookings([]);
+    }
+  };
 
   const bedCount = 2;
   const beds = Array.from({ length: bedCount }, (_, i) => `ベッド${i + 1}`);
@@ -93,7 +107,6 @@ const SalonBoard = () => {
   };
   
   const displayStaff = [headerRowData, ...staffShifts.filter(s => s.is_active)];
-  const bookings = getBookingsByDate(selectedDate);
 
   const timeToMinutes = (time) => {
     const [hours, minutes] = time.split(':').map(Number);
@@ -102,7 +115,7 @@ const SalonBoard = () => {
 
   const calculateBookingPosition = (startTime, endTime) => {
     // タイムライン全体の時間（分）を定義
-    const timelineStartMinutes = 9 * 60; // 10:00
+    const timelineStartMinutes =  9 * 60; // 10:00
     // 10:00から24:00までの14時間 = 840分
     const totalTimelineMinutes = (24 - 9) * 60;
 
@@ -198,7 +211,6 @@ const SalonBoard = () => {
   const handlePageChange = (page) => {
     router.push(`/${page}`);
     setActiveModal(null);
-    setSidebarOpen(false);
   };
 
   return (
@@ -238,13 +250,13 @@ const SalonBoard = () => {
           </div>
         </div>
       </header>
-
+      
       <div className="salon-board__content">
         <div className="salon-board__db-info">
           <div className="salon-board__db-info-content">
             <div className="salon-board__db-info-item">
               <User />
-              <span>スタッフ: {staffShifts.filter(s => s.is_active).length}名</span>
+              <span>スタッフ: {staffShifts.length}名</span>
             </div>
             <div className="salon-board__db-info-item">
               <Clock />
@@ -253,369 +265,249 @@ const SalonBoard = () => {
           </div>
         </div>
 
-        {/* スケジュール表示エリア */}
-        <div className="salon-board__schedule-area">
-          {activeModal && (
-            <>
-              <div className="salon-board__staff-schedule-container">
-                <div className="salon-board__main-scroll-container">
-                  <div className="salon-board__scrollable-content">
-                    <div className="salon-board__section">
-                      <h3 className="salon-board__section-title">
-                        <User />
-                        スタッフ別スケジュール
-                      </h3>
-                      <div className="salon-board__rows">
-                        {displayStaff.map(staff => {
-                          const isHeader = staff.id === 'HEADER_ROW';
-                          // マネージャーは常に勤務扱い
-                          const isHoliday = !isHeader && staff.role !== 'マネージャー' && !staff.hasShift;
-                          
-                          const rowClassName = `salon-board__row ${
-                            isHeader ? 'salon-board__row--is-header' : ''
-                          } ${isHoliday ? 'salon-board__row--holiday' : ''}`;
+        {/* --- 上半分：スタッフ別スケジュール（常に表示）--- */}
+        <div className="salon-board__section">
+          <h3 className="salon-board__section-title"><User />スタッフ別スケジュール</h3>
+          <div className="salon-board__main-scroll-container">
+            <div className="salon-board__rows">
+              {displayStaff.map(staff => {
+                const isHeader = staff.id === 'HEADER_ROW';
+                const isHoliday = !isHeader && staff.role !== 'マネージャー' && !staff.hasShift;
+                const rowClassName = `salon-board__row ${isHeader ? 'salon-board__row--is-header' : ''} ${isHoliday ? 'salon-board__row--holiday' : ''}`;
 
-                          return (
-                            <div key={staff.staff_id || staff.id} className={rowClassName}>
-                              <div className="salon-board__row-content">
-                                <div className="salon-board__row-label">
-                                  {!isHeader && (
-                                    <div className="salon-board__label-content">
-                                      <div className="salon-board__label-main">
-                                        <div className="salon-board__color-indicator" style={{ backgroundColor: staff.color }}></div>
-                                        <span className="salon-board__label-text">{staff.name}</span>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="salon-board__timeline">
-                                  <div className="salon-board__grid-lines">
-                                    {timeSlots.map((time, slotIndex) => {
-                                      const isInShiftTime = !isHeader && !isHoliday && isSlotInShiftTime(staff, time);
-                                      const isAvailable = isInShiftTime && isSlotAvailable(staff.staff_id, time);
-                                      const isOutOfShift = !isHeader && !isHoliday && !isInShiftTime;
-                                      
-                                      return (
-                                        <div 
-                                          key={time} 
-                                          className={`salon-board__grid-line ${
-                                            isAvailable ? 'salon-board__clickable-slot' : ''
-                                          }`}
-                                          onClick={() => isAvailable && handleSlotClick(staff.staff_id, time, slotIndex)}
-                                          style={{ 
-                                            cursor: isAvailable ? 'pointer' : 'default',
-                                            backgroundColor: isOutOfShift ? '#f5f5f5' : 'transparent'
-                                          }}
-                                        />
-                                      );
-                                    })}
-                                  </div>
-                                  
-                                  {isHeader ? (
-                                    <div className="time-header-content">
-                                      <div className="time-header__top-row">
-                                        {timeSlots.map((time, index) => (
-                                          <div key={`top-${time}`} className="time-header__cell time-header__cell--hour">
-                                            {index % 2 === 0 ? time : ''}
-                                          </div>
-                                        ))}
-                                      </div>
-                                      <div className="time-header__bottom-row">
-                                        {timeSlots.map(time => (
-                                          <div key={`bottom-${time}`} className="time-header__cell time-header__cell--minute">
-                                            {time.split(':')[1]}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    !isHoliday && bookings
-                                      .filter(booking => booking.staffId === staff.staff_id)
-                                      .map(booking => {
-                                        const { left, width } = calculateBookingPosition(booking.startTime, booking.endTime);
-                                        const serviceColorClass = getServiceColorClass(booking.serviceType);
-                                        return (
-                                          <div key={booking.id} className={`salon-board__booking ${serviceColorClass}`} style={{ left: `${left}px`, width: `${width}px` }}>
-                                            <div className="salon-board__booking-content">
-                                              <div className="salon-board__booking-client">{booking.serviceType} {booking.client + " 様"}</div>
-                                              <div className="salon-board__booking-service">{booking.bed}</div>
-                                            </div>
-                                          </div>
-                                        );
-                                      })
-                                  )}
-                                </div>
-                              </div>
+                return (
+                  <div key={staff.staff_id || staff.id} className={rowClassName}>
+                    <div className="salon-board__row-content">
+                      <div className="salon-board__row-label">
+                        {!isHeader && (
+                          <div className="salon-board__label-content">
+                            <div className="salon-board__label-main">
+                              <div className="salon-board__color-indicator" style={{ backgroundColor: staff.color }}></div>
+                              <span className="salon-board__label-text">{staff.name}</span>
                             </div>
-                          );
-                        })}
+                          </div>
+                        )}
+                      </div>
+                      <div className="salon-board__timeline">
+                        <div className="salon-board__grid-lines">
+                          {timeSlots.map(time => {
+                            const isInShiftTime = !isHeader && !isHoliday && isSlotInShiftTime(staff, time);
+                            const isAvailable = isInShiftTime && isSlotAvailable(staff.staff_id, time);
+                            const isOutOfShift = !isHeader && !isHoliday && !isInShiftTime;
+                            return (
+                              <div 
+                                key={`${staff.staff_id}-${time}`}
+                                className={`salon-board__grid-line ${isAvailable ? 'salon-board__clickable-slot' : ''}`}
+                                onClick={() => isAvailable && handleSlotClick(staff.staff_id, time)}
+                                style={{ backgroundColor: isOutOfShift ? '#f8f9fa' : 'transparent' }}
+                              />
+                            );
+                          })}
+                        </div>
+                        
+                        {isHeader ? (
+                          <div className="time-header-content">
+                            <div className="time-header__top-row">
+                              {timeSlots.map((time, index) => (
+                                <div key={`top-${time}`} className="time-header__cell time-header__cell--hour">
+                                  {index % 2 === 0 ? time : ''}
+                                </div>
+                              ))}
+                            </div>
+                            <div className="time-header__bottom-row">
+                              {timeSlots.map(time => (
+                                <div key={`bottom-${time}`} className="time-header__cell time-header__cell--minute">
+                                  {time.split(':')[1]}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : (
+                          !isHoliday && bookings
+                            .filter(booking => booking.staffId === staff.staff_id)
+                            .map(booking => {
+                              const { left, width } = calculateBookingPosition(booking.startTime, booking.endTime);
+                              const serviceColorClass = getServiceColorClass(booking);
+                              return (
+                                <div key={booking.id} className={`salon-board__booking ${serviceColorClass}`} style={{ left, width }}>
+                                  <div className="salon-board__booking-content">
+                                    {booking.type === 'schedule' ? (
+                                      <div className="salon-board__booking-client">{booking.service}</div>
+                                    ) : (
+                                      <>
+                                        <div className="salon-board__booking-client">{`${booking.client} 様`}</div>
+                                        <div className="salon-board__booking-service">{booking.service} / {booking.bed}</div>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })
+                        )}
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
 
-              <div className="salon-board__modal-area">
-                <BookingModal 
-                  activeModal={activeModal}
-                  selectedSlot={selectedSlot}
-                  onClose={closeModal}
-                  onModalChange={setActiveModal}
-                />
-              </div>
-            </>
-          )}
-
-          {!activeModal && (
-            <div className="salon-board__unified-schedule-container">
-              <div className="salon-board__main-scroll-container">
-                <div className="salon-board__scrollable-content">
-                  <div className="salon-board__schedule-grids">
-                    <div className="salon-board__section">
-                      <h3 className="salon-board__section-title">
-                        <User />
-                        スタッフ別スケジュール
-                      </h3>
-                      <div className="salon-board__rows">
-                        {displayStaff.map(staff => {
-                          const isHeader = staff.id === 'HEADER_ROW';
-                          // マネージャーは常に勤務扱い
-                          const isHoliday = !isHeader && staff.role !== 'マネージャー' && !staff.hasShift;
-                          
-                          const rowClassName = `salon-board__row ${
-                            isHeader ? 'salon-board__row--is-header' : ''
-                          } ${isHoliday ? 'salon-board__row--holiday' : ''}`;
-
-                          return (
-                            <div key={staff.staff_id || staff.id} className={rowClassName}>
-                              <div className="salon-board__row-content">
-                                <div className="salon-board__row-label">
-                                  {!isHeader && (
-                                    <div className="salon-board__label-content">
-                                      <div className="salon-board__label-main">
-                                        <div className="salon-board__color-indicator" style={{ backgroundColor: staff.color }}></div>
-                                        <span className="salon-board__label-text">{staff.name}</span>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                                <div className="salon-board__timeline">
-                                  <div className="salon-board__grid-lines">
-                                    {timeSlots.map((time, slotIndex) => {
-                                      const isInShiftTime = !isHeader && !isHoliday && isSlotInShiftTime(staff, time);
-                                      const isAvailable = isInShiftTime && isSlotAvailable(staff.staff_id, time);
-                                      const isOutOfShift = !isHeader && !isHoliday && !isInShiftTime;
-                                      
-                                      return (
-                                        <div 
-                                          key={time} 
-                                          className={`salon-board__grid-line ${
-                                            isAvailable ? 'salon-board__clickable-slot' : ''
-                                          }`}
-                                          onClick={() => isAvailable && handleSlotClick(staff.staff_id, time, slotIndex)}
-                                          style={{ 
-                                            cursor: isAvailable ? 'pointer' : 'default',
-                                            backgroundColor: isOutOfShift ? '#f5f5f5' : 'transparent'
-                                          }}
-                                        />
-                                      );
-                                    })}
-                                  </div>
-                                  
-                                  {isHeader ? (
-                                    <div className="time-header-content">
-                                      <div className="time-header__top-row">
-                                        {timeSlots.map((time, index) => (
-                                          <div key={`top-${time}`} className="time-header__cell time-header__cell--hour">
-                                            {index % 2 === 0 ? time : ''}
-                                          </div>
-                                        ))}
-                                      </div>
-                                      <div className="time-header__bottom-row">
-                                        {timeSlots.map(time => (
-                                          <div key={`bottom-${time}`} className="time-header__cell time-header__cell--minute">
-                                            {time.split(':')[1]}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    !isHoliday && bookings
-                                      .filter(booking => booking.staffId === staff.staff_id)
-                                      .map(booking => {
-                                        const { left, width } = calculateBookingPosition(booking.startTime, booking.endTime);
-                                        const serviceColorClass = getServiceColorClass(booking.serviceType);
-                                        return (
-                                          <div key={booking.id} className={`salon-board__booking ${serviceColorClass}`} style={{ left: left, width: width }}>
-                                            <div className="salon-board__booking-content">
-                                              <div className="salon-board__booking-client">{booking.serviceType} {booking.client + " 様"}</div>
-                                              <div className="salon-board__booking-service">{booking.bed}</div>
-                                            </div>
-                                          </div>
-                                        );
-                                      })
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="salon-board__section">
-                      <h3 className="salon-board__section-title">
-                        ベッド別スケジュール
-                      </h3>
-                      <div className="salon-board__rows">
-                        {beds.map(bed => (
-                          <div key={`bed-${bed}`} className="salon-board__row">
-                            <div className="salon-board__row-content">
-                              <div className="salon-board__row-label">
-                                <div className="salon-board__label-content">
-                                  <div className="salon-board__label-main">
-                                    <span className="salon-board__label-text">{bed}</span>
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="salon-board__timeline">
-                                <div className="salon-board__grid-lines">
-                                  {timeSlots.map((time, index) => (
-                                    <div 
-                                      key={time}
-                                      className={`salon-board__grid-line ${
-                                        index % 2 === 0 
-                                          ? 'salon-board__grid-line--even' 
-                                          : 'salon-board__grid-line--odd'
-                                      }`}
-                                    ></div>
-                                  ))}
-                                </div>
-                                {bookings
-                                  .filter(booking => booking.bed === bed)
-                                  .map(booking => {
-                                    const { left, width } = calculateBookingPosition(booking.startTime, booking.endTime);
-                                    const serviceColorClass = getServiceColorClass(booking.serviceType);
-                                    const staff = staffShifts.find(s => s.staff_id === booking.staffId);
-                                    
-                                    return (
-                                      <div
-                                        key={booking.id}
-                                        className={`salon-board__booking ${serviceColorClass}`}
-                                        style={{
-                                          left: left,
-                                          width: width,
-                                        }}
-                                      >
-                                        <div className="salon-board__booking-content">
-                                          <div className="salon-board__booking-client">
-                                            {booking.serviceType} {booking.client + " 様"}
-                                          </div>
-                                          <div className="salon-board__booking-service salon-board__booking-service--with-icon">
-                                            {staff && (
-                                              <div 
-                                                className="salon-board__small-color-indicator"
-                                                style={{ backgroundColor: staff.color }}
-                                              ></div>
-                                            )}
-                                            {staff?.name}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
+        {/* --- 下半分：モーダルの状態に応じて表示を切り替え --- */}
+        <div className="salon-board__lower-area">
+          {activeModal === 'booking' ? (
+            // ▼ モーダルがアクティブな時は、予約フォームを表示
+            <BookingModal 
+              activeModal={activeModal}
+              selectedSlot={selectedSlot}
+              onClose={closeModal}
+              onModalChange={setActiveModal}
+            />
+          ) : (
+            // ▼ モーダルが非表示の時は、ベッド別スケジュールと情報パネルを表示
+            <>
+              <div className="salon-board__section">
+                <h3 className="salon-board__section-title">ベッド別スケジュール</h3>
+                <div className="salon-board__main-scroll-container">
+                  <div className="salon-board__rows">
+                    {['ベッド1', 'ベッド2'].map(bed => (
+                      <div key={bed} className="salon-board__row">
+                        <div className="salon-board__row-content">
+                          <div className="salon-board__row-label">
+                            <div className="salon-board__label-content">
+                              <div className="salon-board__label-main">
+                                <span className="salon-board__label-text">{bed}</span>
                               </div>
                             </div>
                           </div>
-                        ))}
+                          <div className="salon-board__timeline">
+                            <div className="salon-board__grid-lines">
+                              {timeSlots.map((time, index) => (
+                                <div 
+                                  key={time}
+                                  className={`salon-board__grid-line ${
+                                    index % 2 === 0 
+                                      ? 'salon-board__grid-line--even' 
+                                      : 'salon-board__grid-line--odd'
+                                  }`}
+                                ></div>
+                              ))}
+                            </div>
+                            {bookings
+                              .filter(booking => booking.bed === bed)
+                              .map(booking => {
+                                const { left, width } = calculateBookingPosition(booking.startTime, booking.endTime);
+                                const serviceColorClass = getServiceColorClass(booking);
+                                const staff = staffShifts.find(s => s.staff_id === booking.staffId);
+                                return (
+                                  <div key={booking.id} className={`salon-board__booking ${serviceColorClass}`} style={{ left, width }}>
+                                    <div className="salon-board__booking-content">
+                                      <div className="salon-board__booking-client">
+                                        {booking.type === 'schedule' 
+                                          ? booking.service
+                                          : `${booking.client} 様`
+                                        }
+                                      </div>
+                                      <div className="salon-board__booking-service salon-board__booking-service--with-icon">
+                                        {staff && <div className="salon-board__small-color-indicator" style={{ backgroundColor: staff.color }} />}
+                                        {booking.type === 'schedule'
+                                          ? staff?.name
+                                          : `${staff?.name} / ${booking.service}`
+                                        }
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="salon-board__db-panel">
+                <div className="salon-board__db-section">
+                  <h3 className="salon-board__db-section-title">スタッフ業務</h3>
+                  <div className="salon-board__card-grid">
+                    <button 
+                      className="salon-board__action-card salon-board__action-card--customers"
+                      onClick={() => handlePageChange('customers')}
+                    >
+                      <Users className="salon-board__card-icon" />
+                      <div className="salon-board__card-content">
+                        <h4>顧客情報</h4>
+                        <p>顧客一覧・詳細情報</p>
+                      </div>
+                    </button>
+
+                    <button 
+                      className="salon-board__action-card salon-board__action-card--register"
+                      onClick={() => handlePageChange('register')}
+                    >
+                      <CreditCard className="salon-board__card-icon" />
+                      <div className="salon-board__card-content">
+                        <h4>レジ/お会計</h4>
+                        <p>お会計処理・決済</p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="salon-board__db-section">
+                  <h3 className="salon-board__db-section-title">売上分析</h3>
+                  <div className="salon-board__card-grid">
+                    <button 
+                      className="salon-board__action-card salon-board__action-card--analytics"
+                      onClick={() => handlePageChange('analytics')}
+                    >
+                      <BarChart3 className="salon-board__card-icon" />
+                      <div className="salon-board__card-content">
+                        <h4>売上分析</h4>
+                        <p>売上レポート・統計</p>
+                      </div>
+                    </button>
+                    
+                    <div className="salon-board__stats-card">
+                      <div className="salon-board__stats-list">
+                        <div className="salon-board__stat-item">
+                          <span className="salon-board__stat-label">本日の予約</span>
+                          <span className="salon-board__stat-value">{bookings.filter(b => b.type === 'booking').length}件</span>
+                        </div>
+                        <div className="salon-board__stat-item">
+                          <span className="salon-board__stat-label">本日の予定</span>
+                          <span className="salon-board__stat-value">{bookings.filter(b => b.type === 'schedule').length}件</span>
+                        </div>
+                        <div className="salon-board__stat-item">
+                          <span className="salon-board__stat-label">フェイシャル</span>
+                          <span className="salon-board__stat-value">
+                            {bookings.filter(b => b.serviceType === 'フェイシャル').length}件
+                          </span>
+                        </div>
+                        <div className="salon-board__stat-item">
+                          <span className="salon-board__stat-label">ボディトリート</span>
+                          <span className="salon-board__stat-value">
+                            {bookings.filter(b => b.serviceType === 'ボディトリート').length}件
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
               </div>
-            </div>
+            </>
           )}
         </div>
-
-        <div className="salon-board__db-panel">
-          <div className="salon-board__db-section">
-            <h3 className="salon-board__db-section-title">スタッフ業務</h3>
-            <div className="salon-board__card-grid">
-              <button 
-                className="salon-board__action-card salon-board__action-card--customers"
-                onClick={() => handlePageChange('customers')}
-              >
-                <Users className="salon-board__card-icon" />
-                <div className="salon-board__card-content">
-                  <h4>顧客情報</h4>
-                  <p>顧客一覧・詳細情報</p>
-                </div>
-              </button>
-
-              <button 
-                className="salon-board__action-card salon-board__action-card--register"
-                onClick={() => handlePageChange('register')}
-              >
-                <CreditCard className="salon-board__card-icon" />
-                <div className="salon-board__card-content">
-                  <h4>レジ/お会計</h4>
-                  <p>お会計処理・決済</p>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          <div className="salon-board__db-section">
-            <h3 className="salon-board__db-section-title">売上分析</h3>
-            <div className="salon-board__card-grid">
-              <button 
-                className="salon-board__action-card salon-board__action-card--analytics"
-                onClick={() => handlePageChange('analytics')}
-              >
-                <BarChart3 className="salon-board__card-icon" />
-                <div className="salon-board__card-content">
-                  <h4>売上分析</h4>
-                  <p>売上レポート・統計</p>
-                </div>
-              </button>
-              
-              <div className="salon-board__stats-card">
-                <div className="salon-board__stats-list">
-                  <div className="salon-board__stat-item">
-                    <span className="salon-board__stat-label">総予約数</span>
-                    <span className="salon-board__stat-value">{bookingsDatabase.length}件</span>
-                  </div>
-                  <div className="salon-board__stat-item">
-                    <span className="salon-board__stat-label">本日の予約</span>
-                    <span className="salon-board__stat-value">{bookings.length}件</span>
-                  </div>
-                  <div className="salon-board__stat-item">
-                    <span className="salon-board__stat-label">フェイシャル</span>
-                    <span className="salon-board__stat-value">
-                      {bookings.filter(b => b.serviceType === 'フェイシャル').length}件
-                    </span>
-                  </div>
-                  <div className="salon-board__stat-item">
-                    <span className="salon-board__stat-label">ボディトリート</span>
-                    <span className="salon-board__stat-value">
-                      {bookings.filter(b => b.serviceType === 'ボディトリート').length}件
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <CalendarModal 
-          isOpen={activeModal === 'calendar'}
-          selectedDate={selectedDate}
-          onDateSelect={handleDateSelect}
-          onClose={closeModal}
-        />
       </div>
+
+      <CalendarModal 
+        isOpen={activeModal === 'calendar'}
+        selectedDate={selectedDate}
+        onDateSelect={handleDateSelect}
+        onClose={closeModal}
+      />
     </div>
   );
 };
-
 export default SalonBoard;

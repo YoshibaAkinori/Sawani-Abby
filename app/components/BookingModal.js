@@ -241,34 +241,45 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
         setTimeout(() => setError(''), 3000);
         return;
       }
-      
+  
       setIsLoading(true);
       try {
-        // 予定として登録
         const scheduleData = {
+          customer_id: null, // 予定は顧客情報不要
           staff_id: formData.staffId,
+          service_id: null,  // 予定は施術情報不要
           date: formData.date,
           start_time: formData.startTime,
           end_time: formData.endTime,
-          type: 'schedule',
-          notes: formData.scheduleTitle || '予定',
-          status: 'blocked'
+          bed_id: null,      // 予定はベッド不要
+          type: 'schedule',  // ← 予定として識別
+          status: 'blocked', // ← この時間帯は予約不可
+          notes: formData.scheduleTitle || '予定'
         };
-        
-        // APIエンドポイントがあれば実装
-        console.log('予定登録:', scheduleData);
-        alert(`予定「${formData.scheduleTitle || '予定'}」を登録しました`);
-        onClose();
-        window.location.reload();
+    
+        const response = await fetch('/api/bookings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(scheduleData)
+        });
+
+        const result = await response.json();
+        if (result.success) {
+          alert(`予定「${formData.scheduleTitle || '予定'}」を登録しました`);
+          onClose();
+          window.location.reload();
+        } else {
+          throw new Error(result.error || '予定登録に失敗しました');
+        }
       } catch (err) {
         console.error('予定登録エラー:', err);
-        setError('予定登録中にエラーが発生しました');
+        setError(err.message || '予定登録中にエラーが発生しました');
       } finally {
         setIsLoading(false);
-      }
+      
       return;
+      }
     }
-    
     // 通常の予約バリデーション
     if (!formData.serviceId && !formData.ticketId && !formData.couponId && !formData.limitedOfferId) {
       setError('施術メニューを選択してください');
@@ -385,42 +396,8 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
   if (activeModal === 'booking') {
     return (
       <div className="booking-page">
-
         <div className="booking-page-content">
           {/* ヘッダー */}
-        <div className="booking-page-header">
-          <h2>新規登録</h2>
-          <button onClick={onClose} className="booking-page-close">
-            <X size={20} />
-            閉じる
-          </button>
-        </div>
-
-        {/* 予約タイプ選択 */}
-        <div className="booking-type-selector">
-          <button
-            className={`booking-type-btn ${formData.bookingType === 'booking' ? 'booking-type-btn--active' : ''}`}
-            onClick={() => setFormData(prev => ({ ...prev, bookingType: 'booking' }))}
-          >
-            <CalendarCheck size={20} />
-            予約
-          </button>
-          <button
-            className={`booking-type-btn ${formData.bookingType === 'schedule' ? 'booking-type-btn--active' : ''}`}
-            onClick={() => setFormData(prev => ({ ...prev, bookingType: 'schedule' }))}
-          >
-            <CalendarPlus size={20} />
-            予定
-          </button>
-        </div>
-
-        {error && (
-          <div className="booking-alert booking-alert--error">
-            <AlertCircle size={16} />
-            <span>{error}</span>
-            <button onClick={() => setError('')}>×</button>
-          </div>
-        )}{/* ヘッダー */}
         <div className="booking-page-header">
           <h2>新規登録</h2>
           <button onClick={onClose} className="booking-page-close">
