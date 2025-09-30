@@ -284,8 +284,9 @@
 }
 
 .salon-board__grid-line {
+  flex: 1; /* ★重要：すべてのグリッド線が均等に幅を分け合うようにする */
   border-right: 1px solid #e5e7eb;
-  min-width: 60px;
+  box-sizing: border-box;
 }
 
 .salon-board__booking {
@@ -475,10 +476,10 @@
 }
 
 /* ヘッダーの全セル共通のスタイル */
+/* ヘッダーの全セル共通のスタイル */
 .time-header__cell {
-  min-width: 60px; /* グリッド線と全く同じ幅 */
+  flex: 1; /* ★重要：グリッド線と同様に均等に幅を分け合う */
   border-right: 1px solid transparent; /* 線は下のグリッド線を使うので透明に */
-  flex-shrink: 0;
   box-sizing: border-box;
   padding: 0.25rem 0;
 }
@@ -1616,5 +1617,16 @@
   .calendar-modal__date {
     padding: 10px 2px;
     font-size: 13px;
+  }
+}/* スクロール可能エリア全体の最小幅設定 */
+.salon-board__scrollable-content {
+  min-width: 1800px;
+  width: max-content; /* 基本はコンテンツ幅に合わせる */
+}
+
+/* 画面幅が1800px以上になった場合のスタイル */
+@media (min-width: 1800px) {
+  .salon-board__scrollable-content {
+    width: 100%; /* 親要素（スクロールコンテナ）の幅いっぱいに広げる */
   }
 }

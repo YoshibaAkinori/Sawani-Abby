@@ -65,7 +65,7 @@ const SalonBoard = () => {
 
   // 予約DB（予約マスタ）
   const [bookingsDatabase] = useState([
-    { id: 1, staffId: '0001', bed: 'ベッド2', date: '2025-09-20', startTime: '11:00', endTime: '13:00', service: 'フェイシャル', client: '田中 花子', serviceType: 'フェイシャル', status: 'confirmed' },
+    { id: 1, staffId: '0001', bed: 'ベッド2', date: '2025-09-20', startTime: '11:20', endTime: '13:00', service: 'フェイシャル', client: '田中 花子', serviceType: 'フェイシャル', status: 'confirmed' },
     { id: 2, staffId: '0001', bed: 'ベッド2', date: '2025-09-20', startTime: '14:00', endTime: '16:00', service: 'ボディトリート', client: '山田 太郎', serviceType: 'ボディトリート', status: 'confirmed' },
     { id: 3, staffId: '0002', bed: 'ベッド1', date: '2025-09-20', startTime: '10:00', endTime: '12:00', service: 'フェイシャル', client: '鈴木 美香', serviceType: 'フェイシャル', status: 'confirmed' },
     { id: 4, staffId: '0002', bed: 'ベッド1', date: '2025-09-20', startTime: '15:00', endTime: '17:30', service: 'ボディトリート', client: '佐藤 恵子', serviceType: 'ボディトリート', status: 'confirmed' },
@@ -76,11 +76,10 @@ const SalonBoard = () => {
   const beds = Array.from({ length: bedCount }, (_, i) => `ベッド${i + 1}`);
 
   const timeSlots = [];
-  for (let hour = 10; hour <= 23; hour++) {
+  // 10:00から23:30まで30分刻みで生成（計14時間、28スロット）
+  for (let hour = 9; hour < 24; hour++) {
     timeSlots.push(`${hour.toString().padStart(2, '0')}:00`);
-    if (hour < 23) {
-      timeSlots.push(`${hour.toString().padStart(2, '0')}:30`);
-    }
+    timeSlots.push(`${hour.toString().padStart(2, '0')}:30`);
   }
 
   const getBookingsByDate = (date) => bookingsDatabase.filter(booking => booking.date === date);
@@ -102,13 +101,21 @@ const SalonBoard = () => {
   };
 
   const calculateBookingPosition = (startTime, endTime) => {
+    // タイムライン全体の時間（分）を定義
+    const timelineStartMinutes = 9 * 60; // 10:00
+    // 10:00から24:00までの14時間 = 840分
+    const totalTimelineMinutes = (24 - 9) * 60;
+
     const startMinutes = timeToMinutes(startTime);
     const endMinutes = timeToMinutes(endTime);
     const duration = endMinutes - startMinutes;
-    const startHour = 10 * 60;
-    const left = ((startMinutes - startHour) / 30) * 60;
-    const width = (duration / 30) * 60;
-    return { left, width };
+
+    // 位置と幅をパーセンテージで計算
+    const leftPercent = ((startMinutes - timelineStartMinutes) / totalTimelineMinutes) * 100;
+    const widthPercent = (duration / totalTimelineMinutes) * 100;
+
+    // CSSで使えるように文字列で返す
+    return { left: `${leftPercent}%`, width: `${widthPercent}%` };
   };
 
   const getServiceColorClass = (serviceType) => {
@@ -439,7 +446,7 @@ const SalonBoard = () => {
                                         const { left, width } = calculateBookingPosition(booking.startTime, booking.endTime);
                                         const serviceColorClass = getServiceColorClass(booking.serviceType);
                                         return (
-                                          <div key={booking.id} className={`salon-board__booking ${serviceColorClass}`} style={{ left: `${left}px`, width: `${width}px` }}>
+                                          <div key={booking.id} className={`salon-board__booking ${serviceColorClass}`} style={{ left: left, width: width }}>
                                             <div className="salon-board__booking-content">
                                               <div className="salon-board__booking-client">{booking.serviceType} {booking.client + " 様"}</div>
                                               <div className="salon-board__booking-service">{booking.bed}</div>
@@ -496,8 +503,8 @@ const SalonBoard = () => {
                                         key={booking.id}
                                         className={`salon-board__booking ${serviceColorClass}`}
                                         style={{
-                                          left: `${left}px`,
-                                          width: `${width}px`,
+                                          left: left,
+                                          width: width,
                                         }}
                                       >
                                         <div className="salon-board__booking-content">
