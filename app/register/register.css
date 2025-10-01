@@ -694,3 +694,98 @@
     font-size: 0.875rem;
   }
 }
+/* メニューグリッド */
+.menu-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.ticket-category-section {
+  margin-bottom: 1.5rem;
+}
+
+.ticket-category-section:last-child {
+  margin-bottom: 0;
+}
+
+.ticket-category-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #10b981;
+  margin-bottom: 0.75rem;
+  padding-left: 0.5rem;
+  border-left: 3px solid #10b981;
+}
+
+.menu-card {
+  padding: 1rem;
+  background: #f9fafb;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  position: relative;
+}
+
+.menu-card:hover {
+  background: #f3f4f6;
+  border-color: #3b82f6;
+  transform: translateY(-2px);
+}
+
+.menu-card--selected {
+  background: #dbeafe;
+  border-color: #3b82f6;
+}
+
+.menu-card--purchase {
+  border-color: #10b981;
+}
+
+.menu-card--purchase:hover {
+  background: #f3f4f6;
+  border-color: #10b981;
+}
+
+.menu-card__name {
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.menu-card__time,
+.menu-card__info {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+}
+
+.menu-card__price {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #3b82f6;
+}
+
+.menu-card__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background: #10b981;
+  color: white;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.empty-message {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 2rem;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
