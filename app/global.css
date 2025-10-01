@@ -200,9 +200,6 @@
   gap: 1.5rem;
 }
 
-.salon-board__section {
-  /* Base section styles */
-}
 
 .salon-board__section-title {
   font-size: 1.125rem;
@@ -223,6 +220,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  min-width: 1800px;
 }
 
 .salon-board__row {
@@ -245,9 +243,6 @@
   align-items: center;
 }
 
-.salon-board__label-content {
-  /* Base label content styles */
-}
 
 .salon-board__label-main {
   display: flex;
@@ -476,7 +471,6 @@
 }
 
 /* ヘッダーの全セル共通のスタイル */
-/* ヘッダーの全セル共通のスタイル */
 .time-header__cell {
   flex: 1; /* ★重要：グリッド線と同様に均等に幅を分け合う */
   border-right: 1px solid transparent; /* 線は下のグリッド線を使うので透明に */
@@ -545,6 +539,7 @@
   overflow-y: visible;
   width: 100%;
   padding-bottom: 12px; /* スクロールバー用の余白 */
+  overflow-x: auto;
 }
 
 /* スクロールバーのスタイリング */
@@ -1620,13 +1615,24 @@
   }
 }/* スクロール可能エリア全体の最小幅設定 */
 .salon-board__scrollable-content {
-  min-width: 1800px;
+  min-width: 2200px;
   width: max-content; /* 基本はコンテンツ幅に合わせる */
 }
 
 /* 画面幅が1800px以上になった場合のスタイル */
-@media (min-width: 1800px) {
+@media (min-width: 2200px) {
   .salon-board__scrollable-content {
     width: 100%; /* 親要素（スクロールコンテナ）の幅いっぱいに広げる */
   }
+}
+/* スタッフ別・ベッド別スケジュールを囲む、共通のスクロールコンテナ */
+.shared-horizontal-scroller {
+  width: 100%;
+  /* overflow-x: auto; から overflow: auto; に変更 */
+  overflow: auto; 
+}
+
+/* スクロールする中身全体を囲むラッパー */
+.wide-content-wrapper {
+  min-width: 2200px; /* 中身全体で1800pxの幅を確保する */
 }

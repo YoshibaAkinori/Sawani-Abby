@@ -1140,10 +1140,10 @@ const handleUpdateTicketPlan = async (planId) => {
                     value={ticketForm.total_sessions}
                     onChange={handleTicketInputChange}
                   >
+                    <option value="3">3回</option>
                     <option value="5">5回</option>
+                    <option value="8">8回</option>
                     <option value="10">10回</option>
-                    <option value="15">15回</option>
-                    <option value="20">20回</option>
                   </select>
                 </div>
 

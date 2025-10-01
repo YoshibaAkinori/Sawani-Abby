@@ -1,139 +1,742 @@
-/* 顧客情報ページのベーススタイル */
-.customers {
+/* 顧客管理ページ */
+.customers-page {
   min-height: 100vh;
   background-color: #f9fafb;
 }
 
 /* ヘッダー */
-.customers__header {
+.customers-page__header {
   background: linear-gradient(to right, #3b82f6, #2563eb);
   color: white;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 }
 
-.customers__header-container {
-  max-width: 1280px;
+.customers-page__header-container {
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 0 1rem;
+  padding: 0 1.5rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 4rem;
+  height: 5rem;
 }
 
-.customers__back-link {
+.customers-page__back-link {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 1rem;
   color: white;
   text-decoration: none;
   transition: color 0.2s;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
 }
 
-.customers__back-link:hover {
-  color: #bfdbfe;
+.customers-page__back-link:hover {
+  background: rgba(255, 255, 255, 0.1);
 }
 
-.customers__back-icon {
-  width: 1.25rem;
-  height: 1.25rem;
-}
-
-.customers__back-link span {
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.customers__header-title {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.customers__header-icon {
+.customers-page__back-link svg {
   width: 1.5rem;
   height: 1.5rem;
 }
 
-.customers__header-title h1 {
-  font-size: 1.25rem;
+.customers-page__back-link span {
+  font-size: 1rem;
+}
+
+.customers-page__header-title {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.customers-page__header-title svg {
+  width: 2rem;
+  height: 2rem;
+}
+
+.customers-page__header-title h1 {
+  font-size: 1.5rem;
   font-weight: 700;
   margin: 0;
 }
 
 /* メインコンテンツ */
-.customers__main {
-  max-width: 1280px;
+.customers-page__main {
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: 2rem 1.5rem;
 }
 
-.customers__content-card {
-  background-color: white;
+/* 検索セクション */
+.customers-page__search-section {
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 2.5rem;
+  margin-bottom: 2rem;
+  min-height: 400px;
+}
+
+.customers-page__search-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2.5rem;
+  height: 100%;
+}
+
+.customers-page__search-box {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.customers-page__search-label {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #374151;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.customers-page__search-label svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.customers-page__search-input-group {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.customers-page__search-input {
+  flex: 1;
+  padding: 1.25rem 1.5rem;
+  border: 2px solid #e5e7eb;
   border-radius: 0.5rem;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  border: 1px solid #e5e7eb;
-  padding: 2rem;
-  text-align: center;
+  font-size: 1.125rem;
+  transition: all 0.2s;
 }
 
-.customers__content-header {
-  margin-bottom: 1.5rem;
+.customers-page__search-input::placeholder {
+  font-size: 1rem;
 }
 
-.customers__content-icon {
-  width: 4rem;
-  height: 4rem;
+.customers-page__search-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+}
+
+.customers-page__search-btn {
+  padding: 1.25rem 2rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  transition: all 0.2s;
+  min-height: 64px;
+  min-width: 120px;
+}
+
+.customers-page__search-btn:hover {
+  background: #2563eb;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.customers-page__search-btn svg {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+/* 今日の予約者セクション */
+.customers-page__today-bookings {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: 350px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.customers-page__today-bookings::-webkit-scrollbar {
+  width: 8px;
+}
+
+.customers-page__today-bookings::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 4px;
+}
+
+.customers-page__today-bookings::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+.customers-page__today-bookings::-webkit-scrollbar-thumb:hover {
+  background: #9ca3af;
+}
+
+.customers-page__today-booking-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  background: #f9fafb;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-height: 50px;
+}
+
+.customers-page__today-booking-item:hover {
+  background: #f3f4f6;
+  border-color: #3b82f6;
+  transform: translateX(4px);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.customers-page__today-booking-info {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.customers-page__today-booking-time {
+  font-size: 1.25rem;
+  font-weight: 700;
   color: #3b82f6;
-  margin: 0 auto 1rem auto;
+  min-width: 70px;
 }
 
-.customers__content-title {
-  font-size: 1.5rem;
+.customers-page__today-booking-name {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.customers-page__today-booking-service {
+  font-size: 0.95rem;
+  color: #6b7280;
+  margin-top: 0.375rem;
+}
+
+/* 検索結果リスト */
+.customers-page__search-results {
+  margin-top: 1.25rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.5rem;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.customers-page__search-results::-webkit-scrollbar {
+  width: 8px;
+}
+
+.customers-page__search-results::-webkit-scrollbar-track {
+  background: #f3f4f6;
+  border-radius: 4px;
+}
+
+.customers-page__search-results::-webkit-scrollbar-thumb {
+  background: #d1d5db;
+  border-radius: 4px;
+}
+
+.customers-page__search-result-item {
+  padding: 1.5rem;
+  border-bottom: 1px solid #f3f4f6;
+  cursor: pointer;
+  transition: background 0.2s;
+  min-height: 50px;
+}
+
+.customers-page__search-result-item:hover {
+  background: #f9fafb;
+}
+
+.customers-page__search-result-item:last-child {
+  border-bottom: none;
+}
+
+.customers-page__result-name {
+  font-weight: 600;
+  font-size: 1.125rem;
+  color: #111827;
+  margin-bottom: 0.625rem;
+}
+
+.customers-page__result-info {
+  font-size: 0.95rem;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.customers-page__result-info-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.customers-page__result-info-item svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+/* 詳細情報セクション */
+.customers-page__detail-section {
+  background: white;
+  border-radius: 0.75rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.customers-page__detail-header {
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  padding: 2rem;
+  border-bottom: 2px solid #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.customers-page__detail-title {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.customers-page__detail-title svg {
+  width: 2rem;
+  height: 2rem;
+}
+
+.customers-page__detail-title h2 {
+  font-size: 1.75rem;
   font-weight: 700;
   color: #111827;
-  margin: 0 0 0.5rem 0;
-}
-
-.customers__content-description {
-  color: #6b7280;
   margin: 0;
 }
 
-.customers__content-status {
-  font-size: 0.875rem;
-  color: #9ca3af;
+.customers-page__detail-actions {
+  display: flex;
+  gap: 0.75rem;
 }
 
-/* レスポンシブ対応 */
+.customers-page__action-btn {
+  padding: 0.875rem 1.5rem;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  transition: all 0.2s;
+  min-height: 52px;
+}
+
+.customers-page__action-btn svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.customers-page__action-btn--primary {
+  background: #3b82f6;
+  color: white;
+}
+
+.customers-page__action-btn--primary:hover {
+  background: #2563eb;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.customers-page__action-btn--secondary {
+  background: white;
+  color: #374151;
+  border: 2px solid #d1d5db;
+}
+
+.customers-page__action-btn--secondary:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+/* タブナビゲーション */
+.customers-page__tabs {
+  display: flex;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.customers-page__tab {
+  padding: 1.25rem 2rem;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: -2px;
+  min-height: 60px;
+}
+
+.customers-page__tab:hover {
+  color: #374151;
+  background: #f9fafb;
+}
+
+.customers-page__tab--active {
+  color: #3b82f6;
+  border-bottom-color: #3b82f6;
+  background: white;
+}
+
+.customers-page__tab-content {
+  padding: 2rem;
+}
+
+/* 基本情報グリッド */
+.customers-page__info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.customers-page__info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.customers-page__info-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.customers-page__info-value {
+  font-size: 1.125rem;
+  color: #111827;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.customers-page__info-value svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: #6b7280;
+}
+
+.customers-page__info-value--empty {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+/* 回数券リスト */
+.customers-page__ticket-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.customers-page__ticket-item {
+  padding: 1.5rem;
+  background: #f9fafb;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.75rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1.5rem;
+  align-items: center;
+  min-height: 100px;
+}
+
+.customers-page__ticket-info h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 0.75rem 0;
+}
+
+.customers-page__ticket-details {
+  display: flex;
+  gap: 1.5rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.customers-page__ticket-status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.75rem;
+}
+
+.customers-page__ticket-remaining {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #3b82f6;
+}
+
+.customers-page__ticket-expiry {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.customers-page__ticket-badge {
+  display: inline-block;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.customers-page__ticket-badge--active {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.customers-page__ticket-badge--expired {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+/* クーポン履歴リスト */
+.customers-page__coupon-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.customers-page__coupon-item {
+  padding: 1.25rem;
+  background: #f9fafb;
+  border: 2px solid #e5e7eb;
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 80px;
+}
+
+.customers-page__coupon-info {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.customers-page__coupon-icon {
+  color: #3b82f6;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex-shrink: 0;
+}
+
+.customers-page__coupon-name {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 0.25rem;
+}
+
+.customers-page__coupon-date {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+/* 来店履歴テーブル */
+.customers-page__history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.customers-page__history-table th {
+  background: #f9fafb;
+  padding: 1rem 1.25rem;
+  text-align: left;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.customers-page__history-table td {
+  padding: 1.25rem;
+  font-size: 1rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.customers-page__history-table tr:last-child td {
+  border-bottom: none;
+}
+
+.customers-page__history-table tr:hover {
+  background: #f9fafb;
+}
+
+.customers-page__history-date {
+  color: #111827;
+  font-weight: 600;
+}
+
+.customers-page__history-service {
+  color: #374151;
+}
+
+.customers-page__history-staff {
+  color: #6b7280;
+}
+
+.customers-page__history-amount {
+  color: #111827;
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+
+/* 空状態 */
+.customers-page__empty-state {
+  padding: 4rem;
+  text-align: center;
+  color: #6b7280;
+}
+
+.customers-page__empty-state svg {
+  color: #d1d5db;
+  margin: 0 auto 1.5rem;
+  width: 4rem;
+  height: 4rem;
+}
+
+.customers-page__empty-state p {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.customers-page__coupon-icon {
+  color: #3b82f6;
+}
+
+.customers-page__coupon-name {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #111827;
+}
+
+.customers-page__coupon-date {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+/* 来店履歴テーブル */
+.customers-page__history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.customers-page__history-table th {
+  background: #f9fafb;
+  padding: 0.75rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.customers-page__history-table td {
+  padding: 0.875rem 0.75rem;
+  font-size: 0.875rem;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.customers-page__history-table tr:last-child td {
+  border-bottom: none;
+}
+
+.customers-page__history-table tr:hover {
+  background: #f9fafb;
+}
+
+.customers-page__history-date {
+  color: #111827;
+  font-weight: 500;
+}
+
+.customers-page__history-service {
+  color: #374151;
+}
+
+.customers-page__history-staff {
+  color: #6b7280;
+}
+
+.customers-page__history-amount {
+  color: #111827;
+  font-weight: 600;
+}
+
+/* 空状態 */
+.customers-page__empty-state {
+  padding: 3rem;
+  text-align: center;
+  color: #6b7280;
+}
+
+.customers-page__empty-state svg {
+  color: #d1d5db;
+  margin: 0 auto 1rem;
+}
+
+.customers-page__empty-state p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+/* レスポンシブ */
 @media (max-width: 768px) {
-  .customers__header-container {
-    padding: 0 1rem;
-    flex-direction: column;
-    gap: 0.5rem;
-    height: auto;
-    padding-top: 1rem;
-    padding-bottom: 1rem;
+  .customers-page__search-grid {
+    grid-template-columns: 1fr;
   }
   
-  .customers__header-title h1 {
-    font-size: 1.125rem;
+  .customers-page__info-grid {
+    grid-template-columns: 1fr;
   }
   
-  .customers__main {
-    padding: 1rem;
+  .customers-page__ticket-item {
+    grid-template-columns: 1fr;
   }
   
-  .customers__content-card {
-    padding: 1.5rem;
+  .customers-page__ticket-status {
+    align-items: flex-start;
   }
   
-  .customers__content-icon {
-    width: 3rem;
-    height: 3rem;
-  }
-  
-  .customers__content-title {
-    font-size: 1.25rem;
+  .customers-page__history-table {
+    display: block;
+    overflow-x: auto;
   }
 }
