@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Users, Search, Calendar, Phone, Mail, CreditCard, Tag, Clock, Edit2, Plus, FileText } from 'lucide-react';
 import './customers.css';
@@ -8,98 +8,100 @@ const CustomersPage = () => {
   const [activeTab, setActiveTab] = useState('basic');
   const [searchName, setSearchName] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [searchResults, setSearchResults] = useState([]);
+  const [todayBookings, setTodayBookings] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // デモデータ: 今日の予約者
-  const todayBookings = [
-    { id: 1, time: '10:00', name: '田中 花子', service: 'フェイシャル60分' },
-    { id: 2, time: '11:30', name: '山田 太郎', service: 'ボディトリート90分' },
-    { id: 3, time: '14:00', name: '鈴木 美香', service: 'ヘッドスパ45分' },
-    { id: 4, time: '16:00', name: '佐藤 健', service: 'フェイシャル90分' },
-  ];
+  // 顧客詳細データ
+  const [customerTickets, setCustomerTickets] = useState([]);
+  const [customerCoupons, setCustomerCoupons] = useState([]);
+  const [visitHistory, setVisitHistory] = useState([]);
 
-  // デモデータ: 顧客詳細
-  const demoCustomer = {
-    customer_id: '1',
-    line_user_id: 'U1234567890abcdef',
-    last_name: '田中',
-    first_name: '花子',
-    last_name_kana: 'タナカ',
-    first_name_kana: 'ハナコ',
-    phone_number: '090-1234-5678',
-    email: 'tanaka@example.com',
-    birth_date: '1985-05-15',
-    notes: '初回来店のお客様。肩こりが気になるとのこと。',
-    created_at: '2024-01-15',
-    visit_count: 15,
-    tickets: [
-      {
-        id: '1',
-        plan_name: 'フェイシャル10回券',
-        sessions_remaining: 7,
-        expiry_date: '2025-07-15',
-        status: 'active'
-      },
-      {
-        id: '2',
-        plan_name: 'ボディトリート5回券',
-        sessions_remaining: 2,
-        expiry_date: '2025-03-20',
-        status: 'active'
-      }
-    ],
-    coupons: [
-      {
-        id: '1',
-        name: '【男女共通人気NO.1】上半身ケア+小顔コルギ80分',
-        used_date: '2024-12-20'
-      },
-      {
-        id: '2',
-        name: '【朝割/女性限定】上半身ケア50分',
-        used_date: '2024-11-10'
-      }
-    ],
-    visitHistory: [
-      {
-        id: '1',
-        date: '2025-01-10',
-        service: 'フェイシャル60分',
-        staff: '佐野 智里',
-        amount: 8000
-      },
-      {
-        id: '2',
-        date: '2024-12-20',
-        service: '上半身ケア+小顔コルギ80分',
-        staff: '星野 加奈恵',
-        amount: 6000
-      },
-      {
-        id: '3',
-        date: '2024-11-15',
-        service: 'ボディトリート90分',
-        staff: '佐野 智里',
-        amount: 14000
-      },
-      {
-        id: '4',
-        date: '2024-10-05',
-        service: 'フェイシャル60分',
-        staff: '星野 加奈恵',
-        amount: 8000
-      }
-    ]
-  };
+  // 初期データ読み込み
+  useEffect(() => {
+    fetchTodayBookings();
+  }, []);
 
-  // 顧客選択
-  const handleSelectCustomer = (customer) => {
-    setSelectedCustomer(demoCustomer);
+  // 今日の予約者取得
+  const fetchTodayBookings = async () => {
+    try {
+      const response = await fetch('/api/customers/today-bookings');
+      const data = await response.json();
+      if (data.success) {
+        setTodayBookings(data.data || []);
+      }
+    } catch (error) {
+      console.error('今日の予約者取得エラー:', error);
+    }
   };
 
   // 名前検索
-  const handleNameSearch = () => {
-    // 実際はAPIを呼び出す
-    setSelectedCustomer(demoCustomer);
+  const handleNameSearch = async () => {
+    if (!searchName.trim()) return;
+
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/customers/search?name=${encodeURIComponent(searchName)}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setSearchResults(data.data || []);
+        // 結果が1件のみの場合は自動選択
+        if (data.data?.length === 1) {
+          handleSelectCustomer(data.data[0].customer_id);
+        }
+      } else {
+        alert('検索に失敗しました');
+      }
+    } catch (error) {
+      console.error('検索エラー:', error);
+      alert('検索中にエラーが発生しました');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 顧客選択
+  const handleSelectCustomer = async (customerId) => {
+    setIsLoading(true);
+    try {
+      // 顧客基本情報
+      const customerRes = await fetch(`/api/customers/${customerId}`);
+      const customerData = await customerRes.json();
+      
+      if (customerData.success) {
+        setSelectedCustomer(customerData.data);
+        
+        // 回数券取得
+        const ticketsRes = await fetch(`/api/customers/${customerId}/tickets`);
+        const ticketsData = await ticketsRes.json();
+        setCustomerTickets(ticketsData.data || []);
+        
+        // クーポン履歴取得
+        const couponsRes = await fetch(`/api/customers/${customerId}/coupons`);
+        const couponsData = await couponsRes.json();
+        setCustomerCoupons(couponsData.data || []);
+        
+        // 来店履歴取得
+        const historyRes = await fetch(`/api/customers/${customerId}/visit-history`);
+        const historyData = await historyRes.json();
+        setVisitHistory(historyData.data || []);
+        
+        // 検索結果をクリア
+        setSearchResults([]);
+        setSearchName('');
+      }
+    } catch (error) {
+      console.error('顧客情報取得エラー:', error);
+      alert('顧客情報の取得に失敗しました');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 今日の予約者から選択
+  const handleSelectFromBooking = (customerId) => {
+    handleSelectCustomer(customerId);
   };
 
   return (
@@ -137,37 +139,45 @@ const CustomersPage = () => {
                   value={searchName}
                   onChange={(e) => setSearchName(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleNameSearch()}
+                  disabled={isLoading}
                 />
                 <button 
                   className="customers-page__search-btn"
                   onClick={handleNameSearch}
+                  disabled={isLoading}
                 >
                   <Search size={16} />
-                  検索
+                  {isLoading ? '検索中...' : '検索'}
                 </button>
               </div>
 
-              {/* 検索結果（デモ） */}
-              {searchName && (
+              {/* 検索結果 */}
+              {searchResults.length > 0 && (
                 <div className="customers-page__search-results">
-                  <div 
-                    className="customers-page__search-result-item"
-                    onClick={() => handleSelectCustomer(demoCustomer)}
-                  >
-                    <div className="customers-page__result-name">
-                      田中 花子（タナカ ハナコ）
-                    </div>
-                    <div className="customers-page__result-info">
-                      <div className="customers-page__result-info-item">
-                        <Phone size={14} />
-                        090-1234-5678
+                  {searchResults.map(customer => (
+                    <div
+                      key={customer.customer_id}
+                      className="customers-page__search-result-item"
+                      onClick={() => handleSelectCustomer(customer.customer_id)}
+                    >
+                      <div className="customers-page__result-name">
+                        {customer.last_name} {customer.first_name}
+                        （{customer.last_name_kana} {customer.first_name_kana}）
                       </div>
-                      <div className="customers-page__result-info-item">
-                        <Calendar size={14} />
-                        最終来店: 2025-01-10
+                      <div className="customers-page__result-info">
+                        <div className="customers-page__result-info-item">
+                          <Phone size={14} />
+                          {customer.phone_number}
+                        </div>
+                        {customer.email && (
+                          <div className="customers-page__result-info-item">
+                            <Mail size={14} />
+                            {customer.email}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -179,27 +189,36 @@ const CustomersPage = () => {
                 今日の予約者
               </label>
               <div className="customers-page__today-bookings">
-                {todayBookings.map(booking => (
-                  <div
-                    key={booking.id}
-                    className="customers-page__today-booking-item"
-                    onClick={() => handleSelectCustomer(demoCustomer)}
-                  >
-                    <div className="customers-page__today-booking-info">
-                      <span className="customers-page__today-booking-time">
-                        {booking.time}
-                      </span>
-                      <div>
-                        <div className="customers-page__today-booking-name">
-                          {booking.name}
-                        </div>
-                        <div className="customers-page__today-booking-service">
-                          {booking.service}
+                {todayBookings.length > 0 ? (
+                  todayBookings.map(booking => (
+                    <div
+                      key={booking.booking_id}
+                      className="customers-page__today-booking-item"
+                      onClick={() => handleSelectFromBooking(booking.customer_id)}
+                    >
+                      <div className="customers-page__today-booking-info">
+                        <span className="customers-page__today-booking-time">
+                          {booking.start_time?.substring(0, 5)}
+                        </span>
+                        <div>
+                          <div className="customers-page__today-booking-name">
+                            {booking.last_name} {booking.first_name}
+                          </div>
+                          <div className="customers-page__today-booking-service">
+                            {booking.service_name} / {booking.staff_name}
+                          </div>
                         </div>
                       </div>
                     </div>
+                  ))
+                ) : (
+                  <div className="customers-page__empty-state">
+                    <Calendar size={32} />
+                    <p style={{ fontSize: '0.875rem', margin: '0.5rem 0 0 0' }}>
+                      本日の予約はありません
+                    </p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
           </div>
@@ -281,20 +300,26 @@ const CustomersPage = () => {
                   <div className="customers-page__info-item">
                     <div className="customers-page__info-label">メールアドレス</div>
                     <div className="customers-page__info-value">
-                      <Mail size={20} />
-                      {selectedCustomer.email}
+                      {selectedCustomer.email ? (
+                        <>
+                          <Mail size={20} />
+                          {selectedCustomer.email}
+                        </>
+                      ) : (
+                        <span className="customers-page__info-value--empty">未登録</span>
+                      )}
                     </div>
                   </div>
                   <div className="customers-page__info-item">
                     <div className="customers-page__info-label">生年月日</div>
                     <div className="customers-page__info-value">
-                      {selectedCustomer.birth_date}
+                      {selectedCustomer.birth_date || <span className="customers-page__info-value--empty">未登録</span>}
                     </div>
                   </div>
                   <div className="customers-page__info-item">
                     <div className="customers-page__info-label">初回登録日</div>
                     <div className="customers-page__info-value">
-                      {selectedCustomer.created_at}
+                      {new Date(selectedCustomer.created_at).toLocaleDateString('ja-JP')}
                     </div>
                   </div>
                   <div className="customers-page__info-item">
@@ -315,30 +340,31 @@ const CustomersPage = () => {
               {/* 保有回数券タブ */}
               {activeTab === 'tickets' && (
                 <div className="customers-page__ticket-list">
-                  {selectedCustomer.tickets.map(ticket => (
-                    <div key={ticket.id} className="customers-page__ticket-item">
+                  {customerTickets.map(ticket => (
+                    <div key={ticket.customer_ticket_id} className="customers-page__ticket-item">
                       <div className="customers-page__ticket-info">
                         <h3>{ticket.plan_name}</h3>
                         <div className="customers-page__ticket-details">
+                          <span>購入日: {ticket.purchase_date}</span>
                           <span>有効期限: {ticket.expiry_date}</span>
                         </div>
                       </div>
                       <div className="customers-page__ticket-status">
                         <div className="customers-page__ticket-remaining">
-                          残り {ticket.sessions_remaining} 回
+                          残り {ticket.sessions_remaining} / {ticket.total_sessions} 回
                         </div>
                         <span className={`customers-page__ticket-badge ${
                           ticket.status === 'active' 
                             ? 'customers-page__ticket-badge--active' 
                             : 'customers-page__ticket-badge--expired'
                         }`}>
-                          {ticket.status === 'active' ? '有効' : '期限切れ'}
+                          {ticket.status === 'active' ? '有効' : ticket.status === 'used_up' ? '使用済' : '期限切れ'}
                         </span>
                       </div>
                     </div>
                   ))}
 
-                  {selectedCustomer.tickets.length === 0 && (
+                  {customerTickets.length === 0 && (
                     <div className="customers-page__empty-state">
                       <CreditCard size={48} />
                       <p>保有している回数券はありません</p>
@@ -350,23 +376,23 @@ const CustomersPage = () => {
               {/* クーポン利用履歴タブ */}
               {activeTab === 'coupons' && (
                 <div className="customers-page__coupon-list">
-                  {selectedCustomer.coupons.map(coupon => (
-                    <div key={coupon.id} className="customers-page__coupon-item">
+                  {customerCoupons.map(coupon => (
+                    <div key={coupon.usage_id} className="customers-page__coupon-item">
                       <div className="customers-page__coupon-info">
                         <Tag className="customers-page__coupon-icon" size={20} />
                         <div>
                           <div className="customers-page__coupon-name">
-                            {coupon.name}
+                            {coupon.coupon_name}
                           </div>
                           <div className="customers-page__coupon-date">
-                            利用日: {coupon.used_date}
+                            利用日: {new Date(coupon.used_at).toLocaleDateString('ja-JP')}
                           </div>
                         </div>
                       </div>
                     </div>
                   ))}
 
-                  {selectedCustomer.coupons.length === 0 && (
+                  {customerCoupons.length === 0 && (
                     <div className="customers-page__empty-state">
                       <Tag size={48} />
                       <p>クーポンの利用履歴はありません</p>
@@ -384,20 +410,39 @@ const CustomersPage = () => {
                         <th>来店日</th>
                         <th>施術内容</th>
                         <th>担当スタッフ</th>
+                        <th>支払方法</th>
                         <th>金額</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {selectedCustomer.visitHistory.map(visit => (
-                        <tr key={visit.id}>
+                      {visitHistory.map(visit => (
+                        <tr key={visit.payment_id}>
                           <td className="customers-page__history-date">
                             {visit.date}
                           </td>
                           <td className="customers-page__history-service">
                             {visit.service}
+                            {visit.options && visit.options.length > 0 && (
+                              <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                                {visit.options.map((opt, idx) => (
+                                  <span key={idx}>
+                                    {opt.option_name}
+                                    {opt.is_free && ' (無料)'}
+                                    {idx < visit.options.length - 1 && ', '}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </td>
                           <td className="customers-page__history-staff">
                             {visit.staff}
+                          </td>
+                          <td className="customers-page__history-staff">
+                            {visit.payment_type === 'normal' && visit.payment_method === 'cash' && '現金'}
+                            {visit.payment_type === 'normal' && visit.payment_method === 'card' && 'カード'}
+                            {visit.payment_type === 'ticket' && '回数券'}
+                            {visit.payment_type === 'coupon' && 'クーポン'}
+                            {visit.payment_type === 'limited_offer' && '期間限定'}
                           </td>
                           <td className="customers-page__history-amount">
                             ¥{visit.amount.toLocaleString()}
@@ -407,7 +452,7 @@ const CustomersPage = () => {
                     </tbody>
                   </table>
 
-                  {selectedCustomer.visitHistory.length === 0 && (
+                  {visitHistory.length === 0 && (
                     <div className="customers-page__empty-state">
                       <FileText size={48} />
                       <p>来店履歴はありません</p>
