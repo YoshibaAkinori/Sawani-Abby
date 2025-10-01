@@ -11,7 +11,7 @@ export async function GET(request) {
     const year = searchParams.get('year');
     const month = searchParams.get('month');
 
-    console.log('シフト取得:', { staffId, year, month }); // デバッグ用
+    //console.log('シフト取得:', { staffId, year, month }); // デバッグ用
 
     let query = `
       SELECT 
@@ -45,7 +45,7 @@ export async function GET(request) {
     query += ' ORDER BY date ASC';
 
     const [rows] = await pool.execute(query, params);
-    console.log('取得したシフト件数:', rows.length); // デバッグ用
+    //console.log('取得したシフト件数:', rows.length); // デバッグ用
 
     // スタッフの給与設定を取得
     let wageSetting = { hourly_wage: 1500, transport_allowance: 900 };
@@ -94,7 +94,7 @@ export async function POST(request) {
       notes = ''
     } = body;
 
-    console.log('シフト登録:', { staff_id, date, start_time, end_time }); // デバッグ用
+    //console.log('シフト登録:', { staff_id, date, start_time, end_time }); // デバッグ用
 
     // バリデーション
     if (!staff_id || !date) {
