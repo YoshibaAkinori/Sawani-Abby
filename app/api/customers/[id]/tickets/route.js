@@ -1,6 +1,4 @@
 // app/api/customers/[id]/tickets/route.js
-// 保有回数券取得
-
 import { NextResponse } from 'next/server';
 import { getConnection } from '../../../../../lib/db';
 
@@ -9,6 +7,7 @@ export async function GET(request, { params }) {
     const pool = await getConnection();
     const { id: customerId } = await params;
 
+    // 回数券情報と支払い状況を取得
     const [rows] = await pool.execute(
       `SELECT 
         ct.customer_ticket_id,
@@ -19,6 +18,13 @@ export async function GET(request, { params }) {
         tp.name as plan_name,
         tp.total_sessions,
         s.name as service_name,
+        s.free_option_choices,
+        -- すでに支払った金額の合計
+        COALESCE((
+          SELECT SUM(amount_paid) 
+          FROM ticket_payments 
+          WHERE customer_ticket_id = ct.customer_ticket_id
+        ), 0) as total_paid,
         CASE 
           WHEN ct.sessions_remaining > 0 AND ct.expiry_date >= CURDATE() THEN 'active'
           WHEN ct.sessions_remaining <= 0 THEN 'used_up'
@@ -32,9 +38,15 @@ export async function GET(request, { params }) {
       [customerId]
     );
 
+    // 残り支払額を計算
+    const ticketsWithPayment = rows.map(ticket => ({
+      ...ticket,
+      remaining_payment: ticket.purchase_price - ticket.total_paid
+    }));
+
     return NextResponse.json({
       success: true,
-      data: rows
+      data: ticketsWithPayment
     });
   } catch (error) {
     console.error('回数券取得エラー:', error);

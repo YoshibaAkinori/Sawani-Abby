@@ -1,18 +1,9 @@
 // app/api/ticket-purchases/route.js
 import { NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
-
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'salon_db',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
+import { getConnection } from '../../../lib/db';
 
 export async function POST(request) {
+  const pool = await getConnection();
   const connection = await pool.getConnection();
   
   try {

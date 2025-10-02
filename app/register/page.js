@@ -14,6 +14,7 @@ const RegisterPage = () => {
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
   const [staffList, setStaffList] = useState([]);
   const [selectedStaff, setSelectedStaff] = useState(null);
+  const [selectedBookingId, setSelectedBookingId] = useState(null);
 
   // 新規顧客登録フォーム
   const [newCustomer, setNewCustomer] = useState({
@@ -75,16 +76,17 @@ const RegisterPage = () => {
       fetch('/api/ticket-plans'),
       fetch('/api/coupons'),
       fetch('/api/limited-offers'),
-      fetch('/api/staff') // ← 追加
+      fetch('/api/staff')
     ]);
 
     const todayData = await todayRes.json();
+    console.log('今日の予約データ:', todayData.data); // ← 追加
     const servicesData = await servicesRes.json();
     const optionsData = await optionsRes.json();
     const ticketPlansData = await ticketPlansRes.json();
     const couponsData = await couponsRes.json();
     const limitedOffersData = await limitedOffersRes.json();
-    const staffData = await staffRes.json(); // ← 追加
+    const staffData = await staffRes.json();
 
     setTodayBookings(todayData.data || []);
     setServices(servicesData.data || []);
@@ -93,11 +95,10 @@ const RegisterPage = () => {
     setCoupons(couponsData.data || []);
     setLimitedOffers(limitedOffersData.data || []);
     
-    // ← 追加：アクティブなスタッフのみ & デフォルト選択
     const activeStaff = (staffData.data || []).filter(s => s.is_active);
     setStaffList(activeStaff);
     if (activeStaff.length > 0) {
-      setSelectedStaff(activeStaff[0]); // 最初のスタッフをデフォルト選択
+      setSelectedStaff(activeStaff[0]);
     }
   } catch (err) {
     console.error('データ取得エラー:', err);
@@ -129,6 +130,8 @@ const RegisterPage = () => {
       first_name: booking.first_name
     });
 
+    setSelectedBookingId(booking.booking_id);
+
     if (booking.service_id) {
       const service = services.find(s => s.service_id === booking.service_id);
       if (service) {
@@ -143,28 +146,29 @@ const RegisterPage = () => {
   // 検索結果から顧客選択
   const handleSelectCustomer = async (customer) => {
     setSelectedCustomer(customer);
+    setSelectedBookingId(null);
     await fetchCustomerTickets(customer.customer_id);
   };
 
   // 顧客の回数券を取得
   const fetchCustomerTickets = async (customerId) => {
-    try {
-      const response = await fetch(`/api/customers/${customerId}/tickets`);
-      const data = await response.json();
-      if (data.success) {
-        const activeTickets = (data.data || []).filter(t => t.status === 'active').map(ticket => {
-          const service = services.find(s => s.name === ticket.service_name);
-          return {
-            ...ticket,
-            service_free_option_choices: service?.free_option_choices || 0
-          };
-        });
-        setOwnedTickets(activeTickets);
-      }
-    } catch (err) {
-      console.error('回数券取得エラー:', err);
+  try {
+    const response = await fetch(`/api/customers/${customerId}/tickets`);
+    const data = await response.json();
+    if (data.success) {
+      const activeTickets = (data.data || []).filter(t => t.status === 'active').map(ticket => {
+        const service = services.find(s => s.name === ticket.service_name);
+        return {
+          ...ticket,
+          service_free_option_choices: service?.free_option_choices || 0
+        };
+      });
+      setOwnedTickets(activeTickets);
     }
-  };
+  } catch (err) {
+    console.error('回数券取得エラー:', err);
+  }
+};
 
   // 新規顧客登録
   const handleNewCustomerSubmit = async () => {
@@ -445,6 +449,7 @@ const handleCheckout = async () => {
     // 1. 施術の会計処理
     const paymentData = {
       customer_id: selectedCustomer.customer_id,
+      booking_id: selectedBookingId,
       staff_id: selectedStaff?.staff_id || staffList[0]?.staff_id,
       service_id: selectedMenuType === 'normal' ? selectedMenu.service_id : 
                   (selectedMenuType === 'ticket' ? null : 
@@ -519,6 +524,7 @@ const handleCheckout = async () => {
 
   const resetForm = () => {
     setSelectedCustomer(null);
+    setSelectedBookingId(null);
     setSelectedMenu(null);
     setSelectedFreeOptions([]);
     setSelectedPaidOptions([]);
@@ -605,23 +611,28 @@ const handleCheckout = async () => {
                 </div>
 
                 {customerTab === 'today' ? (
-                  <div className="customer-quick-list">
-                    {todayBookings.map(booking => (
-                      <div
-                        key={booking.booking_id}
-                        className={`customer-item ${selectedCustomer?.customer_id === booking.customer_id ? 'customer-item--selected' : ''}`}
-                        onClick={() => handleSelectFromBooking(booking)}
-                      >
-                        <div className="customer-item__name">
-                          {booking.last_name} {booking.first_name} 様
-                        </div>
-                        <div className="customer-item__info">
-                          {booking.start_time?.substring(0, 5)} - {booking.service_name}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
+  <div className="customer-quick-list">
+    {todayBookings.map(booking => (
+      <div
+        key={booking.booking_id}
+        className={`customer-item ${selectedCustomer?.customer_id === booking.customer_id ? 'customer-item--selected' : ''} ${booking.is_paid ? 'customer-item--paid' : ''}`}
+        onClick={() => handleSelectFromBooking(booking)}
+      >
+        <div className="customer-item__header">
+          <div className="customer-item__name">
+            {booking.last_name} {booking.first_name} 様
+          </div>
+          {booking.is_paid && (
+            <span className="customer-item__paid-badge">会計済</span>
+          )}
+        </div>
+        <div className="customer-item__info">
+          {booking.start_time?.substring(0, 5)} - {booking.service_name}
+        </div>
+      </div>
+    ))}
+  </div>
+) : (
                   <>
                     <div className="search-box">
                       <input

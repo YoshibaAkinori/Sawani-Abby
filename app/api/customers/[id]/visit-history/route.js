@@ -1,20 +1,11 @@
 // app/api/customers/[id]/visit-history/route.js
 import { NextResponse } from 'next/server';
-import mysql from 'mysql2/promise';
-
-const pool = mysql.createPool({
-  host: process.env.DB_HOST || 'localhost',
-  user: process.env.DB_USER || 'root',
-  password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'salon_db',
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
+import { getConnection } from '../../../../../lib/db';
 
 export async function GET(request, { params }) {
   try {
     const customerId = params.id;
+    const pool = await getConnection();
     const connection = await pool.getConnection();
 
     // 来店履歴取得（paymentsテーブルから）

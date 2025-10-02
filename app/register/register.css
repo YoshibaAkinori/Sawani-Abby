@@ -1063,3 +1063,38 @@
 .staff-btn--selected .staff-btn__name {
   color: #1e40af;
 }
+/* register.css に追加 */
+
+/* 会計済み顧客の表示 */
+.customer-item--paid {
+  background: #f0fdf4 !important;
+  border-left: 4px solid #10b981 !important;
+  opacity: 0.7;
+}
+
+.customer-item--paid:hover {
+  opacity: 0.85;
+}
+
+.customer-item__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.customer-item__paid-badge {
+  background: #10b981;
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  white-space: nowrap;
+}
+
+/* 会計済みで選択中の場合 */
+.customer-item--paid.customer-item--selected {
+  background: #d1fae5 !important;
+  border-color: #059669 !important;
+}

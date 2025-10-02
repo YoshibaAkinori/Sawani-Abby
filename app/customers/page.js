@@ -454,18 +454,18 @@ const CustomersPage = () => {
               )}
               
               {/* オプション情報の表示 */}
-              {visit.options && visit.options.length > 0 && (
-                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                  オプション: {visit.options.map((opt, idx) => (
-                    <span key={idx}>
-                      {opt.option_name}
-                      {opt.is_free && ' (無料)'}
-                      {!opt.is_free && ` (+¥${opt.price.toLocaleString()})`}
-                      {idx < visit.options.length - 1 && ', '}
-                    </span>
-                  ))}
-                </div>
-              )}
+              {/* オプション情報の表示 */}
+{visit.options && visit.options.length > 0 && (
+  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+    オプション: {visit.options.map((opt, idx) => (
+      <span key={idx}>
+        {opt.option_name}
+        {opt.is_free ? ' (無料)' : ` (+¥${opt.price.toLocaleString()})`}
+        {idx < visit.options.length - 1 && ', '}
+      </span>
+    ))}
+  </div>
+)}
             </td>
             <td className="customers-page__history-staff">
               {visit.staff}
