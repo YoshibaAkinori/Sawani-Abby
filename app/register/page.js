@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CreditCard, Users, Package, Calculator as CalcIcon, Check, AlertCircle, Sparkles, X, UserPlus, Ticket } from 'lucide-react';
+import { ArrowLeft, CreditCard, Users, Package, Calculator as CalcIcon, Check, AlertCircle, Sparkles, X, UserPlus } from 'lucide-react';
 import './register.css';
 
 const RegisterPage = () => {
@@ -12,6 +12,8 @@ const RegisterPage = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
+  const [staffList, setStaffList] = useState([]);
+  const [selectedStaff, setSelectedStaff] = useState(null);
 
   // 新規顧客登録フォーム
   const [newCustomer, setNewCustomer] = useState({
@@ -26,29 +28,27 @@ const RegisterPage = () => {
   // 施術・メニュー
   const [menuTab, setMenuTab] = useState('normal');
   const [services, setServices] = useState([]);
-  const [ownedTickets, setOwnedTickets] = useState([]); // 保有回数券
-  const [availableTicketPlans, setAvailableTicketPlans] = useState([]); // 購入可能な回数券プラン
+  const [ownedTickets, setOwnedTickets] = useState([]);
+  const [availableTicketPlans, setAvailableTicketPlans] = useState([]);
   const [coupons, setCoupons] = useState([]);
   const [limitedOffers, setLimitedOffers] = useState([]);
   const [selectedMenu, setSelectedMenu] = useState(null);
   const [selectedMenuType, setSelectedMenuType] = useState('normal');
-
-  // 回数券購入モーダル
-  const [showTicketPurchaseModal, setShowTicketPurchaseModal] = useState(false);
-  const [selectedTicketPlan, setSelectedTicketPlan] = useState(null);
-  const [ticketPaymentMethod, setTicketPaymentMethod] = useState('cash');
-  const [ticketCashAmount, setTicketCashAmount] = useState('');
-  const [ticketCardAmount, setTicketCardAmount] = useState('');
+  
+  // 回数券購入リスト
+  const [ticketPurchaseList, setTicketPurchaseList] = useState([]);
 
   // オプション
   const [options, setOptions] = useState([]);
   const [selectedFreeOptions, setSelectedFreeOptions] = useState([]);
   const [selectedPaidOptions, setSelectedPaidOptions] = useState([]);
 
-  // 支払い
+  // 支払い・割引
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [cashAmount, setCashAmount] = useState('');
   const [cardAmount, setCardAmount] = useState('');
+  const [discountAmount, setDiscountAmount] = useState('');
+  const [receivedAmount, setReceivedAmount] = useState('');
 
   // 電卓
   const [calcDisplay, setCalcDisplay] = useState('0');
@@ -66,37 +66,46 @@ const RegisterPage = () => {
   }, []);
 
   const fetchInitialData = async () => {
-    setIsLoading(true);
-    try {
-      const [todayRes, servicesRes, optionsRes, ticketPlansRes, couponsRes, limitedOffersRes] = await Promise.all([
-        fetch('/api/customers/today-bookings'),
-        fetch('/api/services'),
-        fetch('/api/options'),
-        fetch('/api/ticket-plans'),
-        fetch('/api/coupons'),
-        fetch('/api/limited-offers')
-      ]);
+  setIsLoading(true);
+  try {
+    const [todayRes, servicesRes, optionsRes, ticketPlansRes, couponsRes, limitedOffersRes, staffRes] = await Promise.all([
+      fetch('/api/customers/today-bookings'),
+      fetch('/api/services'),
+      fetch('/api/options'),
+      fetch('/api/ticket-plans'),
+      fetch('/api/coupons'),
+      fetch('/api/limited-offers'),
+      fetch('/api/staff') // ← 追加
+    ]);
 
-      const todayData = await todayRes.json();
-      const servicesData = await servicesRes.json();
-      const optionsData = await optionsRes.json();
-      const ticketPlansData = await ticketPlansRes.json();
-      const couponsData = await couponsRes.json();
-      const limitedOffersData = await limitedOffersRes.json();
+    const todayData = await todayRes.json();
+    const servicesData = await servicesRes.json();
+    const optionsData = await optionsRes.json();
+    const ticketPlansData = await ticketPlansRes.json();
+    const couponsData = await couponsRes.json();
+    const limitedOffersData = await limitedOffersRes.json();
+    const staffData = await staffRes.json(); // ← 追加
 
-      setTodayBookings(todayData.data || []);
-      setServices(servicesData.data || []);
-      setOptions(optionsData.data || []);
-      setAvailableTicketPlans(ticketPlansData.data || []);
-      setCoupons(couponsData.data || []);
-      setLimitedOffers(limitedOffersData.data || []);
-    } catch (err) {
-      console.error('データ取得エラー:', err);
-      setError('データの取得に失敗しました');
-    } finally {
-      setIsLoading(false);
+    setTodayBookings(todayData.data || []);
+    setServices(servicesData.data || []);
+    setOptions(optionsData.data || []);
+    setAvailableTicketPlans(ticketPlansData.data || []);
+    setCoupons(couponsData.data || []);
+    setLimitedOffers(limitedOffersData.data || []);
+    
+    // ← 追加：アクティブなスタッフのみ & デフォルト選択
+    const activeStaff = (staffData.data || []).filter(s => s.is_active);
+    setStaffList(activeStaff);
+    if (activeStaff.length > 0) {
+      setSelectedStaff(activeStaff[0]); // 最初のスタッフをデフォルト選択
     }
-  };
+  } catch (err) {
+    console.error('データ取得エラー:', err);
+    setError('データの取得に失敗しました');
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   // 顧客検索
   const handleSearch = async () => {
@@ -205,76 +214,50 @@ const RegisterPage = () => {
     }
   };
 
-  // 回数券購入モーダルを開く
-  const handleOpenTicketPurchase = (plan) => {
-    if (!selectedCustomer) {
-      setError('お客様を先に選択してください');
-      setTimeout(() => setError(''), 3000);
-      return;
-    }
-    setSelectedTicketPlan(plan);
-    setTicketPaymentMethod('cash');
-    setTicketCashAmount('');
-    setTicketCardAmount('');
-    setShowTicketPurchaseModal(true);
-  };
-
-  // 回数券購入処理
-  const handlePurchaseTicket = async () => {
-    if (!selectedCustomer) {
-      setError('お客様を選択してください');
-      setTimeout(() => setError(''), 3000);
-      return;
-    }
-
-    if (!selectedTicketPlan) {
-      setError('回数券プランを選択してください');
-      setTimeout(() => setError(''), 3000);
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      const purchaseResponse = await fetch('/api/ticket-purchases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customer_id: selectedCustomer.customer_id,
-          plan_id: selectedTicketPlan.plan_id,
-          payment_method: ticketPaymentMethod,
-          cash_amount: ticketPaymentMethod === 'mixed' ? parseInt(ticketCashAmount) || 0 : (ticketPaymentMethod === 'cash' ? selectedTicketPlan.price : 0),
-          card_amount: ticketPaymentMethod === 'mixed' ? parseInt(ticketCardAmount) || 0 : (ticketPaymentMethod === 'card' ? selectedTicketPlan.price : 0)
-        })
-      });
-
-      const result = await purchaseResponse.json();
-      
-      if (result.success) {
-        setSuccess('回数券を購入しました！');
-        setShowTicketPurchaseModal(false);
-        setSelectedTicketPlan(null);
-        
-        await fetchCustomerTickets(selectedCustomer.customer_id);
-        
-        setTimeout(() => setSuccess(''), 3000);
-      } else {
-        throw new Error(result.error);
-      }
-    } catch (err) {
-      console.error('回数券購入エラー:', err);
-      setError(err.message || '回数券購入に失敗しました');
-      setTimeout(() => setError(''), 3000);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   // メニュー選択
   const handleSelectMenu = (menu, type) => {
     setSelectedMenu(menu);
     setSelectedMenuType(type);
     setSelectedFreeOptions([]);
     setSelectedPaidOptions([]);
+    setDiscountAmount('');
+    setReceivedAmount('');
+  };
+
+  // 回数券を購入リストに追加
+  const handleAddTicketToPurchase = (plan) => {
+    if (!selectedCustomer) {
+      setError('お客様を先に選択してください');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+    
+    const newTicket = {
+      id: Date.now(),
+      plan_id: plan.plan_id,
+      name: plan.name,
+      service_name: plan.service_name,
+      total_sessions: plan.total_sessions,
+      full_price: plan.price,
+      payment_amount: plan.price,
+      service_category: plan.service_category
+    };
+    
+    setTicketPurchaseList(prev => [...prev, newTicket]);
+    setSuccess(`${plan.name}を追加しました`);
+    setTimeout(() => setSuccess(''), 2000);
+  };
+
+  // 回数券購入リストから削除
+  const handleRemoveTicketFromPurchase = (ticketId) => {
+    setTicketPurchaseList(prev => prev.filter(t => t.id !== ticketId));
+  };
+
+  // 回数券の支払い額を更新
+  const handleUpdateTicketPayment = (ticketId, amount) => {
+    setTicketPurchaseList(prev => 
+      prev.map(t => t.id === ticketId ? { ...t, payment_amount: parseInt(amount) || '' } : t)
+    );
   };
 
   // オプション選択（自由選択）
@@ -313,6 +296,7 @@ const RegisterPage = () => {
   const calculateTotal = () => {
     let total = 0;
 
+    // 通常メニュー・回数券使用・クーポンなど
     if (selectedMenu) {
       if (selectedMenuType === 'normal') {
         total += selectedMenu.price || 0;
@@ -325,12 +309,22 @@ const RegisterPage = () => {
       }
     }
 
+    // 回数券購入リストの合計
+    ticketPurchaseList.forEach(ticket => {
+      total += ticket.payment_amount || 0;
+    });
+
+    // 追加オプション
     selectedPaidOptions.forEach(optionId => {
       const option = options.find(o => o.option_id === optionId);
       if (option) {
         total += option.price;
       }
     });
+
+    // 割引適用
+    const discount = parseInt(discountAmount) || 0;
+    total = Math.max(0, total - discount);
 
     return total;
   };
@@ -364,75 +358,185 @@ const RegisterPage = () => {
     }
   };
 
+  // 電卓の値を支払い金額に入力
+  const handleSetReceivedAmount = () => {
+    setReceivedAmount(calcDisplay);
+  };
+
   // お会計処理
-  const handleCheckout = async () => {
-    if (!selectedCustomer) {
-      setError('お客様を選択してください');
-      setTimeout(() => setError(''), 3000);
-      return;
-    }
+  // 修正版 handleCheckout 関数
+const handleCheckout = async () => {
+  if (!selectedCustomer) {
+    setError('お客様を選択してください');
+    setTimeout(() => setError(''), 3000);
+    return;
+  }
+  if (!selectedStaff) {
+    setError('担当スタッフを選択してください');
+    setTimeout(() => setError(''), 3000);
+    return;
+  }
 
-    if (!selectedMenu) {
-      setError('施術メニューを選択してください');
-      setTimeout(() => setError(''), 3000);
-      return;
-    }
-
+  // 回数券購入のみの場合
+  if (ticketPurchaseList.length > 0 && !selectedMenu) {
     setIsLoading(true);
     try {
-      const paymentData = {
-        customer_id: selectedCustomer.customer_id,
-        staff_id: '550e8400-e29b-41d4-a716-446655440001',
-        service_id: selectedMenu.service_id || null,
-        payment_type: selectedMenuType,
-        ticket_id: selectedMenuType === 'ticket' ? selectedMenu.customer_ticket_id : null,
-        coupon_id: selectedMenuType === 'coupon' ? selectedMenu.coupon_id : null,
-        limited_offer_id: selectedMenuType === 'limited' ? selectedMenu.offer_id : null,
-        options: [
-          ...selectedPaidOptions.map(id => ({ option_id: id, is_free: false })),
-          ...selectedFreeOptions.map(id => ({ option_id: id, is_free: true }))
-        ],
-        discount_amount: 0,
-        payment_method: paymentMethod,
-        cash_amount: paymentMethod === 'mixed' ? parseInt(cashAmount) || 0 : (paymentMethod === 'cash' ? calculateTotal() : 0),
-        card_amount: paymentMethod === 'mixed' ? parseInt(cardAmount) || 0 : (paymentMethod === 'card' ? calculateTotal() : 0)
-      };
+      for (const ticket of ticketPurchaseList) {
+        // 支払い方法による金額設定
+        let cashAmt = 0;
+        let cardAmt = 0;
+        
+        if (paymentMethod === 'cash') {
+          cashAmt = ticket.payment_amount;
+        } else if (paymentMethod === 'card') {
+          cardAmt = ticket.payment_amount;
+        } else if (paymentMethod === 'mixed') {
+          // 混合支払いの場合、比率で分配
+          const totalTicketAmount = ticketPurchaseList.reduce((sum, t) => sum + (t.payment_amount || 0), 0);
+          const ratio = ticket.payment_amount / totalTicketAmount;
+          cashAmt = Math.round(parseInt(cashAmount) * ratio);
+          cardAmt = Math.round(parseInt(cardAmount) * ratio);
+        }
 
-      const response = await fetch('/api/payments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(paymentData)
-      });
+        const purchaseResponse = await fetch('/api/ticket-purchases', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_id: selectedCustomer.customer_id,
+            plan_id: ticket.plan_id,
+            payment_amount: ticket.payment_amount,
+            payment_method: paymentMethod,
+            cash_amount: cashAmt,
+            card_amount: cardAmt,
+            staff_id: selectedStaff?.staff_id || staffList[0]?.staff_id
+          })
+        });
 
-      const result = await response.json();
-      
-      if (result.success) {
-        setSuccess('お会計が完了しました！');
-        setTimeout(() => {
-          setSuccess('');
-          setSelectedCustomer(null);
-          setSelectedMenu(null);
-          setSelectedFreeOptions([]);
-          setSelectedPaidOptions([]);
-          setPaymentMethod('cash');
-          setCashAmount('');
-          setCardAmount('');
-          setOwnedTickets([]);
-          fetchInitialData();
-        }, 2000);
-      } else {
-        throw new Error(result.error);
+        const result = await purchaseResponse.json();
+        if (!result.success) {
+          throw new Error(result.error || '回数券購入に失敗しました');
+        }
       }
+
+      setSuccess('回数券を購入しました！');
+      setTimeout(() => {
+        setSuccess('');
+        resetForm();
+      }, 2000);
     } catch (err) {
-      console.error('お会計エラー:', err);
-      setError(err.message || 'お会計処理に失敗しました');
+      console.error('回数券購入エラー:', err);
+      setError(err.message || '回数券購入に失敗しました');
       setTimeout(() => setError(''), 3000);
     } finally {
       setIsLoading(false);
     }
+    return;
+  }
+
+  // 施術が選択されていない場合
+  if (!selectedMenu) {
+    setError('メニューを選択してください');
+    setTimeout(() => setError(''), 3000);
+    return;
+  }
+
+  setIsLoading(true);
+  try {
+    // 1. 施術の会計処理
+    const paymentData = {
+      customer_id: selectedCustomer.customer_id,
+      staff_id: selectedStaff?.staff_id || staffList[0]?.staff_id,
+      service_id: selectedMenuType === 'normal' ? selectedMenu.service_id : 
+                  (selectedMenuType === 'ticket' ? null : 
+                  (selectedMenuType === 'coupon' ? selectedMenu.base_service_id : null)),
+      payment_type: selectedMenuType,
+      ticket_id: selectedMenuType === 'ticket' ? selectedMenu.customer_ticket_id : null,
+      coupon_id: selectedMenuType === 'coupon' ? selectedMenu.coupon_id : null,
+      limited_offer_id: selectedMenuType === 'limited' ? selectedMenu.offer_id : null,
+      options: [
+        ...selectedPaidOptions.map(id => ({ option_id: id, is_free: false })),
+        ...selectedFreeOptions.map(id => ({ option_id: id, is_free: true }))
+      ],
+      discount_amount: parseInt(discountAmount) || 0,
+      payment_method: paymentMethod,
+      cash_amount: paymentMethod === 'cash' ? calculateTotal() : 
+                    (paymentMethod === 'mixed' ? parseInt(cashAmount) || 0 : 0),
+      card_amount: paymentMethod === 'card' ? calculateTotal() : 
+                    (paymentMethod === 'mixed' ? parseInt(cardAmount) || 0 : 0)
+    };
+
+    const response = await fetch('/api/payments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(paymentData)
+    });
+
+    const result = await response.json();
+    
+    if (!result.success) {
+      throw new Error(result.error || 'お会計処理に失敗しました');
+    }
+
+    // 2. 回数券購入がある場合
+    if (ticketPurchaseList.length > 0) {
+      for (const ticket of ticketPurchaseList) {
+        const ticketPurchaseResponse = await fetch('/api/ticket-purchases', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_id: selectedCustomer.customer_id,
+            plan_id: ticket.plan_id,
+            payment_amount: ticket.payment_amount,
+            payment_method: 'cash', // 回数券購入は別会計として現金扱い
+            cash_amount: ticket.payment_amount,
+            card_amount: 0,
+            staff_id: selectedStaff?.staff_id || staffList[0]?.staff_id
+          })
+        });
+
+        const ticketResult = await ticketPurchaseResponse.json();
+        if (!ticketResult.success) {
+          console.error('回数券購入エラー:', ticketResult.error);
+          // 回数券購入失敗しても施術会計は完了しているので続行
+        }
+      }
+    }
+
+    setSuccess('お会計が完了しました！');
+    setTimeout(() => {
+      setSuccess('');
+      resetForm();
+    }, 2000);
+
+  } catch (err) {
+    console.error('お会計エラー:', err);
+    setError(err.message || 'お会計処理に失敗しました');
+    setTimeout(() => setError(''), 3000);
+  } finally {
+    setIsLoading(false);
+  }
+};
+
+  const resetForm = () => {
+    setSelectedCustomer(null);
+    setSelectedMenu(null);
+    setSelectedFreeOptions([]);
+    setSelectedPaidOptions([]);
+    setPaymentMethod('cash');
+    setCashAmount('');
+    setCardAmount('');
+    setDiscountAmount('');
+    setReceivedAmount('');
+    setOwnedTickets([]);
+    setTicketPurchaseList([]);
+    if (staffList.length > 0) {
+      setSelectedStaff(staffList[0]);
+    }
+    fetchInitialData();
   };
 
   const total = calculateTotal();
+  const change = receivedAmount ? Math.max(0, parseInt(receivedAmount) - total) : 0;
   
   let maxFreeOptions = 0;
   if (selectedMenuType === 'normal' && selectedMenu?.free_option_choices) {
@@ -445,7 +549,6 @@ const RegisterPage = () => {
 
   return (
     <div className="register-page">
-      {/* ヘッダー */}
       <header className="register-page__header">
         <div className="register-page__header-container">
           <Link href="/" className="register-page__back-link">
@@ -459,7 +562,6 @@ const RegisterPage = () => {
         </div>
       </header>
 
-      {/* メインコンテンツ */}
       <main className="register-page__main">
         {error && (
           <div className="alert alert--error">
@@ -475,7 +577,6 @@ const RegisterPage = () => {
         )}
 
         <div className="register-page__grid">
-          {/* 左側: 顧客・メニュー選択 */}
           <div className="register-page__left">
             {/* 顧客選択 */}
             <div className="register-section">
@@ -555,6 +656,30 @@ const RegisterPage = () => {
                 )}
               </div>
             </div>
+            {/* 担当スタッフ選択 */}
+<div className="register-section">
+  <div className="register-section__header">
+    <Users size={18} />
+    <h3 className="register-section__title">担当スタッフ</h3>
+  </div>
+  <div className="register-section__content">
+    <div className="staff-selection">
+      {staffList.map(staff => (
+        <button
+          key={staff.staff_id}
+          className={`staff-btn ${selectedStaff?.staff_id === staff.staff_id ? 'staff-btn--selected' : ''}`}
+          onClick={() => setSelectedStaff(staff)}
+          style={{
+            '--staff-color': staff.color
+          }}
+        >
+          <div className="staff-btn__color" style={{ backgroundColor: staff.color }}></div>
+          <div className="staff-btn__name">{staff.name}</div>
+        </button>
+      ))}
+    </div>
+  </div>
+</div>
 
             {/* メニュー・施術選択 */}
             <div className="register-section">
@@ -636,8 +761,13 @@ const RegisterPage = () => {
                     </div>
                   ))}
 
-                  {menuTab === 'ticket-buy' && (() => {
-                    // カテゴリーごとにグループ化
+                  {menuTab === 'ticket-buy' && !selectedCustomer && (
+                    <div className="empty-message">
+                      お客様を選択してください
+                    </div>
+                  )}
+
+                  {menuTab === 'ticket-buy' && selectedCustomer && (() => {
                     const groupedPlans = {};
                     availableTicketPlans.forEach(plan => {
                       const category = plan.service_category || 'その他';
@@ -655,15 +785,12 @@ const RegisterPage = () => {
                             <div
                               key={plan.plan_id}
                               className="menu-card menu-card--purchase"
-                              onClick={() => handleOpenTicketPurchase(plan)}
+                              onClick={() => handleAddTicketToPurchase(plan)}
                             >
                               <div className="menu-card__name">{plan.name}</div>
                               <div className="menu-card__info">{plan.service_name} × {plan.total_sessions}回</div>
                               <div className="menu-card__price">¥{plan.price?.toLocaleString()}</div>
-                              <div className="menu-card__badge">
-                                <Ticket size={14} />
-                                購入
-                              </div>
+                              <div className="menu-card__badge-add">+追加</div>
                             </div>
                           ))}
                         </div>
@@ -699,9 +826,10 @@ const RegisterPage = () => {
                 </div>
               </div>
             </div>
+            
 
             {/* オプション選択 */}
-            {selectedMenu && menuTab !== 'ticket-buy' && (
+            {selectedMenu && (
               <div className="register-section">
                 <div className="register-section__header">
                   <Sparkles size={18} />
@@ -714,7 +842,6 @@ const RegisterPage = () => {
                         自由選択オプション（{selectedFreeOptions.length}/{maxFreeOptions}個まで無料）
                       </div>
                       
-                      {/* カテゴリごとに表示 */}
                       {['フェイシャル', 'ボディ', 'その他'].map(category => {
                         const categoryOptions = options.filter(opt => opt.is_active && opt.category === category);
                         if (categoryOptions.length === 0) return null;
@@ -743,7 +870,6 @@ const RegisterPage = () => {
 
                   <div className="option-section-label">追加オプション（有料）</div>
                   
-                  {/* カテゴリごとに表示 */}
                   {['フェイシャル', 'ボディ', 'その他'].map(category => {
                     const categoryOptions = options.filter(opt => opt.is_active && opt.category === category);
                     if (categoryOptions.length === 0) return null;
@@ -789,7 +915,7 @@ const RegisterPage = () => {
                   </div>
                 )}
 
-                {selectedMenu && menuTab !== 'ticket-buy' && (
+                {selectedMenu && (
                   <div className="payment-summary">
                     <div className="payment-summary__item">
                       <span>メニュー</span>
@@ -797,7 +923,7 @@ const RegisterPage = () => {
                     </div>
                     <div className="payment-summary__item payment-summary__item--sub">
                       <span>料金</span>
-                      <span>¥{selectedMenuType === 'ticket' ? 0 : (selectedMenu.price || selectedMenu.total_price || 0).toLocaleString()}</span>
+                      <span>¥{(selectedMenuType === 'ticket' || selectedMenuType === 'limited' ? 0 : (selectedMenu.price || selectedMenu.total_price || selectedMenu.special_price || 0)).toLocaleString()}</span>
                     </div>
 
                     {selectedFreeOptions.length > 0 && (
@@ -838,9 +964,122 @@ const RegisterPage = () => {
                       </>
                     )}
 
+                    {discountAmount && parseInt(discountAmount) > 0 && (
+                      <>
+                        <div className="payment-summary__divider"></div>
+                        <div className="payment-summary__item payment-summary__item--discount">
+                          <span>割引</span>
+                          <span>-¥{parseInt(discountAmount).toLocaleString()}</span>
+                        </div>
+                      </>
+                    )}
+
                     <div className="payment-summary__total">
                       <span>合計金額</span>
                       <span>¥{total.toLocaleString()}</span>
+                    </div>
+
+                    {receivedAmount && parseInt(receivedAmount) > 0 && (
+                      <>
+                        <div className="payment-summary__item">
+                          <span>お預かり</span>
+                          <span>¥{parseInt(receivedAmount).toLocaleString()}</span>
+                        </div>
+                        <div className="payment-summary__item payment-summary__item--change">
+                          <span>おつり</span>
+                          <span>¥{change.toLocaleString()}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* 回数券購入リスト */}
+                {ticketPurchaseList.length > 0 && (
+                  <>
+                    <div className="payment-summary" style={{ marginTop: '1rem' }}>
+                      <div className="payment-summary__header">
+                        <span>回数券購入</span>
+                      </div>
+                      {ticketPurchaseList.map(ticket => (
+                        <div key={ticket.id} className="ticket-purchase-item">
+                          <div className="ticket-purchase-item__header">
+                            <span className="ticket-purchase-item__name">{ticket.name}</span>
+                            <button 
+                              className="ticket-purchase-item__remove"
+                              onClick={() => handleRemoveTicketFromPurchase(ticket.id)}
+                            >
+                              <X size={16} />
+                            </button>
+                          </div>
+                          <div className="ticket-purchase-item__info">
+                            {ticket.service_name} × {ticket.total_sessions}回
+                          </div>
+                          <div className="ticket-purchase-item__price">
+                            <span>定価: ¥{ticket.full_price.toLocaleString()}</span>
+                          </div>
+                          <div className="ticket-purchase-item__payment">
+                            <label>今回支払額</label>
+                            <input
+                              type="number"
+                              className="form-input"
+                              value={ticket.payment_amount}
+                              onChange={(e) => handleUpdateTicketPayment(ticket.id, e.target.value)}
+                              placeholder="0"
+                              max={ticket.full_price}
+                            />
+                          </div>
+                          {ticket.payment_amount < ticket.full_price && (
+                            <div className="ticket-purchase-item__remaining">
+                              残額: ¥{(ticket.full_price - ticket.payment_amount).toLocaleString()}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    {!selectedMenu && (
+                      <div className="payment-summary__total" style={{ marginTop: '1rem', padding: '1rem', background: '#dbeafe', borderRadius: '0.5rem' }}>
+                        <span>回数券購入合計</span>
+                        <span>¥{total.toLocaleString()}</span>
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* 割引入力 */}
+                {selectedMenu && selectedMenuType !== 'ticket' && selectedMenuType !== 'limited' && (
+                  <div className="form-group" style={{ marginTop: '1rem' }}>
+                    <label>割引金額</label>
+                    <input
+                      type="number"
+                      className="form-input"
+                      value={discountAmount}
+                      onChange={(e) => setDiscountAmount(e.target.value)}
+                      placeholder="0"
+                    />
+                  </div>
+                )}
+
+                {/* お預かり金額入力 */}
+                {(selectedMenu || ticketPurchaseList.length > 0) && paymentMethod === 'cash' && (
+                  <div className="form-group" style={{ marginTop: '1rem' }}>
+                    <label>お預かり金額</label>
+                    <div className="received-amount-input">
+                      <input
+                        type="number"
+                        className="form-input"
+                        value={receivedAmount}
+                        onChange={(e) => setReceivedAmount(e.target.value)}
+                        placeholder="0"
+                      />
+                      <button 
+                        className="calc-to-input-btn"
+                        onClick={handleSetReceivedAmount}
+                        type="button"
+                      >
+                        電卓から入力
+                      </button>
                     </div>
                   </div>
                 )}
@@ -848,61 +1087,59 @@ const RegisterPage = () => {
             </div>
 
             {/* 支払い方法 */}
-            {menuTab !== 'ticket-buy' && (
-              <div className="register-section">
-                <div className="register-section__header">
-                  <CreditCard size={18} />
-                  <h3 className="register-section__title">支払い方法</h3>
-                </div>
-                <div className="register-section__content">
-                  <div className="payment-method-tabs">
-                    <button
-                      className={`payment-tab ${paymentMethod === 'cash' ? 'payment-tab--active' : ''}`}
-                      onClick={() => setPaymentMethod('cash')}
-                    >
-                      現金
-                    </button>
-                    <button
-                      className={`payment-tab ${paymentMethod === 'card' ? 'payment-tab--active' : ''}`}
-                      onClick={() => setPaymentMethod('card')}
-                    >
-                      カード
-                    </button>
-                    <button
-                      className={`payment-tab ${paymentMethod === 'mixed' ? 'payment-tab--active' : ''}`}
-                      onClick={() => setPaymentMethod('mixed')}
-                    >
-                      混合
-                    </button>
-                  </div>
-
-                  {paymentMethod === 'mixed' && (
-                    <div className="mixed-payment-inputs">
-                      <div className="form-group">
-                        <label>現金</label>
-                        <input
-                          type="number"
-                          className="form-input"
-                          value={cashAmount}
-                          onChange={(e) => setCashAmount(e.target.value)}
-                          placeholder="0"
-                        />
-                      </div>
-                      <div className="form-group">
-                        <label>カード</label>
-                        <input
-                          type="number"
-                          className="form-input"
-                          value={cardAmount}
-                          onChange={(e) => setCardAmount(e.target.value)}
-                          placeholder="0"
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
+            <div className="register-section">
+              <div className="register-section__header">
+                <CreditCard size={18} />
+                <h3 className="register-section__title">支払い方法</h3>
               </div>
-            )}
+              <div className="register-section__content">
+                <div className="payment-method-tabs">
+                  <button
+                    className={`payment-tab ${paymentMethod === 'cash' ? 'payment-tab--active' : ''}`}
+                    onClick={() => setPaymentMethod('cash')}
+                  >
+                    現金
+                  </button>
+                  <button
+                    className={`payment-tab ${paymentMethod === 'card' ? 'payment-tab--active' : ''}`}
+                    onClick={() => setPaymentMethod('card')}
+                  >
+                    カード
+                  </button>
+                  <button
+                    className={`payment-tab ${paymentMethod === 'mixed' ? 'payment-tab--active' : ''}`}
+                    onClick={() => setPaymentMethod('mixed')}
+                  >
+                    混合
+                  </button>
+                </div>
+
+                {paymentMethod === 'mixed' && (
+                  <div className="mixed-payment-inputs">
+                    <div className="form-group">
+                      <label>現金</label>
+                      <input
+                        type="number"
+                        className="form-input"
+                        value={cashAmount}
+                        onChange={(e) => setCashAmount(e.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>カード</label>
+                      <input
+                        type="number"
+                        className="form-input"
+                        value={cardAmount}
+                        onChange={(e) => setCardAmount(e.target.value)}
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* 電卓 */}
             <div className="register-section">
@@ -943,15 +1180,13 @@ const RegisterPage = () => {
             </div>
 
             {/* お会計ボタン */}
-            {menuTab !== 'ticket-buy' && (
-              <button
-                className="checkout-btn"
-                onClick={handleCheckout}
-                disabled={!selectedCustomer || !selectedMenu || isLoading}
-              >
-                {isLoading ? '処理中...' : 'お会計を完了する'}
-              </button>
-            )}
+            <button
+              className="checkout-btn"
+              onClick={handleCheckout}
+              disabled={!selectedCustomer || (!selectedMenu && ticketPurchaseList.length === 0) || isLoading}
+            >
+              {isLoading ? '処理中...' : 'お会計を完了する'}
+            </button>
           </div>
         </div>
       </main>
@@ -1034,109 +1269,6 @@ const RegisterPage = () => {
               </button>
               <button className="modal-btn modal-btn--primary" onClick={handleNewCustomerSubmit}>
                 登録する
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 回数券購入モーダル */}
-      {showTicketPurchaseModal && selectedTicketPlan && (
-        <div className="modal-overlay" onClick={() => setShowTicketPurchaseModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>回数券購入</h3>
-              <button className="modal-close" onClick={() => setShowTicketPurchaseModal(false)}>
-                <X size={20} />
-              </button>
-            </div>
-            <div className="modal-body">
-              <div className="ticket-purchase-info">
-                <div className="ticket-purchase-info__item">
-                  <span>お客様</span>
-                  <span>{selectedCustomer?.last_name} {selectedCustomer?.first_name} 様</span>
-                </div>
-                <div className="ticket-purchase-info__item">
-                  <span>回数券</span>
-                  <span>{selectedTicketPlan.name}</span>
-                </div>
-                <div className="ticket-purchase-info__item">
-                  <span>施術</span>
-                  <span>{selectedTicketPlan.service_name}</span>
-                </div>
-                <div className="ticket-purchase-info__item">
-                  <span>回数</span>
-                  <span>{selectedTicketPlan.total_sessions}回</span>
-                </div>
-                <div className="ticket-purchase-info__item">
-                  <span>有効期限</span>
-                  <span>{selectedTicketPlan.validity_days}日間</span>
-                </div>
-                <div className="ticket-purchase-info__total">
-                  <span>販売価格</span>
-                  <span>¥{selectedTicketPlan.price?.toLocaleString()}</span>
-                </div>
-              </div>
-
-              <div className="form-group" style={{ marginTop: '1.5rem' }}>
-                <label>支払い方法</label>
-                <div className="payment-method-tabs">
-                  <button
-                    className={`payment-tab ${ticketPaymentMethod === 'cash' ? 'payment-tab--active' : ''}`}
-                    onClick={() => setTicketPaymentMethod('cash')}
-                  >
-                    現金
-                  </button>
-                  <button
-                    className={`payment-tab ${ticketPaymentMethod === 'card' ? 'payment-tab--active' : ''}`}
-                    onClick={() => setTicketPaymentMethod('card')}
-                  >
-                    カード
-                  </button>
-                  <button
-                    className={`payment-tab ${ticketPaymentMethod === 'mixed' ? 'payment-tab--active' : ''}`}
-                    onClick={() => setTicketPaymentMethod('mixed')}
-                  >
-                    混合
-                  </button>
-                </div>
-              </div>
-
-              {ticketPaymentMethod === 'mixed' && (
-                <div className="mixed-payment-inputs">
-                  <div className="form-group">
-                    <label>現金</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      value={ticketCashAmount}
-                      onChange={(e) => setTicketCashAmount(e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-                  <div className="form-group">
-                    <label>カード</label>
-                    <input
-                      type="number"
-                      className="form-input"
-                      value={ticketCardAmount}
-                      onChange={(e) => setTicketCardAmount(e.target.value)}
-                      placeholder="0"
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="modal-footer">
-              <button className="modal-btn modal-btn--cancel" onClick={() => setShowTicketPurchaseModal(false)}>
-                キャンセル
-              </button>
-              <button 
-                className="modal-btn modal-btn--primary" 
-                onClick={handlePurchaseTicket}
-                disabled={isLoading}
-              >
-                {isLoading ? '処理中...' : '購入する'}
               </button>
             </div>
           </div>
