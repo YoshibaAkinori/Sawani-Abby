@@ -1,9 +1,8 @@
 // app/api/customers/[id]/route.js
-// 顧客詳細取得
 import { NextResponse } from 'next/server';
 import { getConnection } from '../../../../lib/db';
 
-export async function GET(request, { params }) {
+export async function GET(request, { params }) { // ← 引数の形を { params } に戻します
   try {
     const pool = await getConnection();
     const { id: customerId } = await params;

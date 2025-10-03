@@ -144,6 +144,7 @@ export async function POST(request) {
 
 // 追加支払いAPI
 export async function PATCH(request) {
+  const pool = await getConnection();
   const connection = await pool.getConnection();
   
   try {

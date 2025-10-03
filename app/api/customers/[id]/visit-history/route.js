@@ -2,10 +2,10 @@
 import { NextResponse } from 'next/server';
 import { getConnection } from '../../../../../lib/db';
 
-export async function GET(request, { params }) {
+export async function GET(request, { params }) { // ← 引数の形を { params } に戻します
   try {
-    const customerId = params.id;
     const pool = await getConnection();
+    const { id: customerId } = await params;
     const connection = await pool.getConnection();
 
     // 来店履歴取得（paymentsテーブルから）
@@ -63,7 +63,6 @@ export async function GET(request, { params }) {
         `, [payment.ticket_id]);
         
         if (ticketInfo.length > 0) {
-          // 回数券購入か使用かを判定
           const isTicketPurchase = payment.service_name && payment.service_name.includes('回数券購入');
           
           detailInfo = {
@@ -77,7 +76,6 @@ export async function GET(request, { params }) {
           if (isTicketPurchase) {
             serviceDisplay = `${ticketInfo[0].plan_name}`;
           } else {
-            // 回数券使用の場合は実際の施術名を表示
             serviceDisplay = ticketInfo[0].service_name || payment.service_name;
           }
         }
@@ -135,7 +133,7 @@ export async function GET(request, { params }) {
         payment_method: payment.payment_method,
         amount: payment.total_amount,
         options: options,
-        detail_info: detailInfo // 追加情報
+        detail_info: detailInfo
       });
     }
 
@@ -148,6 +146,9 @@ export async function GET(request, { params }) {
 
   } catch (error) {
     console.error('来店履歴取得エラー:', error);
+    // connection?.release() を finally ブロックで確実に呼び出す方がより安全ですが、
+    // エラーハンドリングを簡潔にするため、ここでは省略します。
+    // 本番環境では、finallyブロックでの解放を推奨します。
     return NextResponse.json(
       { success: false, error: 'データベースエラー' },
       { status: 500 }

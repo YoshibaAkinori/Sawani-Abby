@@ -219,38 +219,69 @@ const RegisterPage = () => {
   };
 
   // メニュー選択
-  const handleSelectMenu = (menu, type) => {
-    setSelectedMenu(menu);
-    setSelectedMenuType(type);
-    setSelectedFreeOptions([]);
-    setSelectedPaidOptions([]);
-    setDiscountAmount('');
-    setReceivedAmount('');
-  };
+  // handleSelectMenu を修正
+const handleSelectMenu = (menu, type) => {
+  setSelectedMenu(menu);
+  setSelectedMenuType(type);
+  setSelectedFreeOptions([]);
+  setSelectedPaidOptions([]);
+  setDiscountAmount('');
+  setReceivedAmount('');
+  
+  // 回数券使用で未払いがある場合、購入リストに追加
+  if (type === 'ticket' && menu.remaining_payment > 0) {
+    const ticketPayment = {
+      id: `payment-${Date.now()}`,
+      customer_ticket_id: menu.customer_ticket_id,
+      name: menu.plan_name,
+      service_name: menu.service_name,
+      total_sessions: menu.total_sessions,
+      full_price: menu.purchase_price,
+      total_sessions: menu.total_sessions,
+      already_paid: menu.purchase_price - menu.remaining_payment,
+      remaining_payment: menu.remaining_payment,
+      payment_amount: menu.remaining_payment, // デフォルトで全額
+      is_additional_payment: true // 追加支払いフラグ
+    };
+    
+    // 既に追加されていないかチェック
+    setTicketPurchaseList(prev => {
+      const exists = prev.find(t => t.customer_ticket_id === menu.customer_ticket_id);
+      if (exists) return prev;
+      return [...prev, ticketPayment];
+    });
+  } else {
+    // 回数券以外または完済済みの場合はリストから削除
+    setTicketPurchaseList(prev => 
+      prev.filter(t => !t.is_additional_payment)
+    );
+  }
+};
 
   // 回数券を購入リストに追加
   const handleAddTicketToPurchase = (plan) => {
-    if (!selectedCustomer) {
-      setError('お客様を先に選択してください');
-      setTimeout(() => setError(''), 3000);
-      return;
-    }
-    
-    const newTicket = {
-      id: Date.now(),
-      plan_id: plan.plan_id,
-      name: plan.name,
-      service_name: plan.service_name,
-      total_sessions: plan.total_sessions,
-      full_price: plan.price,
-      payment_amount: plan.price,
-      service_category: plan.service_category
-    };
-    
-    setTicketPurchaseList(prev => [...prev, newTicket]);
-    setSuccess(`${plan.name}を追加しました`);
-    setTimeout(() => setSuccess(''), 2000);
+  if (!selectedCustomer) {
+    setError('お客様を先に選択してください');
+    setTimeout(() => setError(''), 3000);
+    return;
+  }
+  
+  const newTicket = {
+    id: Date.now(),
+    plan_id: plan.plan_id,
+    name: plan.name,
+    service_name: plan.service_name,
+    total_sessions: plan.total_sessions,
+    full_price: plan.price,
+    already_paid: 0, // 新規購入なので0
+    payment_amount: plan.price, // デフォルトで全額
+    service_category: plan.service_category
   };
+  
+  setTicketPurchaseList(prev => [...prev, newTicket]);
+  setSuccess(`${plan.name}を追加しました`);
+  setTimeout(() => setSuccess(''), 2000);
+};
 
   // 回数券購入リストから削除
   const handleRemoveTicketFromPurchase = (ticketId) => {
@@ -368,25 +399,30 @@ const RegisterPage = () => {
   };
 
   // お会計処理
-  // 修正版 handleCheckout 関数
 const handleCheckout = async () => {
   if (!selectedCustomer) {
     setError('お客様を選択してください');
     setTimeout(() => setError(''), 3000);
     return;
   }
-  if (!selectedStaff) {
+
+  if (!selectedStaff || !selectedStaff.staff_id) {
     setError('担当スタッフを選択してください');
     setTimeout(() => setError(''), 3000);
+    if (staffList.length > 0) {
+      setSelectedStaff(staffList[0]);
+    }
     return;
   }
 
-  // 回数券購入のみの場合
-  if (ticketPurchaseList.length > 0 && !selectedMenu) {
+  // 回数券購入のみの場合（新規購入）
+  const newTicketPurchases = ticketPurchaseList.filter(t => !t.is_additional_payment);
+  const additionalPayments = ticketPurchaseList.filter(t => t.is_additional_payment);
+
+  if (newTicketPurchases.length > 0 && !selectedMenu) {
     setIsLoading(true);
     try {
-      for (const ticket of ticketPurchaseList) {
-        // 支払い方法による金額設定
+      for (const ticket of newTicketPurchases) {
         let cashAmt = 0;
         let cardAmt = 0;
         
@@ -395,8 +431,7 @@ const handleCheckout = async () => {
         } else if (paymentMethod === 'card') {
           cardAmt = ticket.payment_amount;
         } else if (paymentMethod === 'mixed') {
-          // 混合支払いの場合、比率で分配
-          const totalTicketAmount = ticketPurchaseList.reduce((sum, t) => sum + (t.payment_amount || 0), 0);
+          const totalTicketAmount = newTicketPurchases.reduce((sum, t) => sum + (t.payment_amount || 0), 0);
           const ratio = ticket.payment_amount / totalTicketAmount;
           cashAmt = Math.round(parseInt(cashAmount) * ratio);
           cardAmt = Math.round(parseInt(cardAmount) * ratio);
@@ -412,7 +447,7 @@ const handleCheckout = async () => {
             payment_method: paymentMethod,
             cash_amount: cashAmt,
             card_amount: cardAmt,
-            staff_id: selectedStaff?.staff_id || staffList[0]?.staff_id
+            staff_id: selectedStaff.staff_id
           })
         });
 
@@ -437,7 +472,6 @@ const handleCheckout = async () => {
     return;
   }
 
-  // 施術が選択されていない場合
   if (!selectedMenu) {
     setError('メニューを選択してください');
     setTimeout(() => setError(''), 3000);
@@ -450,12 +484,12 @@ const handleCheckout = async () => {
     const paymentData = {
       customer_id: selectedCustomer.customer_id,
       booking_id: selectedBookingId,
-      staff_id: selectedStaff?.staff_id || staffList[0]?.staff_id,
+      staff_id: selectedStaff.staff_id,
       service_id: selectedMenuType === 'normal' ? selectedMenu.service_id : 
                   (selectedMenuType === 'ticket' ? null : 
                   (selectedMenuType === 'coupon' ? selectedMenu.base_service_id : null)),
       payment_type: selectedMenuType,
-      ticket_id: selectedMenuType === 'ticket' ? selectedMenu.customer_ticket_id : null,
+      ticket_id: selectedMenuType === 'ticket' && selectedMenu.customer_ticket_id ? selectedMenu.customer_ticket_id : null,
       coupon_id: selectedMenuType === 'coupon' ? selectedMenu.coupon_id : null,
       limited_offer_id: selectedMenuType === 'limited' ? selectedMenu.offer_id : null,
       options: [
@@ -482,28 +516,46 @@ const handleCheckout = async () => {
       throw new Error(result.error || 'お会計処理に失敗しました');
     }
 
-    // 2. 回数券購入がある場合
-    if (ticketPurchaseList.length > 0) {
-      for (const ticket of ticketPurchaseList) {
-        const ticketPurchaseResponse = await fetch('/api/ticket-purchases', {
-          method: 'POST',
+    // 2. 回数券の未払い分支払い処理
+    for (const ticket of additionalPayments) {
+      if (ticket.payment_amount > 0) {
+        const patchResponse = await fetch('/api/ticket-purchases', {
+          method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            customer_id: selectedCustomer.customer_id,
-            plan_id: ticket.plan_id,
+            customer_ticket_id: ticket.customer_ticket_id,
             payment_amount: ticket.payment_amount,
-            payment_method: 'cash', // 回数券購入は別会計として現金扱い
-            cash_amount: ticket.payment_amount,
-            card_amount: 0,
-            staff_id: selectedStaff?.staff_id || staffList[0]?.staff_id
+            payment_method: paymentMethod,
+            notes: '回数券使用時の未払い分支払い'
           })
         });
 
-        const ticketResult = await ticketPurchaseResponse.json();
-        if (!ticketResult.success) {
-          console.error('回数券購入エラー:', ticketResult.error);
-          // 回数券購入失敗しても施術会計は完了しているので続行
+        const patchResult = await patchResponse.json();
+        if (!patchResult.success) {
+          console.error('回数券追加支払いエラー:', patchResult.error);
         }
+      }
+    }
+
+    // 3. 新規回数券購入がある場合
+    for (const ticket of newTicketPurchases) {
+      const ticketPurchaseResponse = await fetch('/api/ticket-purchases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: selectedCustomer.customer_id,
+          plan_id: ticket.plan_id,
+          payment_amount: ticket.payment_amount,
+          payment_method: 'cash',
+          cash_amount: ticket.payment_amount,
+          card_amount: 0,
+          staff_id: selectedStaff.staff_id
+        })
+      });
+
+      const ticketResult = await ticketPurchaseResponse.json();
+      if (!ticketResult.success) {
+        console.error('回数券購入エラー:', ticketResult.error);
       }
     }
 
@@ -768,7 +820,7 @@ const handleCheckout = async () => {
                     >
                       <div className="menu-card__name">{ticket.plan_name}</div>
                       <div className="menu-card__info">残り{ticket.sessions_remaining}回</div>
-                      <div className="menu-card__price">¥0（回数券使用）</div>
+                      <div className="menu-card__price">（回数券使用）</div>
                     </div>
                   ))}
 
@@ -1041,10 +1093,10 @@ const handleCheckout = async () => {
                             />
                           </div>
                           {ticket.payment_amount < ticket.full_price && (
-                            <div className="ticket-purchase-item__remaining">
-                              残額: ¥{(ticket.full_price - ticket.payment_amount).toLocaleString()}
-                            </div>
-                          )}
+  <div className="ticket-purchase-item__remaining">
+    残額: ¥{(ticket.full_price - (ticket.already_paid || 0) - ticket.payment_amount).toLocaleString()}
+  </div>
+)}
                         </div>
                       ))}
                     </div>
