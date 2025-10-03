@@ -15,6 +15,7 @@ const RegisterPage = () => {
   const [staffList, setStaffList] = useState([]);
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [selectedBookingId, setSelectedBookingId] = useState(null);
+  const [ticketUseOnPurchase, setTicketUseOnPurchase] = useState({});
 
   // 新規顧客登録フォーム
   const [newCustomer, setNewCustomer] = useState({
@@ -220,7 +221,25 @@ const RegisterPage = () => {
 
   // メニュー選択
   // handleSelectMenu を修正
+// メニュー選択
 const handleSelectMenu = (menu, type) => {
+  // 同じメニューをクリックしたら解除
+  if (selectedMenu && 
+      ((type === 'normal' && selectedMenu.service_id === menu.service_id) ||
+       (type === 'ticket' && selectedMenu.customer_ticket_id === menu.customer_ticket_id) ||
+       (type === 'coupon' && selectedMenu.coupon_id === menu.coupon_id) ||
+       (type === 'limited' && selectedMenu.offer_id === menu.offer_id))) {
+    setSelectedMenu(null);
+    setSelectedMenuType('normal');
+    setSelectedFreeOptions([]);
+    setSelectedPaidOptions([]);
+    setDiscountAmount('');
+    setReceivedAmount('');
+    // 回数券使用で未払いがある場合、購入リストから削除
+    setTicketPurchaseList(prev => prev.filter(t => !t.is_additional_payment));
+    return;
+  }
+  
   setSelectedMenu(menu);
   setSelectedMenuType(type);
   setSelectedFreeOptions([]);
@@ -240,11 +259,10 @@ const handleSelectMenu = (menu, type) => {
       total_sessions: menu.total_sessions,
       already_paid: menu.purchase_price - menu.remaining_payment,
       remaining_payment: menu.remaining_payment,
-      payment_amount: menu.remaining_payment, // デフォルトで全額
-      is_additional_payment: true // 追加支払いフラグ
+      payment_amount: menu.remaining_payment,
+      is_additional_payment: true
     };
     
-    // 既に追加されていないかチェック
     setTicketPurchaseList(prev => {
       const exists = prev.find(t => t.customer_ticket_id === menu.customer_ticket_id);
       if (exists) return prev;
@@ -259,34 +277,50 @@ const handleSelectMenu = (menu, type) => {
 };
 
   // 回数券を購入リストに追加
-  const handleAddTicketToPurchase = (plan) => {
+const handleAddTicketToPurchase = (plan) => {
   if (!selectedCustomer) {
     setError('お客様を先に選択してください');
     setTimeout(() => setError(''), 3000);
     return;
   }
   
+  const ticketId = Date.now(); // ← これを追加
   const newTicket = {
-    id: Date.now(),
+    id: ticketId, // ← Date.now()から変更
     plan_id: plan.plan_id,
     name: plan.name,
     service_name: plan.service_name,
     total_sessions: plan.total_sessions,
     full_price: plan.price,
-    already_paid: 0, // 新規購入なので0
-    payment_amount: plan.price, // デフォルトで全額
-    service_category: plan.service_category
+    already_paid: 0,
+    payment_amount: plan.price,
+    service_category: plan.service_category,
+    service_id: plan.service_id // ← これを追加
   };
   
   setTicketPurchaseList(prev => [...prev, newTicket]);
+  
+  // ↓ この4行を追加
+  setTicketUseOnPurchase(prev => ({
+    ...prev,
+    [ticketId]: false
+  }));
+  
   setSuccess(`${plan.name}を追加しました`);
   setTimeout(() => setSuccess(''), 2000);
 };
 
   // 回数券購入リストから削除
   const handleRemoveTicketFromPurchase = (ticketId) => {
-    setTicketPurchaseList(prev => prev.filter(t => t.id !== ticketId));
-  };
+  setTicketPurchaseList(prev => prev.filter(t => t.id !== ticketId));
+  
+  // ↓ この4行を追加
+  setTicketUseOnPurchase(prev => {
+    const newState = { ...prev };
+    delete newState[ticketId];
+    return newState;
+  });
+};
 
   // 回数券の支払い額を更新
   const handleUpdateTicketPayment = (ticketId, amount) => {
@@ -447,7 +481,8 @@ const handleCheckout = async () => {
             payment_method: paymentMethod,
             cash_amount: cashAmt,
             card_amount: cardAmt,
-            staff_id: selectedStaff.staff_id
+            staff_id: selectedStaff.staff_id,
+            use_immediately: ticketUseOnPurchase[ticket.id] || false
           })
         });
 
@@ -538,26 +573,27 @@ const handleCheckout = async () => {
     }
 
     // 3. 新規回数券購入がある場合
-    for (const ticket of newTicketPurchases) {
-      const ticketPurchaseResponse = await fetch('/api/ticket-purchases', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          customer_id: selectedCustomer.customer_id,
-          plan_id: ticket.plan_id,
-          payment_amount: ticket.payment_amount,
-          payment_method: 'cash',
-          cash_amount: ticket.payment_amount,
-          card_amount: 0,
-          staff_id: selectedStaff.staff_id
-        })
-      });
+for (const ticket of newTicketPurchases) {
+  const ticketPurchaseResponse = await fetch('/api/ticket-purchases', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      customer_id: selectedCustomer.customer_id,
+      plan_id: ticket.plan_id,
+      payment_amount: ticket.payment_amount,
+      payment_method: 'cash',
+      cash_amount: ticket.payment_amount,
+      card_amount: 0,
+      staff_id: selectedStaff.staff_id,
+      use_immediately: ticketUseOnPurchase[ticket.id] || false
+    })
+  });
 
-      const ticketResult = await ticketPurchaseResponse.json();
-      if (!ticketResult.success) {
-        console.error('回数券購入エラー:', ticketResult.error);
-      }
+  const ticketResult = await ticketPurchaseResponse.json();
+  if (!ticketResult.success) {
+    console.error('回数券購入エラー:', ticketResult.error);
     }
+  }
 
     setSuccess('お会計が完了しました！');
     setTimeout(() => {
@@ -587,6 +623,7 @@ const handleCheckout = async () => {
     setReceivedAmount('');
     setOwnedTickets([]);
     setTicketPurchaseList([]);
+    setTicketUseOnPurchase({});
     if (staffList.length > 0) {
       setSelectedStaff(staffList[0]);
     }
@@ -1081,6 +1118,21 @@ const handleCheckout = async () => {
                           <div className="ticket-purchase-item__price">
                             <span>定価: ¥{ticket.full_price.toLocaleString()}</span>
                           </div>
+                          {!ticket.is_additional_payment && (
+      <div className="ticket-purchase-item__use-now">
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={ticketUseOnPurchase[ticket.id] || false}
+            onChange={(e) => setTicketUseOnPurchase(prev => ({
+              ...prev,
+              [ticket.id]: e.target.checked
+            }))}
+          />
+          <span className="checkbox-text">購入時に1回分使用する</span>
+        </label>
+      </div>
+    )}
                           <div className="ticket-purchase-item__payment">
                             <label>今回支払額</label>
                             <input

@@ -11,11 +11,12 @@ export async function POST(request) {
     const {
       customer_id,
       plan_id,
-      payment_amount, // 今回の支払額
-      payment_method, // 'cash', 'card', 'mixed'
+      payment_amount,
+      payment_method,
       cash_amount = 0,
       card_amount = 0,
-      staff_id, // 担当スタッフID（追加）
+      staff_id,
+      use_immediately = false,
       notes = null
     } = body;
 
@@ -38,7 +39,7 @@ export async function POST(request) {
 
     // 1. 回数券プラン情報取得
     const [plans] = await connection.query(`
-      SELECT tp.*, s.name as service_name
+      SELECT tp.*, s.name as service_name, s.service_id
       FROM ticket_plans tp
       JOIN services s ON tp.service_id = s.service_id
       WHERE tp.plan_id = ?
@@ -57,7 +58,12 @@ export async function POST(request) {
     const expiryDate = new Date(purchaseDate);
     expiryDate.setDate(expiryDate.getDate() + validityDays);
 
-    // 3. customer_tickets レコード作成（UUIDを生成）
+    // 3. 初回使用時は残回数を1減らす
+    const initialSessions = use_immediately 
+      ? plan.total_sessions - 1 
+      : plan.total_sessions;
+
+    // 4. customer_tickets レコード作成（UUIDを生成）
     const customerTicketId = crypto.randomUUID();
     
     await connection.query(`
@@ -70,11 +76,11 @@ export async function POST(request) {
       plan_id,
       purchaseDate.toISOString().split('T')[0],
       expiryDate.toISOString().split('T')[0],
-      plan.total_sessions,
+      initialSessions,
       fullPrice
     ]);
 
-    // 4. ticket_payments レコード作成（初回支払い）
+    // 5. ticket_payments レコード作成（初回支払い）
     if (payment_amount > 0) {
       await connection.query(`
         INSERT INTO ticket_payments (
@@ -83,7 +89,7 @@ export async function POST(request) {
       `, [customerTicketId, payment_amount, payment_method, notes]);
     }
 
-    // 5. payments テーブルにも記録（売上管理用）
+    // 6. payments テーブルにも記録（売上管理用）
     await connection.query(`
       INSERT INTO payments (
         customer_id, staff_id, service_id, service_name, service_price, service_duration,
@@ -106,12 +112,42 @@ export async function POST(request) {
       payment_method,
       payment_method === 'mixed' ? cash_amount : (payment_method === 'cash' ? payment_amount : 0),
       payment_method === 'mixed' ? card_amount : (payment_method === 'card' ? payment_amount : 0),
-      `回数券購入: ${plan.name}（${plan.total_sessions}回）`
+      use_immediately 
+        ? `回数券購入: ${plan.name}（${plan.total_sessions}回）- 購入時に1回使用済み`
+        : `回数券購入: ${plan.name}（${plan.total_sessions}回）`
     ]);
+
+    // 7. 初回使用の場合は使用記録も作成
+    if (use_immediately) {
+      await connection.query(`
+        INSERT INTO payments (
+          customer_id, staff_id, service_id, service_name, service_price, service_duration,
+          payment_type, ticket_id, service_subtotal, options_total, discount_amount, total_amount,
+          payment_method, cash_amount, card_amount, notes
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        customer_id,
+        staff_id,
+        plan.service_id,
+        plan.service_name,
+        0,
+        0,
+        'ticket',
+        customerTicketId,
+        0,
+        0,
+        0,
+        0,
+        'cash',
+        0,
+        0,
+        '回数券購入時の初回使用'
+      ]);
+    }
 
     await connection.commit();
 
-    // 6. 残額計算
+    // 8. 残額計算
     const remainingAmount = fullPrice - payment_amount;
 
     return NextResponse.json({
@@ -121,12 +157,14 @@ export async function POST(request) {
         plan_name: plan.name,
         service_name: plan.service_name,
         total_sessions: plan.total_sessions,
+        sessions_remaining: initialSessions,
         full_price: fullPrice,
         paid_amount: payment_amount,
         remaining_amount: remainingAmount,
         purchase_date: purchaseDate.toISOString().split('T')[0],
         expiry_date: expiryDate.toISOString().split('T')[0],
-        is_fully_paid: remainingAmount === 0
+        is_fully_paid: remainingAmount === 0,
+        used_immediately: use_immediately
       }
     });
 
