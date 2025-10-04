@@ -124,15 +124,92 @@ const RegisterPage = () => {
   };
 
   // 予約から顧客選択
-  const handleSelectFromBooking = async (booking) => {
-    setSelectedCustomer({
-      customer_id: booking.customer_id,
-      last_name: booking.last_name,
-      first_name: booking.first_name
-    });
+  // app/register/page.js の handleSelectFromBooking 関数を完全に置き換え
 
-    setSelectedBookingId(booking.booking_id);
+const handleSelectFromBooking = async (booking) => {
+  setSelectedCustomer({
+    customer_id: booking.customer_id,
+    last_name: booking.last_name,
+    first_name: booking.first_name
+  });
 
+  setSelectedBookingId(booking.booking_id);
+
+  // 予約の詳細情報とオプションを取得
+  try {
+    const bookingResponse = await fetch(`/api/bookings?id=${booking.booking_id}`);
+    const bookingData = await bookingResponse.json();
+    
+    if (bookingData.success && bookingData.data && bookingData.data.length > 0) {
+      const bookingDetail = bookingData.data[0];
+      
+      // サービス選択
+      if (bookingDetail.service_id) {
+        const service = services.find(s => s.service_id === bookingDetail.service_id);
+        if (service) {
+          setSelectedMenu(service);
+          setSelectedMenuType('normal');
+          
+          // オプションを自動選択
+          if (bookingDetail.options && bookingDetail.options.length > 0) {
+            const optionIds = bookingDetail.options.map(opt => opt.option_id);
+            
+            // サービスの無料オプション数を確認
+            const maxFreeOptions = service.free_option_choices || 0;
+            
+            if (maxFreeOptions > 0 && optionIds.length <= maxFreeOptions) {
+              // 全て無料オプションとして選択
+              setSelectedFreeOptions(optionIds);
+              setSelectedPaidOptions([]);
+            } else if (maxFreeOptions > 0) {
+              // 一部を無料、残りを有料として選択
+              setSelectedFreeOptions(optionIds.slice(0, maxFreeOptions));
+              setSelectedPaidOptions(optionIds.slice(maxFreeOptions));
+            } else {
+              // 全て有料オプションとして選択
+              setSelectedFreeOptions([]);
+              setSelectedPaidOptions(optionIds);
+            }
+          }
+        }
+      } else if (bookingDetail.customer_ticket_id) {
+        // 回数券使用の場合
+        await fetchCustomerTickets(booking.customer_id);
+        
+        // 顧客の回数券から該当するものを探して選択
+        setTimeout(() => {
+          const ticket = ownedTickets.find(t => 
+            t.customer_ticket_id === bookingDetail.customer_ticket_id
+          );
+          if (ticket) {
+            setSelectedMenu(ticket);
+            setSelectedMenuType('ticket');
+            
+            // オプションを自動選択
+            if (bookingDetail.options && bookingDetail.options.length > 0) {
+              const optionIds = bookingDetail.options.map(opt => opt.option_id);
+              
+              // 回数券のサービスの無料オプション数を確認
+              const maxFreeOptions = ticket.service_free_option_choices || 0;
+              
+              if (maxFreeOptions > 0 && optionIds.length <= maxFreeOptions) {
+                setSelectedFreeOptions(optionIds);
+                setSelectedPaidOptions([]);
+              } else if (maxFreeOptions > 0) {
+                setSelectedFreeOptions(optionIds.slice(0, maxFreeOptions));
+                setSelectedPaidOptions(optionIds.slice(maxFreeOptions));
+              } else {
+                setSelectedFreeOptions([]);
+                setSelectedPaidOptions(optionIds);
+              }
+            }
+          }
+        }, 100);
+      }
+    }
+  } catch (err) {
+    console.error('予約詳細取得エラー:', err);
+    // エラーが発生してもサービスだけは選択できるようにフォールバック
     if (booking.service_id) {
       const service = services.find(s => s.service_id === booking.service_id);
       if (service) {
@@ -140,9 +217,10 @@ const RegisterPage = () => {
         setSelectedMenuType('normal');
       }
     }
+  }
 
-    await fetchCustomerTickets(booking.customer_id);
-  };
+  await fetchCustomerTickets(booking.customer_id);
+};
 
   // 検索結果から顧客選択
   const handleSelectCustomer = async (customer) => {
@@ -433,6 +511,7 @@ const handleAddTicketToPurchase = (plan) => {
   };
 
   // お会計処理
+// お会計処理
 const handleCheckout = async () => {
   if (!selectedCustomer) {
     setError('お客様を選択してください');
@@ -536,7 +615,8 @@ const handleCheckout = async () => {
       cash_amount: paymentMethod === 'cash' ? calculateTotal() : 
                     (paymentMethod === 'mixed' ? parseInt(cashAmount) || 0 : 0),
       card_amount: paymentMethod === 'card' ? calculateTotal() : 
-                    (paymentMethod === 'mixed' ? parseInt(cardAmount) || 0 : 0)
+                    (paymentMethod === 'mixed' ? parseInt(cardAmount) || 0 : 0),
+      payment_amount: selectedMenuType === 'ticket' ? (additionalPayments.reduce((sum, t) => sum + (t.payment_amount || 0), 0)) : 0
     };
 
     const response = await fetch('/api/payments', {
@@ -550,6 +630,8 @@ const handleCheckout = async () => {
     if (!result.success) {
       throw new Error(result.error || 'お会計処理に失敗しました');
     }
+
+    const mainPaymentId = result.data.payment_id; // ← 施術のpayment_idを保存
 
     // 2. 回数券の未払い分支払い処理
     for (const ticket of additionalPayments) {
@@ -573,27 +655,28 @@ const handleCheckout = async () => {
     }
 
     // 3. 新規回数券購入がある場合
-for (const ticket of newTicketPurchases) {
-  const ticketPurchaseResponse = await fetch('/api/ticket-purchases', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      customer_id: selectedCustomer.customer_id,
-      plan_id: ticket.plan_id,
-      payment_amount: ticket.payment_amount,
-      payment_method: 'cash',
-      cash_amount: ticket.payment_amount,
-      card_amount: 0,
-      staff_id: selectedStaff.staff_id,
-      use_immediately: ticketUseOnPurchase[ticket.id] || false
-    })
-  });
+    for (const ticket of newTicketPurchases) {
+      const ticketPurchaseResponse = await fetch('/api/ticket-purchases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: selectedCustomer.customer_id,
+          plan_id: ticket.plan_id,
+          payment_amount: ticket.payment_amount,
+          payment_method: 'cash',
+          cash_amount: ticket.payment_amount,
+          card_amount: 0,
+          staff_id: selectedStaff.staff_id,
+          use_immediately: ticketUseOnPurchase[ticket.id] || false,
+          related_payment_id: mainPaymentId || null  // ← 施術と紐付け
+        })
+      });
 
-  const ticketResult = await ticketPurchaseResponse.json();
-  if (!ticketResult.success) {
-    console.error('回数券購入エラー:', ticketResult.error);
+      const ticketResult = await ticketPurchaseResponse.json();
+      if (!ticketResult.success) {
+        console.error('回数券購入エラー:', ticketResult.error);
+      }
     }
-  }
 
     setSuccess('お会計が完了しました！');
     setTimeout(() => {

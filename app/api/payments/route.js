@@ -85,6 +85,7 @@ export async function GET(request) {
 }
 
 // お会計新規登録
+
 export async function POST(request) {
   const pool = await getConnection();
   const connection = await pool.getConnection();
@@ -106,7 +107,8 @@ export async function POST(request) {
       payment_method = 'cash',
       cash_amount = 0,
       card_amount = 0,
-      notes = ''
+      notes = '',
+      payment_amount = 0  // ★★★ 回数券の残金支払い額を追加 ★★★
     } = body;
 
     // バリデーション
@@ -132,6 +134,33 @@ export async function POST(request) {
           price: serviceRows[0].price,
           duration: serviceRows[0].duration_minutes
         };
+      }
+    }
+
+    // 回数券使用の場合、回数券情報を取得
+    if (payment_type === 'ticket' && ticket_id) {
+      const [ticketRows] = await connection.execute(
+        `SELECT 
+          tp.name as plan_name,
+          s.name as service_name,
+          s.price as service_price,
+          s.duration_minutes as service_duration
+        FROM customer_tickets ct
+        JOIN ticket_plans tp ON ct.plan_id = tp.plan_id
+        JOIN services s ON tp.service_id = s.service_id
+        WHERE ct.customer_ticket_id = ?`,
+        [ticket_id]
+      );
+      
+      if (ticketRows.length > 0) {
+        // サービス情報がない場合は回数券のサービス情報を使用
+        if (!service_id) {
+          serviceData = {
+            name: ticketRows[0].service_name,
+            price: 0, // 回数券使用なので施術自体は0円
+            duration: ticketRows[0].service_duration
+          };
+        }
       }
     }
 
@@ -164,7 +193,17 @@ export async function POST(request) {
 
     // 合計金額計算
     const serviceSubtotal = serviceData.price;
-    const totalAmount = serviceSubtotal + optionsTotal - discount_amount;
+    // ★★★ 回数券の残金支払いも合計に含める ★★★
+    let totalAmount;
+    if (payment_type === 'ticket' && payment_amount > 0) {
+      // 残金支払いの場合は、実際に支払った金額
+      totalAmount = payment_method === 'mixed' 
+      ? (parseInt(cash_amount) || 0) + (parseInt(card_amount) || 0)
+      : (payment_method === 'cash' ? parseInt(cash_amount) || 0 : parseInt(card_amount) || 0);
+    } else {
+    // 通常の計算
+      totalAmount = serviceSubtotal + optionsTotal - discount_amount;
+    }
 
     // お会計レコード作成
     const [result] = await connection.execute(
@@ -184,12 +223,13 @@ export async function POST(request) {
         service_subtotal,
         options_total,
         discount_amount,
+        payment_amount,
         total_amount,
         payment_method,
         cash_amount,
         card_amount,
         notes
-      ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         customer_id,
         booking_id || null,
@@ -205,7 +245,8 @@ export async function POST(request) {
         serviceSubtotal,
         optionsTotal,
         discount_amount,
-        totalAmount,
+        payment_amount,
+        totalAmount,  // ★★★ 残金支払いを含めた合計 ★★★
         payment_method,
         cash_amount,
         card_amount,

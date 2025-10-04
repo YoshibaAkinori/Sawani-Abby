@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { getConnection } from '../../../../lib/db';
 
-export async function GET(request, { params }) { // ← 引数の形を { params } に戻します
+export async function GET(request, { params }) {
   try {
     const pool = await getConnection();
     const { id: customerId } = await params;
@@ -18,6 +18,7 @@ export async function GET(request, { params }) { // ← 引数の形を { params
         phone_number,
         email,
         birth_date,
+        base_visit_count,
         notes,
         created_at,
         updated_at
@@ -33,17 +34,19 @@ export async function GET(request, { params }) { // ← 引数の形を { params
       );
     }
 
-    // 来店回数を取得
+    // 来店回数を取得（related_payment_idに値があるレコードを除外）
     const [visitCount] = await pool.execute(
       `SELECT COUNT(*) as count 
        FROM payments 
-       WHERE customer_id = ? AND is_cancelled = FALSE`,
+       WHERE customer_id = ? 
+         AND is_cancelled = FALSE
+         AND (related_payment_id IS NULL OR related_payment_id = '')`,
       [customerId]
     );
 
     const customerData = {
       ...rows[0],
-      visit_count: visitCount[0].count
+      visit_count: (rows[0].base_visit_count || 0) + visitCount[0].count
     };
 
     return NextResponse.json({

@@ -2,6 +2,7 @@
 import { NextResponse } from 'next/server';
 import { getConnection } from '../../../lib/db';
 
+
 // 予約一覧取得
 export async function GET(request) {
   try {
@@ -10,6 +11,7 @@ export async function GET(request) {
     const date = searchParams.get('date');
     const staffId = searchParams.get('staffId');
     const customerId = searchParams.get('customerId');
+    const bookingId = searchParams.get('id'); // 単一予約ID取得用
 
     let query = `
       SELECT 
@@ -30,16 +32,32 @@ export async function GET(request) {
         c.first_name,
         s.name as staff_name,
         s.color as staff_color,
-        sv.name as service_name,
-        sv.category as service_category
+        -- 直接のサービス情報（通常予約）
+        sv_direct.name as direct_service_name,
+        sv_direct.category as direct_service_category,
+        -- 回数券情報
+        tp.name as ticket_plan_name,
+        sv_ticket.category as ticket_service_category,
+        -- 表示用の名前（回数券の場合はプラン名、通常はサービス名）
+        COALESCE(tp.name, sv_direct.name) as service_name,
+        -- カテゴリ（直接 or 回数券経由）
+        COALESCE(sv_direct.category, sv_ticket.category) as service_category
       FROM bookings b
       LEFT JOIN customers c ON b.customer_id = c.customer_id
       LEFT JOIN staff s ON b.staff_id = s.staff_id
-      LEFT JOIN services sv ON b.service_id = sv.service_id
+      LEFT JOIN services sv_direct ON b.service_id = sv_direct.service_id
+      LEFT JOIN customer_tickets ct ON b.customer_ticket_id = ct.customer_ticket_id
+      LEFT JOIN ticket_plans tp ON ct.plan_id = tp.plan_id
+      LEFT JOIN services sv_ticket ON tp.service_id = sv_ticket.service_id
       WHERE 1=1
     `;
 
     const params = [];
+
+    if (bookingId) {
+      query += ' AND b.booking_id = ?';
+      params.push(bookingId);
+    }
 
     if (date) {
       query += ' AND b.date = ?';
@@ -64,8 +82,10 @@ export async function GET(request) {
     for (let booking of rows) {
       const [options] = await pool.execute(
         `SELECT 
+          bo.booking_option_id,
           o.option_id,
           o.name as option_name,
+          o.category as option_category,
           o.price,
           o.duration_minutes
         FROM booking_options bo

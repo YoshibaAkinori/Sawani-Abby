@@ -17,6 +17,7 @@ export async function POST(request) {
       card_amount = 0,
       staff_id,
       use_immediately = false,
+      related_payment_id = null,  // ← 追加
       notes = null
     } = body;
 
@@ -90,12 +91,13 @@ export async function POST(request) {
     }
 
     // 6. payments テーブルにも記録（売上管理用）
-    await connection.query(`
+    const [purchasePaymentResult] = await connection.query(`
       INSERT INTO payments (
+        payment_id,
         customer_id, staff_id, service_id, service_name, service_price, service_duration,
         payment_type, ticket_id, service_subtotal, options_total, discount_amount, total_amount,
-        payment_method, cash_amount, card_amount, notes
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        payment_method, cash_amount, card_amount, notes, related_payment_id
+      ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       customer_id,
       staff_id,
@@ -114,17 +116,25 @@ export async function POST(request) {
       payment_method === 'mixed' ? card_amount : (payment_method === 'card' ? payment_amount : 0),
       use_immediately 
         ? `回数券購入: ${plan.name}（${plan.total_sessions}回）- 購入時に1回使用済み`
-        : `回数券購入: ${plan.name}（${plan.total_sessions}回）`
+        : `回数券購入: ${plan.name}（${plan.total_sessions}回）`,
+      related_payment_id  // ← 通常施術のpayment_idを設定
     ]);
 
-    // 7. 初回使用の場合は使用記録も作成
+    // 購入レコードのpayment_idを取得
+    const [purchasePayment] = await connection.query(
+      'SELECT payment_id FROM payments WHERE customer_id = ? ORDER BY created_at DESC LIMIT 1',
+      [customer_id]
+    );
+    const purchasePaymentId = purchasePayment[0].payment_id;
+
+    // 7. 初回使用の場合は使用記録も作成（related_payment_idで紐付け）
     if (use_immediately) {
       await connection.query(`
         INSERT INTO payments (
           customer_id, staff_id, service_id, service_name, service_price, service_duration,
           payment_type, ticket_id, service_subtotal, options_total, discount_amount, total_amount,
-          payment_method, cash_amount, card_amount, notes
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          payment_method, cash_amount, card_amount, notes, related_payment_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         customer_id,
         staff_id,
@@ -141,7 +151,8 @@ export async function POST(request) {
         'cash',
         0,
         0,
-        '回数券購入時の初回使用'
+        '回数券購入時の初回使用',
+        purchasePaymentId  // ★ 購入レコードと紐付け
       ]);
     }
 
