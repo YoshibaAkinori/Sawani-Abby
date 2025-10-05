@@ -20,6 +20,7 @@ const ServicesManagement = () => {
   const [showLimitedForm, setShowLimitedForm] = useState(false);
   // 状態に編集用のIDと編集中のフォームを追加
   const [editingTicketId, setEditingTicketId] = useState(null);
+  const [editingCouponId, setEditingCouponId] = useState(null);
 
   // サービスフォームデータ（自由選択オプション追加）
   const [serviceForm, setServiceForm] = useState({
@@ -49,8 +50,9 @@ const ServicesManagement = () => {
   const [couponForm, setCouponForm] = useState({
     name: '',
     description: '',
+    total_duration_minutes: '', // undefined → ''
     base_service_id: '',
-    included_options: [], // [{ option_id, quantity }]
+    included_options: [],
     free_option_count: 0,
     total_price: '',
     validity_days: 180,
@@ -136,6 +138,7 @@ const ServicesManagement = () => {
       setCoupons([]);
     }
   };
+
 
   // 期間限定オファー取得
   const fetchLimitedOffers = async () => {
@@ -522,9 +525,9 @@ const ServicesManagement = () => {
     }
   };
 
-  // クーポン追加（改良版）
+  // クーポン追加
   const handleAddCoupon = async () => {
-    if (!couponForm.name || !couponForm.base_service_id || !couponForm.total_price) {
+    if (!couponForm.name || !couponForm.total_price) {
       setError('必須項目を入力してください');
       setTimeout(() => setError(''), 3000);
       return;
@@ -560,6 +563,100 @@ const ServicesManagement = () => {
       setSuccess('クーポンを登録しました（ローカル保存）');
       setShowCouponForm(false);
       resetCouponForm();
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => { setSuccess(''); setError(''); }, 3000);
+    }
+  };
+  // ★★★ クーポン削除処理を追加 ★★★
+  const handleDeleteCoupon = async (couponId) => {
+    if (!window.confirm('このクーポンを削除（または無効化）してもよろしいですか？')) {
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const response = await fetch(`/api/coupons?id=${couponId}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setSuccess(data.message);
+        fetchCoupons();
+      } else {
+        throw new Error(data.error || '削除に失敗しました');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => { setSuccess(''); setError(''); }, 3000);
+    }
+  };
+
+  const startEditCoupon = async (coupon) => {
+    try {
+      const response = await fetch(`/api/coupons`);
+      const data = await response.json();
+
+      if (data.success) {
+        const couponDetail = data.data.find(c => c.coupon_id === coupon.coupon_id);
+
+        if (couponDetail) {
+          setCouponForm({
+            name: couponDetail.name,
+            description: couponDetail.description || '',
+            total_duration_minutes: couponDetail.total_duration_minutes || '',
+            base_service_id: couponDetail.base_service_id || '',
+            included_options: couponDetail.included_options || [],
+            free_option_count: couponDetail.free_option_count || 0,
+            total_price: couponDetail.total_price,
+            validity_days: couponDetail.validity_days || 180,
+            usage_limit: couponDetail.usage_limit || '',
+            is_active: couponDetail.is_active,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('クーポン詳細取得エラー:', err);
+      // フォールバック
+      setCouponForm({
+        name: coupon.name,
+        description: coupon.description || '',
+        total_duration_minutes: coupon.total_duration_minutes || '',
+        base_service_id: coupon.base_service_id || '',
+        included_options: coupon.included_options || [],
+        free_option_count: coupon.free_option_count || 0,
+        total_price: coupon.total_price,
+        validity_days: coupon.validity_days || 180,
+        usage_limit: coupon.usage_limit || '',
+        is_active: coupon.is_active,
+      });
+    }
+
+    setEditingCouponId(coupon.coupon_id);
+    setShowCouponForm(true);
+  };
+
+  // ★★★ クーポン更新処理を追加 ★★★
+  const handleUpdateCoupon = async (couponId) => {
+    // (バリデーションは handleAddCoupon と同様)
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/coupons', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ coupon_id: couponId, ...couponForm })
+      });
+      if (response.ok) {
+        setSuccess('クーポンを更新しました');
+        fetchCoupons();
+        handleCancel();
+      } else {
+        const data = await response.json();
+        throw new Error(data.error || '更新に失敗しました');
+      }
+    } catch (err) {
+      setError(err.message);
     } finally {
       setIsLoading(false);
       setTimeout(() => { setSuccess(''); setError(''); }, 3000);
@@ -642,6 +739,7 @@ const ServicesManagement = () => {
     setCouponForm({
       name: '',
       description: '',
+      total_duration_minutes: '', // undefined → ''
       base_service_id: '',
       included_options: [],
       free_option_count: 0,
@@ -670,6 +768,7 @@ const ServicesManagement = () => {
   const handleCancel = () => {
     setEditingId(null);
     setEditingTicketId(null);
+    setEditingCouponId(null);
     setShowAddForm(false);
     setShowTicketForm(false);
     setShowCouponForm(false);
@@ -1425,7 +1524,10 @@ const ServicesManagement = () => {
             <h3 className="services-title">クーポン一覧</h3>
             {!showCouponForm && (
               <button
-                onClick={() => setShowCouponForm(true)}
+                onClick={() => {
+                  setEditingCouponId(null);
+                  setShowCouponForm(true);
+                }}
                 className="services-btn services-btn--primary"
                 disabled={isLoading}
               >
@@ -1435,10 +1537,10 @@ const ServicesManagement = () => {
             )}
           </div>
 
-          {/* 新規クーポン追加フォーム */}
+          {/* クーポン追加・編集フォーム */}
           {showCouponForm && (
             <div className="services-form-card">
-              <h4>新規クーポン登録</h4>
+              <h4>{editingCouponId ? 'クーポン編集' : '新規クーポン登録'}</h4>
               <div className="services-form-grid">
                 <div className="services-form-group services-form-group--full">
                   <label>クーポン名 *</label>
@@ -1452,13 +1554,25 @@ const ServicesManagement = () => {
                 </div>
 
                 <div className="services-form-group">
-                  <label>ベース施術 *</label>
+                  <label>全体の時間（分）</label>
+                  <input
+                    type="number"
+                    name="total_duration_minutes"
+                    value={couponForm.total_duration_minutes}
+                    onChange={handleCouponInputChange}
+                    placeholder="例: 80"
+                    step="5"
+                  />
+                </div>
+
+                <div className="services-form-group">
+                  <label>ベース施術</label>
                   <select
                     name="base_service_id"
                     value={couponForm.base_service_id}
                     onChange={handleCouponInputChange}
                   >
-                    <option value="">選択してください</option>
+                    <option value="">選択なし</option>
                     {services.filter(s => s.is_active).map(service => (
                       <option key={service.service_id} value={service.service_id}>
                         {service.name} ({service.duration_minutes}分) - ¥{service.price.toLocaleString()}
@@ -1595,17 +1709,16 @@ const ServicesManagement = () => {
                   キャンセル
                 </button>
                 <button
-                  onClick={handleAddCoupon}
+                  onClick={editingCouponId ? () => handleUpdateCoupon(editingCouponId) : handleAddCoupon}
                   className="services-btn services-btn--primary"
                   disabled={isLoading}
                 >
                   <Save size={16} />
-                  登録
+                  {editingCouponId ? '更新' : '登録'}
                 </button>
               </div>
             </div>
           )}
-
 
           {/* クーポン一覧テーブル */}
           <div className="services-table">
@@ -1613,6 +1726,7 @@ const ServicesManagement = () => {
               <thead>
                 <tr>
                   <th>クーポン名</th>
+                  <th>全体の時間</th>
                   <th>ベース施術</th>
                   <th>指定オプション</th>
                   <th>自由オプション</th>
@@ -1626,49 +1740,46 @@ const ServicesManagement = () => {
               <tbody>
                 {coupons.map(coupon => (
                   <tr key={coupon.coupon_id}>
-                    <td className="services-table-name">
-                      <Tag size={14} />
-                      {coupon.name}
-                    </td>
-                    <td>{coupon.service_name}</td>
+                    <td className="services-table-name"><Tag size={14} /> {coupon.name}</td>
+                    <td>{coupon.total_duration_minutes > 0 ? `${coupon.total_duration_minutes}分` : '-'}</td>
+                    <td>{coupon.service_name || <span className="services-text-muted">-</span>}</td>
                     <td>
                       {coupon.included_options && coupon.included_options.length > 0 ? (
                         <div className="services-option-list">
                           {coupon.included_options.map((opt, idx) => (
                             <span key={idx} className="services-option-tag">
-                              {opt.option_name} x{opt.quantity}
+                              {opt.option_name}
                             </span>
                           ))}
                         </div>
-                      ) : (
-                        <span className="services-text-muted">-</span>
-                      )}
+                      ) : <span className="services-text-muted">-</span>}
                     </td>
-                    <td>
-                      {coupon.free_option_count > 0 ? (
-                        <span>{coupon.free_option_count}個選択可</span>
-                      ) : (
-                        <span className="services-text-muted">-</span>
-                      )}
-                    </td>
+                    <td>{coupon.free_option_count > 0 ? `${coupon.free_option_count}個` : <span className="services-text-muted">-</span>}</td>
                     <td>¥{coupon.total_price.toLocaleString()}</td>
                     <td>{coupon.validity_days}日</td>
-                    <td>
-                      {coupon.used_count || 0} / {coupon.usage_limit || '∞'}
-                    </td>
+                    <td>{coupon.used_count || 0} / {coupon.usage_limit || '∞'}</td>
                     <td>
                       <span className={`services-status-badge ${coupon.is_active ? 'services-status-badge--active' : 'services-status-badge--inactive'}`}>
                         {coupon.is_active ? '有効' : '無効'}
                       </span>
                     </td>
                     <td>
-                      <button
-                        onClick={() => console.log('編集:', coupon.coupon_id)}
-                        className="services-btn-icon services-btn-icon--primary"
-                        disabled={isLoading}
-                      >
-                        <Edit2 size={16} />
-                      </button>
+                      <div className="services-actions">
+                        <button
+                          onClick={() => startEditCoupon(coupon)}
+                          className="services-btn-icon services-btn-icon--primary"
+                          disabled={isLoading}
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCoupon(coupon.coupon_id)}
+                          className="services-btn-icon services-btn-icon--danger"
+                          disabled={isLoading}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

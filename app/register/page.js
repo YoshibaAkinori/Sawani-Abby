@@ -904,109 +904,107 @@ const RegisterPage = () => {
                   </button>
                 </div>
 
-                <div className="menu-grid">
-                  {menuTab === 'normal' && services.map(service => (
-                    <div
-                      key={service.service_id}
-                      className={`menu-card ${selectedMenu?.service_id === service.service_id && selectedMenuType === 'normal' ? 'menu-card--selected' : ''}`}
-                      onClick={() => handleSelectMenu(service, 'normal')}
-                    >
-                      <div className="menu-card__name">{service.name}</div>
-                      <div className="menu-card__time">{service.duration_minutes}分</div>
-                      <div className="menu-card__price">¥{service.price?.toLocaleString()}</div>
-                      {service.free_option_choices > 0 && (
-                        <div className="menu-card__badge">オプション{service.free_option_choices}個無料</div>
-                      )}
-                    </div>
-                  ))}
+                {/* ★★★★★ ここからが修正箇所です ★★★★★ */}
 
-                  {menuTab === 'ticket-use' && !selectedCustomer && (
-                    <div className="empty-message">
-                      お客様を選択してください
-                    </div>
-                  )}
+                {/* --- 回数券購入"以外"のタブは、これまで通りのグリッドレイアウト --- */}
+                {menuTab !== 'ticket-buy' && (
+                  <div className="menu-grid">
+                    {menuTab === 'normal' && services.map(service => (
+                      <div
+                        key={service.service_id}
+                        className={`menu-card ${selectedMenu?.service_id === service.service_id && selectedMenuType === 'normal' ? 'menu-card--selected' : ''}`}
+                        onClick={() => handleSelectMenu(service, 'normal')}
+                      >
+                        <div className="menu-card__name">{service.name}</div>
+                        <div className="menu-card__time">{service.duration_minutes}分</div>
+                        <div className="menu-card__price">¥{service.price?.toLocaleString()}</div>
+                        {service.free_option_choices > 0 && (
+                          <div className="menu-card__badge">オプション{service.free_option_choices}個無料</div>
+                        )}
+                      </div>
+                    ))}
 
-                  {menuTab === 'ticket-use' && selectedCustomer && ownedTickets.length === 0 && (
-                    <div className="empty-message">
-                      有効な回数券がありません
-                    </div>
-                  )}
+                    {menuTab === 'ticket-use' && !selectedCustomer && (
+                      <div className="empty-message">お客様を選択してください</div>
+                    )}
 
-                  {menuTab === 'ticket-use' && ownedTickets.map(ticket => (
-                    <div
-                      key={ticket.customer_ticket_id}
-                      className={`menu-card ${selectedMenu?.customer_ticket_id === ticket.customer_ticket_id && selectedMenuType === 'ticket' ? 'menu-card--selected' : ''}`}
-                      onClick={() => handleSelectMenu(ticket, 'ticket')}
-                    >
-                      <div className="menu-card__name">{ticket.plan_name}</div>
-                      <div className="menu-card__info">残り{ticket.sessions_remaining}回</div>
-                      <div className="menu-card__price">（回数券使用）</div>
-                    </div>
-                  ))}
+                    {menuTab === 'ticket-use' && selectedCustomer && ownedTickets.length === 0 && (
+                      <div className="empty-message">有効な回数券がありません</div>
+                    )}
 
-                  {menuTab === 'ticket-buy' && !selectedCustomer && (
-                    <div className="empty-message">
-                      お客様を選択してください
-                    </div>
-                  )}
+                    {menuTab === 'ticket-use' && ownedTickets.map(ticket => (
+                      <div
+                        key={ticket.customer_ticket_id}
+                        className={`menu-card ${selectedMenu?.customer_ticket_id === ticket.customer_ticket_id && selectedMenuType === 'ticket' ? 'menu-card--selected' : ''}`}
+                        onClick={() => handleSelectMenu(ticket, 'ticket')}
+                      >
+                        <div className="menu-card__name">{ticket.plan_name}</div>
+                        <div className="menu-card__info">残り{ticket.sessions_remaining}回</div>
+                        <div className="menu-card__price">（回数券使用）</div>
+                      </div>
+                    ))}
+                    
+                    {/* (クーポンと期間限定のJSXは変更なし) */}
+                    {menuTab === 'coupon' && coupons.map(coupon => (
+                      <div key={coupon.coupon_id} className={`menu-card ${selectedMenu?.coupon_id === coupon.coupon_id && selectedMenuType === 'coupon' ? 'menu-card--selected' : ''}`} onClick={() => handleSelectMenu(coupon, 'coupon')}>
+                        <div className="menu-card__name">{coupon.name}</div>
+                        <div className="menu-card__info">{coupon.description}</div>
+                        <div className="menu-card__price">¥{coupon.total_price?.toLocaleString()}</div>
+                      </div>
+                    ))}
+                    {menuTab === 'limited' && limitedOffers.map(offer => (
+                      <div key={offer.offer_id} className={`menu-card ${selectedMenu?.offer_id === offer.offer_id && selectedMenuType === 'limited' ? 'menu-card--selected' : ''}`} onClick={() => handleSelectMenu(offer, 'limited')}>
+                        <div className="menu-card__name">{offer.name}</div>
+                        <div className="menu-card__info">期限: {new Date(offer.sale_end_date).toLocaleDateString()}</div>
+                        <div className="menu-card__price">¥{offer.special_price?.toLocaleString()}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-                  {menuTab === 'ticket-buy' && selectedCustomer && (() => {
-                    const groupedPlans = {};
-                    availableTicketPlans.forEach(plan => {
-                      const category = plan.service_category || 'その他';
-                      if (!groupedPlans[category]) {
-                        groupedPlans[category] = [];
-                      }
-                      groupedPlans[category].push(plan);
-                    });
+                {/* --- 回数券購入タブ専用の、カテゴリが縦に並ぶレイアウト --- */}
+                {menuTab === 'ticket-buy' && (
+                  <div>
+                    {!selectedCustomer ? (
+                      <div className="empty-message">お客様を選択してください</div>
+                    ) : (
+                      (() => {
+                        // カテゴリごとにグループ化
+                        const groupedPlans = {};
+                        availableTicketPlans.forEach(plan => {
+                          const category = plan.service_category || 'その他';
+                          if (!groupedPlans[category]) {
+                            groupedPlans[category] = [];
+                          }
+                          groupedPlans[category].push(plan);
+                        });
 
-                    return Object.entries(groupedPlans).map(([category, plans]) => (
-                      <div key={category} className="ticket-category-section">
-                        <h5 className="ticket-category-title">{category}</h5>
-                        <div className="menu-grid">
-                          {plans.map(plan => (
-                            <div
-                              key={plan.plan_id}
-                              className="menu-card menu-card--purchase"
-                              onClick={() => handleAddTicketToPurchase(plan)}
-                            >
-                              <div className="menu-card__name">{plan.name}</div>
-                              <div className="menu-card__info">{plan.service_name} × {plan.total_sessions}回</div>
-                              <div className="menu-card__price">¥{plan.price?.toLocaleString()}</div>
-                              <div className="menu-card__badge-add">+追加</div>
+                        // カテゴリごとに縦のセクションを作成
+                        return Object.entries(groupedPlans).map(([category, plans]) => (
+                          <div key={category} className="ticket-category-section">
+                            <h5 className="ticket-category-title">{category}</h5>
+                            {/* カテゴリの中に、横並びのグリッドを作成 */}
+                            <div className="menu-grid">
+                              {plans.map(plan => (
+                                <div
+                                  key={plan.plan_id}
+                                  className="menu-card menu-card--purchase"
+                                  onClick={() => handleAddTicketToPurchase(plan)}
+                                >
+                                  <div className="menu-card__name">{plan.name}</div>
+                                  <div className="menu-card__info">{plan.service_name} × {plan.total_sessions}回</div>
+                                  <div className="menu-card__price">¥{plan.price?.toLocaleString()}</div>
+                                  <div className="menu-card__badge-add">+追加</div>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
-                      </div>
-                    ));
-                  })()}
-
-                  {menuTab === 'coupon' && coupons.map(coupon => (
-                    <div
-                      key={coupon.coupon_id}
-                      className={`menu-card ${selectedMenu?.coupon_id === coupon.coupon_id && selectedMenuType === 'coupon' ? 'menu-card--selected' : ''}`}
-                      onClick={() => handleSelectMenu(coupon, 'coupon')}
-                    >
-                      <div className="menu-card__name">{coupon.name}</div>
-                      <div className="menu-card__info">{coupon.description}</div>
-                      <div className="menu-card__price">¥{coupon.total_price?.toLocaleString()}</div>
-                    </div>
-                  ))}
-
-                  {menuTab === 'limited' && limitedOffers.map(offer => (
-                    <div
-                      key={offer.offer_id}
-                      className={`menu-card ${selectedMenu?.offer_id === offer.offer_id && selectedMenuType === 'limited' ? 'menu-card--selected' : ''}`}
-                      onClick={() => handleSelectMenu(offer, 'limited')}
-                    >
-                      <div className="menu-card__name">{offer.name}</div>
-                      <div className="menu-card__info">
-                        期限: {new Date(offer.sale_end_date).toLocaleDateString()}
-                      </div>
-                      <div className="menu-card__price">¥{offer.special_price?.toLocaleString()}</div>
-                    </div>
-                  ))}
-                </div>
+                          </div>
+                        ));
+                      })()
+                    )}
+                  </div>
+                )}
+                {/* ★★★★★ 修正はここまでです ★★★★★ */}
               </div>
             </div>
 

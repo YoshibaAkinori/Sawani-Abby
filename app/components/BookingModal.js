@@ -9,8 +9,8 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
     bookingType: 'booking',
     
     // 予約情報
-    date: selectedSlot?.date || '',
-    startTime: selectedSlot?.timeSlot || '10:00',
+    date: selectedSlot?.date || new Date().toISOString().split('T')[0],
+    startTime: selectedSlot?.timeSlot || new Date().toTimeString().slice(0, 5),
     endTime: '',
     staffId: selectedSlot?.staffId || '',
     bedId: '1',
@@ -147,41 +147,69 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
     setSearchName('');
   };
 
-  // 施術時間から終了時間を計算
-  const calculateEndTime = () => {
+  // 施術時間から終了時間を計算（修正版）
+  const calculateEndTime = (updatedFormData) => {
     let duration = 0;
 
     // 予定モードの場合は計算しない
-    if (formData.bookingType === 'schedule') {
-      return formData.endTime;
+    if (updatedFormData.bookingType === 'schedule') {
+      return updatedFormData.endTime;
     }
 
     // サービスタイプに応じて時間を計算
-    if (formData.serviceType === 'normal' && formData.serviceId) {
-      const service = services.find(s => s.service_id === formData.serviceId);
+    if (updatedFormData.serviceType === 'normal' && updatedFormData.serviceId) {
+      // 通常メニュー
+      const service = services.find(s => s.service_id === updatedFormData.serviceId);
       duration = service?.duration_minutes || 0;
-    } else if (formData.serviceType === 'ticket' && formData.ticketId) {
-      const ticket = customerTickets.find(t => t.customer_ticket_id === formData.ticketId);
-      duration = 60; // デフォルト60分
-    } else if (formData.serviceType === 'coupon' && formData.couponId) {
-      const coupon = coupons.find(c => c.coupon_id === formData.couponId);
-      const service = services.find(s => s.service_id === coupon?.base_service_id);
-      duration = service?.duration_minutes || 60;
-    } else if (formData.serviceType === 'limited' && formData.limitedOfferId) {
-      duration = 60; // デフォルト60分
+    } else if (updatedFormData.serviceType === 'ticket' && updatedFormData.ticketId) {
+      // 回数券 - 回数券プランからサービスIDを取得して施術時間を取得
+      const ticket = customerTickets.find(t => t.customer_ticket_id === updatedFormData.ticketId);
+      if (ticket) {
+        // ticket.service_name から対応するサービスを検索
+        const service = services.find(s => s.name === ticket.service_name);
+        duration = service?.duration_minutes || 60;
+      } else {
+        duration = 60; // デフォルト
+      }
+    } else if (updatedFormData.serviceType === 'coupon' && updatedFormData.couponId) {
+      // クーポン - total_duration_minutesを優先的に使用
+      const coupon = coupons.find(c => c.coupon_id === updatedFormData.couponId);
+      
+      if (coupon?.total_duration_minutes) {
+        // クーポンテーブルに直接登録されている施術時間を使用
+        duration = coupon.total_duration_minutes;
+      } else if (coupon?.service_duration) {
+        // JOINで取得したベースサービスの時間を使用
+        duration = coupon.service_duration;
+      } else if (coupon?.base_service_id) {
+        // それでもない場合はservicesから検索
+        const service = services.find(s => s.service_id === coupon.base_service_id);
+        duration = service?.duration_minutes || 60;
+      } else {
+        duration = 60; // デフォルト
+      }
+    } else if (updatedFormData.serviceType === 'limited' && updatedFormData.limitedOfferId) {
+      // 期間限定オファー - service_name から施術時間を推定
+      const offer = limitedOffers.find(o => o.offer_id === updatedFormData.limitedOfferId);
+      if (offer?.service_name) {
+        const service = services.find(s => s.name === offer.service_name);
+        duration = service?.duration_minutes || 60;
+      } else {
+        duration = 60; // デフォルト
+      }
     }
 
     // オプションの時間を加算
-    const optionMinutes = formData.optionIds.reduce((sum, optId) => {
+    const optionMinutes = updatedFormData.optionIds.reduce((sum, optId) => {
       const option = options.find(o => o.option_id === optId);
       return sum + (option?.duration_minutes || 0);
     }, 0);
 
     const totalMinutes = duration + optionMinutes;
     
-    if (totalMinutes === 0) return formData.endTime;
+    if (totalMinutes === 0) return updatedFormData.endTime;
 
-    const [hour, minute] = formData.startTime.split(':').map(Number);
+    const [hour, minute] = updatedFormData.startTime.split(':').map(Number);
     const startMinutes = hour * 60 + minute;
     const endMinutes = startMinutes + totalMinutes;
     const endHour = Math.floor(endMinutes / 60);
@@ -190,7 +218,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
     return `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
   };
 
-  // フォーム入力処理
+  // フォーム入力処理（修正版）
   const handleInputChange = (field, value) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
@@ -204,15 +232,16 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
       }
       
       // 予約モードの場合のみ終了時間を再計算
-      if (formData.bookingType === 'booking' && ['serviceId', 'serviceType', 'ticketId', 'couponId', 'limitedOfferId', 'startTime'].includes(field)) {
-        updated.endTime = calculateEndTime();
+      if (updated.bookingType === 'booking' && 
+          ['serviceId', 'serviceType', 'ticketId', 'couponId', 'limitedOfferId', 'startTime'].includes(field)) {
+        updated.endTime = calculateEndTime(updated);
       }
       
       return updated;
     });
   };
 
-  // オプション選択処理
+  // オプション選択処理（修正版）
   const handleOptionToggle = (optionId) => {
     setFormData(prev => {
       const updated = { ...prev };
@@ -222,7 +251,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
         updated.optionIds = [...prev.optionIds, optionId];
       }
       // 終了時間を再計算
-      updated.endTime = calculateEndTime();
+      updated.endTime = calculateEndTime(updated);
       return updated;
     });
   };
@@ -245,15 +274,15 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
       setIsLoading(true);
       try {
         const scheduleData = {
-          customer_id: null, // 予定は顧客情報不要
+          customer_id: null,
           staff_id: formData.staffId,
-          service_id: null,  // 予定は施術情報不要
+          service_id: null,
           date: formData.date,
           start_time: formData.startTime,
           end_time: formData.endTime,
-          bed_id: null,      // 予定はベッド不要
-          type: 'schedule',  // ← 予定として識別
-          status: 'blocked', // ← この時間帯は予約不可
+          bed_id: null,
+          type: 'schedule',
+          status: 'blocked',
           notes: formData.scheduleTitle || '予定'
         };
     
@@ -276,10 +305,10 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
         setError(err.message || '予定登録中にエラーが発生しました');
       } finally {
         setIsLoading(false);
-      
-      return;
       }
+      return;
     }
+
     // 通常の予約バリデーション
     if (!formData.serviceId && !formData.ticketId && !formData.couponId && !formData.limitedOfferId) {
       setError('施術メニューを選択してください');

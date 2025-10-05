@@ -631,17 +631,18 @@
 /* オプションリスト（テーブル内） */
 .services-option-list {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 0.25rem;
+  align-items: flex-start;
 }
 
 .services-option-tag {
   display: inline-block;
-  padding: 0.125rem 0.5rem;
-  background: #eff6ff;
-  color: #1e40af;
-  border: 1px solid #bfdbfe;
+  padding: 0.25rem 0.5rem;
+  background: #e0f2fe;
+  border: 1px solid #7dd3fc;
   border-radius: 0.25rem;
   font-size: 0.75rem;
-  font-weight: 500;
+  color: #0369a1;
+  white-space: nowrap;
 }
