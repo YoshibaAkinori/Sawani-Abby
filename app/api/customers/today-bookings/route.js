@@ -7,8 +7,8 @@ export async function GET(request) {
     const pool = await getConnection();
     const today = new Date().toISOString().split('T')[0];
 
-const [rows] = await pool.execute(
-  `SELECT 
+    const [rows] = await pool.execute(
+      `SELECT 
     b.booking_id,
     b.customer_id,
     b.start_time,
@@ -35,19 +35,19 @@ const [rows] = await pool.execute(
     AND b.status IN ('pending', 'confirmed', 'completed')
     AND b.type = 'booking'
   ORDER BY b.start_time ASC`,
-  [today]
-);
+      [today]
+    );
 
-// 確実にbooleanに変換
-const bookingsWithPaidStatus = rows.map(row => ({
-  ...row,
-  is_paid: Boolean(row.is_paid)
-}));
+    // 確実にbooleanに変換
+    const bookingsWithPaidStatus = rows.map(row => ({
+      ...row,
+      is_paid: Boolean(row.is_paid)
+    }));
 
-return NextResponse.json({
-  success: true,
-  data: bookingsWithPaidStatus
-});
+    return NextResponse.json({
+      success: true,
+      data: bookingsWithPaidStatus
+    });
   } catch (error) {
     console.error('今日の予約者取得エラー:', error);
     return NextResponse.json(

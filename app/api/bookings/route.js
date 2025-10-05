@@ -113,7 +113,7 @@ export async function GET(request) {
 export async function POST(request) {
   const pool = await getConnection();
   const connection = await pool.getConnection();
-  
+
   try {
     const body = await request.json();
 
@@ -298,7 +298,7 @@ export async function PUT(request) {
   // ★★★ 修正点 ★★★
   const pool = await getConnection();
   const connection = await pool.getConnection();
-  
+
   try {
     const body = await request.json();
 
@@ -372,7 +372,7 @@ export async function DELETE(request) {
   // ★★★ 修正点 ★★★
   const pool = await getConnection();
   const connection = await pool.getConnection();
-  
+
   try {
     const { searchParams } = new URL(request.url);
     const bookingId = searchParams.get('id');

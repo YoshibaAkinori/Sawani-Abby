@@ -6,7 +6,7 @@ import { getConnection } from '../../../lib/db';
 export async function GET(request) {
   try {
     const pool = await getConnection();
-    
+
     const [rows] = await pool.execute(
       `SELECT 
         option_id,

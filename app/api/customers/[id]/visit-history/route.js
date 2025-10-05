@@ -36,7 +36,7 @@ export async function GET(request, { params }) {
     `, [customerId]);
 
     const visitHistory = [];
-    
+
     for (const payment of payments) {
       // 子レコード（この payment に紐づく回数券購入・初回使用）を取得
       const [childPayments] = await connection.query(`
@@ -77,9 +77,9 @@ export async function GET(request, { params }) {
       }
 
       // 親レコード自体が回数券購入の場合も処理
-      const isParentTicketPurchase = payment.payment_type === 'ticket' && 
-                                     payment.service_name && 
-                                     payment.service_name.includes('回数券購入');
+      const isParentTicketPurchase = payment.payment_type === 'ticket' &&
+        payment.service_name &&
+        payment.service_name.includes('回数券購入');
 
       if (isParentTicketPurchase && payment.ticket_id) {
         // 親が回数券購入の場合、その回数券情報を取得
@@ -116,7 +116,7 @@ export async function GET(request, { params }) {
         } else if (child.service_name && child.service_name.includes('回数券購入')) {
           // 回数券購入レコード（通常メニューと一緒に購入した場合）
           totalAmount += child.total_amount; // 回数券の金額を加算
-          
+
           const [ticketInfo] = await connection.query(`
             SELECT 
               tp.name as plan_name,
@@ -147,23 +147,23 @@ export async function GET(request, { params }) {
       // app/api/customers/[id]/visit-history/route.js の該当部分を修正
 
       // payment_type に応じて詳細情報を取得
-if (payment.payment_type === 'ticket' && payment.ticket_id && !isParentTicketPurchase) {
-  // 回数券使用（購入ではない場合）
-  const [ticketInfo] = await connection.query(`
+      if (payment.payment_type === 'ticket' && payment.ticket_id && !isParentTicketPurchase) {
+        // 回数券使用（購入ではない場合）
+        const [ticketInfo] = await connection.query(`
     SELECT 
       tp.name as plan_name
     FROM customer_tickets ct
     JOIN ticket_plans tp ON ct.plan_id = tp.plan_id
     WHERE ct.customer_ticket_id = ?
   `, [payment.ticket_id]);
-  
-  if (ticketInfo.length > 0) {
-    detailInfo = {
-      type: 'ticket_use',
-      plan_name: ticketInfo[0].plan_name,
-      remaining_payment: payment.payment_amount || 0 // DBから取得
-    };
-  }
+
+        if (ticketInfo.length > 0) {
+          detailInfo = {
+            type: 'ticket_use',
+            plan_name: ticketInfo[0].plan_name,
+            remaining_payment: payment.payment_amount || 0 // DBから取得
+          };
+        }
       } else if (payment.payment_type === 'coupon' && payment.coupon_id) {
         // クーポン情報
         const [couponInfo] = await connection.query(`
@@ -173,7 +173,7 @@ if (payment.payment_type === 'ticket' && payment.ticket_id && !isParentTicketPur
           FROM coupons c
           WHERE c.coupon_id = ?
         `, [payment.coupon_id]);
-        
+
         if (couponInfo.length > 0) {
           detailInfo = {
             type: 'coupon',
@@ -191,7 +191,7 @@ if (payment.payment_type === 'ticket' && payment.ticket_id && !isParentTicketPur
           FROM limited_offers
           WHERE offer_id = ?
         `, [payment.limited_offer_id]);
-        
+
         if (offerInfo.length > 0) {
           detailInfo = {
             type: 'limited_offer',

@@ -18,9 +18,9 @@ const ServicesManagement = () => {
   const [showTicketForm, setShowTicketForm] = useState(false);
   const [showCouponForm, setShowCouponForm] = useState(false);
   const [showLimitedForm, setShowLimitedForm] = useState(false);
-    // 状態に編集用のIDと編集中のフォームを追加
+  // 状態に編集用のIDと編集中のフォームを追加
   const [editingTicketId, setEditingTicketId] = useState(null);
-  
+
   // サービスフォームデータ（自由選択オプション追加）
   const [serviceForm, setServiceForm] = useState({
     name: '',
@@ -35,15 +35,15 @@ const ServicesManagement = () => {
   });
 
   // 回数券フォームデータ
-const [ticketForm, setTicketForm] = useState({
-  service_id: '',
-  name: '',
-  service_category: '新規', // ← 追加
-  gender_restriction: 'all',
-  total_sessions: 5,
-  price: '',
-  validity_days: 180
-});
+  const [ticketForm, setTicketForm] = useState({
+    service_id: '',
+    name: '',
+    service_category: '新規', // ← 追加
+    gender_restriction: 'all',
+    total_sessions: 5,
+    price: '',
+    validity_days: 180
+  });
 
   // クーポンフォームデータ（改良版）
   const [couponForm, setCouponForm] = useState({
@@ -161,41 +161,41 @@ const [ticketForm, setTicketForm] = useState({
   };
 
   // 回数券フォーム入力処理
-const handleTicketInputChange = (e) => {
-  const { name, value } = e.target;
-  
-  if (name === 'service_id') {
-    const selectedService = services.find(s => s.service_id === value);
-    if (selectedService) {
-      const genderText = ticketForm.gender_restriction === 'male' ? '男性' :
-                        ticketForm.gender_restriction === 'female' ? '女性' : '';
+  const handleTicketInputChange = (e) => {
+    const { name, value } = e.target;
+
+    if (name === 'service_id') {
+      const selectedService = services.find(s => s.service_id === value);
+      if (selectedService) {
+        const genderText = ticketForm.gender_restriction === 'male' ? '男性' :
+          ticketForm.gender_restriction === 'female' ? '女性' : '';
+        setTicketForm(prev => ({
+          ...prev,
+          service_id: value,
+          // service_categoryはそのまま保持(ユーザーが選択した値を維持)
+          name: `${selectedService.name}${prev.total_sessions}回券${genderText ? `(${genderText})` : ''}`
+        }));
+      }
+    } else if (name === 'total_sessions' || name === 'gender_restriction') {
+      const selectedService = services.find(s => s.service_id === ticketForm.service_id);
+      const genderText = name === 'gender_restriction' ?
+        (value === 'male' ? '男性' : value === 'female' ? '女性' : '') :
+        (ticketForm.gender_restriction === 'male' ? '男性' : ticketForm.gender_restriction === 'female' ? '女性' : '');
+      const sessions = name === 'total_sessions' ? value : ticketForm.total_sessions;
+
       setTicketForm(prev => ({
         ...prev,
-        service_id: value,
-        // service_categoryはそのまま保持(ユーザーが選択した値を維持)
-        name: `${selectedService.name}${prev.total_sessions}回券${genderText ? `(${genderText})` : ''}`
+        [name]: value,
+        name: selectedService ? `${selectedService.name}${sessions}回券${genderText ? `(${genderText})` : ''}` : prev.name
+      }));
+    } else {
+      // service_categoryを含む他のフィールドはそのまま更新
+      setTicketForm(prev => ({
+        ...prev,
+        [name]: value
       }));
     }
-  } else if (name === 'total_sessions' || name === 'gender_restriction') {
-    const selectedService = services.find(s => s.service_id === ticketForm.service_id);
-    const genderText = name === 'gender_restriction' ?
-      (value === 'male' ? '男性' : value === 'female' ? '女性' : '') :
-      (ticketForm.gender_restriction === 'male' ? '男性' : ticketForm.gender_restriction === 'female' ? '女性' : '');
-    const sessions = name === 'total_sessions' ? value : ticketForm.total_sessions;
-    
-    setTicketForm(prev => ({
-      ...prev,
-      [name]: value,
-      name: selectedService ? `${selectedService.name}${sessions}回券${genderText ? `(${genderText})` : ''}` : prev.name
-    }));
-  } else {
-    // service_categoryを含む他のフィールドはそのまま更新
-    setTicketForm(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  }
-};
+  };
 
   // クーポンフォーム入力処理（改良版）
   const handleCouponInputChange = (e) => {
@@ -225,10 +225,10 @@ const handleTicketInputChange = (e) => {
         // 新規追加
         return {
           ...prev,
-          included_options: [...prev.included_options, { 
-            option_id: optionId, 
+          included_options: [...prev.included_options, {
+            option_id: optionId,
             option_name: option.name,
-            quantity: 1 
+            quantity: 1
           }]
         };
       }
@@ -352,14 +352,14 @@ const handleTicketInputChange = (e) => {
       }
     } catch (err) {
       // デモモード
-      setServices(prev => prev.map(s => 
-        s.service_id === serviceId 
-          ? { 
-              ...s, 
-              ...serviceForm,
-              price: Number(serviceForm.price),
-              first_time_price: serviceForm.has_first_time_discount ? Number(serviceForm.first_time_price) : null
-            } 
+      setServices(prev => prev.map(s =>
+        s.service_id === serviceId
+          ? {
+            ...s,
+            ...serviceForm,
+            price: Number(serviceForm.price),
+            first_time_price: serviceForm.has_first_time_discount ? Number(serviceForm.first_time_price) : null
+          }
           : s
       ));
       setSuccess('更新しました（ローカル保存）');
@@ -444,55 +444,55 @@ const handleTicketInputChange = (e) => {
     }
   };
 
-// 回数券編集開始
-const startEditTicketPlan = (plan) => {
-  setEditingTicketId(plan.plan_id);
-  setTicketForm({
-    service_id: plan.service_id,
-    name: plan.name,
-    service_category: plan.service_category,
-    gender_restriction: plan.gender_restriction || 'all',
-    total_sessions: plan.total_sessions,
-    price: plan.price,
-    validity_days: plan.validity_days
-  });
-};
-
-// 回数券更新
-const handleUpdateTicketPlan = async (planId) => {
-  if (!ticketForm.service_id || !ticketForm.name || !ticketForm.price) {
-    setError('必須項目を入力してください');
-    setTimeout(() => setError(''), 3000);
-    return;
-  }
-
-  setIsLoading(true);
-  try {
-    const response = await fetch('/api/ticket-plans', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        plan_id: planId,
-        ...ticketForm
-      })
+  // 回数券編集開始
+  const startEditTicketPlan = (plan) => {
+    setEditingTicketId(plan.plan_id);
+    setTicketForm({
+      service_id: plan.service_id,
+      name: plan.name,
+      service_category: plan.service_category,
+      gender_restriction: plan.gender_restriction || 'all',
+      total_sessions: plan.total_sessions,
+      price: plan.price,
+      validity_days: plan.validity_days
     });
+  };
 
-    if (response.ok) {
-      setSuccess('更新しました');
-      fetchTicketPlans();
-      setEditingTicketId(null);
-      resetTicketForm();
-    } else {
-      const data = await response.json();
-      throw new Error(data.error || '更新に失敗しました');
+  // 回数券更新
+  const handleUpdateTicketPlan = async (planId) => {
+    if (!ticketForm.service_id || !ticketForm.name || !ticketForm.price) {
+      setError('必須項目を入力してください');
+      setTimeout(() => setError(''), 3000);
+      return;
     }
-  } catch (err) {
-    setError(err.message);
-  } finally {
-    setIsLoading(false);
-    setTimeout(() => { setSuccess(''); setError(''); }, 3000);
-  }
-};
+
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/ticket-plans', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          plan_id: planId,
+          ...ticketForm
+        })
+      });
+
+      if (response.ok) {
+        setSuccess('更新しました');
+        fetchTicketPlans();
+        setEditingTicketId(null);
+        resetTicketForm();
+      } else {
+        const data = await response.json();
+        throw new Error(data.error || '更新に失敗しました');
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => { setSuccess(''); setError(''); }, 3000);
+    }
+  };
 
   // 回数券プラン削除
   const handleDeleteTicketPlan = async (planId) => {
@@ -625,18 +625,18 @@ const handleUpdateTicketPlan = async (planId) => {
   };
 
 
-// フォームリセット関数
+  // フォームリセット関数
   const resetTicketForm = () => {
     setTicketForm({
-    service_id: '',
-    name: '',
-    service_category: '新規', // ← 追加
-    gender_restriction: 'all',
-    total_sessions: 5,
-    price: '',
-    validity_days: 180
-  });
-};
+      service_id: '',
+      name: '',
+      service_category: '新規', // ← 追加
+      gender_restriction: 'all',
+      total_sessions: 5,
+      price: '',
+      validity_days: 180
+    });
+  };
 
   const resetCouponForm = () => {
     setCouponForm({
@@ -1222,203 +1222,203 @@ const handleUpdateTicketPlan = async (planId) => {
             </div>
           )}
 
-{/* 回数券プラン一覧 */}
-<div className="services-table">
-  {(() => {
-    const uniqueCategories = [...new Set(ticketPlans.map(plan => plan.service_category || 'その他'))];
-    
-    return (
-      <>
-        {uniqueCategories.map(category => {
-          const categoryPlans = ticketPlans.filter(plan => (plan.service_category || 'その他') === category);
-          
-          return (
-            <div key={`ticket-category-${category}`} className="ticket-category-section">
-              <h3 className="ticket-category-title">{category}</h3>
-              <table>
-                <thead>
-                  <tr>
-                    <th>対象コース</th>
-                    <th>プラン名</th>
-                    <th>対象</th>
-                    <th>回数</th>
-                    <th>総額</th>
-                    <th>1回あたり</th>
-                    <th>割引率</th>
-                    <th>有効期限</th>
-                    <th>操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {categoryPlans.map(plan => (
-                    <tr key={plan.plan_id}>
-                      {editingTicketId === plan.plan_id ? (
-                        <>
-                          <td>
-                            <select
-                              name="service_id"
-                              value={ticketForm.service_id}
-                              onChange={handleTicketInputChange}
-                              className="services-input-inline"
-                            >
-                              {services.filter(s => s.is_active).map(service => (
-                                <option key={service.service_id} value={service.service_id}>
-                                  {service.name}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td>
-                            <input
-                              type="text"
-                              name="name"
-                              value={ticketForm.name}
-                              onChange={handleTicketInputChange}
-                              className="services-input-inline"
-                            />
-                          </td>
-                          <td>
-                            <select
-                              name="gender_restriction"
-                              value={ticketForm.gender_restriction}
-                              onChange={handleTicketInputChange}
-                              className="services-input-inline services-input-inline--small"
-                            >
-                              <option value="all">全員</option>
-                              <option value="female">女性</option>
-                              <option value="male">男性</option>
-                            </select>
-                          </td>
-                          <td>
-                            <select
-                              name="total_sessions"
-                              value={ticketForm.total_sessions}
-                              onChange={handleTicketInputChange}
-                              className="services-input-inline services-input-inline--small"
-                            >
-                              <option value="5">5回</option>
-                              <option value="10">10回</option>
-                              <option value="15">15回</option>
-                              <option value="20">20回</option>
-                            </select>
-                          </td>
-                          <td>
-                            <input
-                              type="number"
-                              name="price"
-                              value={ticketForm.price}
-                              onChange={handleTicketInputChange}
-                              className="services-input-inline services-input-inline--medium"
-                            />
-                          </td>
-                          <td>¥{Math.floor(ticketForm.price / ticketForm.total_sessions).toLocaleString()}</td>
-                          <td>-</td>
-                          <td>
-                            <select
-                              name="validity_days"
-                              value={ticketForm.validity_days}
-                              onChange={handleTicketInputChange}
-                              className="services-input-inline services-input-inline--small"
-                            >
-                              <option value="90">90日</option>
-                              <option value="180">180日</option>
-                              <option value="365">365日</option>
-                              <option value="730">730日</option>
-                            </select>
-                          </td>
-                          <td>
-                            <div className="services-actions">
-                              <button
-                                onClick={() => handleUpdateTicketPlan(plan.plan_id)}
-                                className="services-btn-icon services-btn-icon--success"
-                                disabled={isLoading}
-                              >
-                                <Save size={16} />
-                              </button>
-                              <button
-                                onClick={handleCancel}
-                                className="services-btn-icon services-btn-icon--secondary"
-                                disabled={isLoading}
-                              >
-                                <X size={16} />
-                              </button>
-                            </div>
-                          </td>
-                        </>
-                      ) : (
-                        <>
-                          <td>{plan.service_name}</td>
-                          <td className="services-table-name">{plan.name}</td>
-                          <td>
-                            {plan.gender_restriction === 'female' && (
-                              <span className="services-gender-badge services-gender-badge--female">
-                                <Users size={14} /> 女性
-                              </span>
-                            )}
-                            {plan.gender_restriction === 'male' && (
-                              <span className="services-gender-badge services-gender-badge--male">
-                                <Users size={14} /> 男性
-                              </span>
-                            )}
-                            {(!plan.gender_restriction || plan.gender_restriction === 'all') && (
-                              <span className="services-text-muted">全員</span>
-                            )}
-                          </td>
-                          <td>{plan.total_sessions}回</td>
-                          <td>¥{Number(plan.price || 0).toLocaleString()}</td>
-                          <td>¥{Number(plan.price_per_session || 0).toLocaleString()}</td>
-                          <td>
-                            {plan.discount_rate > 0 ? (
-                              <span className="services-discount-badge">
-                                {plan.discount_rate}%OFF
-                              </span>
-                            ) : (
-                              <span className="services-text-muted">-</span>
-                            )}
-                          </td>
-                          <td>{plan.validity_days}日</td>
-                          <td>
-                            <div className="services-actions">
-                              <button
-                                onClick={() => startEditTicketPlan(plan)}
-                                className="services-btn-icon services-btn-icon--primary"
-                                disabled={isLoading}
-                              >
-                                <Edit2 size={16} />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteTicketPlan(plan.plan_id)}
-                                className="services-btn-icon services-btn-icon--danger"
-                                disabled={isLoading}
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          </td>
-                        </>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          );
-        })}
-      </>
-    );
-  })()}
-  
-  {ticketPlans.length === 0 && (
-    <div className="services-empty-state">
-      <Package size={48} />
-      <p>回数券プランが登録されていません</p>
-    </div>
-  )}
-</div>
-            </div>  
+          {/* 回数券プラン一覧 */}
+          <div className="services-table">
+            {(() => {
+              const uniqueCategories = [...new Set(ticketPlans.map(plan => plan.service_category || 'その他'))];
+
+              return (
+                <>
+                  {uniqueCategories.map(category => {
+                    const categoryPlans = ticketPlans.filter(plan => (plan.service_category || 'その他') === category);
+
+                    return (
+                      <div key={`ticket-category-${category}`} className="ticket-category-section">
+                        <h3 className="ticket-category-title">{category}</h3>
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>対象コース</th>
+                              <th>プラン名</th>
+                              <th>対象</th>
+                              <th>回数</th>
+                              <th>総額</th>
+                              <th>1回あたり</th>
+                              <th>割引率</th>
+                              <th>有効期限</th>
+                              <th>操作</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {categoryPlans.map(plan => (
+                              <tr key={plan.plan_id}>
+                                {editingTicketId === plan.plan_id ? (
+                                  <>
+                                    <td>
+                                      <select
+                                        name="service_id"
+                                        value={ticketForm.service_id}
+                                        onChange={handleTicketInputChange}
+                                        className="services-input-inline"
+                                      >
+                                        {services.filter(s => s.is_active).map(service => (
+                                          <option key={service.service_id} value={service.service_id}>
+                                            {service.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </td>
+                                    <td>
+                                      <input
+                                        type="text"
+                                        name="name"
+                                        value={ticketForm.name}
+                                        onChange={handleTicketInputChange}
+                                        className="services-input-inline"
+                                      />
+                                    </td>
+                                    <td>
+                                      <select
+                                        name="gender_restriction"
+                                        value={ticketForm.gender_restriction}
+                                        onChange={handleTicketInputChange}
+                                        className="services-input-inline services-input-inline--small"
+                                      >
+                                        <option value="all">全員</option>
+                                        <option value="female">女性</option>
+                                        <option value="male">男性</option>
+                                      </select>
+                                    </td>
+                                    <td>
+                                      <select
+                                        name="total_sessions"
+                                        value={ticketForm.total_sessions}
+                                        onChange={handleTicketInputChange}
+                                        className="services-input-inline services-input-inline--small"
+                                      >
+                                        <option value="5">5回</option>
+                                        <option value="10">10回</option>
+                                        <option value="15">15回</option>
+                                        <option value="20">20回</option>
+                                      </select>
+                                    </td>
+                                    <td>
+                                      <input
+                                        type="number"
+                                        name="price"
+                                        value={ticketForm.price}
+                                        onChange={handleTicketInputChange}
+                                        className="services-input-inline services-input-inline--medium"
+                                      />
+                                    </td>
+                                    <td>¥{Math.floor(ticketForm.price / ticketForm.total_sessions).toLocaleString()}</td>
+                                    <td>-</td>
+                                    <td>
+                                      <select
+                                        name="validity_days"
+                                        value={ticketForm.validity_days}
+                                        onChange={handleTicketInputChange}
+                                        className="services-input-inline services-input-inline--small"
+                                      >
+                                        <option value="90">90日</option>
+                                        <option value="180">180日</option>
+                                        <option value="365">365日</option>
+                                        <option value="730">730日</option>
+                                      </select>
+                                    </td>
+                                    <td>
+                                      <div className="services-actions">
+                                        <button
+                                          onClick={() => handleUpdateTicketPlan(plan.plan_id)}
+                                          className="services-btn-icon services-btn-icon--success"
+                                          disabled={isLoading}
+                                        >
+                                          <Save size={16} />
+                                        </button>
+                                        <button
+                                          onClick={handleCancel}
+                                          className="services-btn-icon services-btn-icon--secondary"
+                                          disabled={isLoading}
+                                        >
+                                          <X size={16} />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </>
+                                ) : (
+                                  <>
+                                    <td>{plan.service_name}</td>
+                                    <td className="services-table-name">{plan.name}</td>
+                                    <td>
+                                      {plan.gender_restriction === 'female' && (
+                                        <span className="services-gender-badge services-gender-badge--female">
+                                          <Users size={14} /> 女性
+                                        </span>
+                                      )}
+                                      {plan.gender_restriction === 'male' && (
+                                        <span className="services-gender-badge services-gender-badge--male">
+                                          <Users size={14} /> 男性
+                                        </span>
+                                      )}
+                                      {(!plan.gender_restriction || plan.gender_restriction === 'all') && (
+                                        <span className="services-text-muted">全員</span>
+                                      )}
+                                    </td>
+                                    <td>{plan.total_sessions}回</td>
+                                    <td>¥{Number(plan.price || 0).toLocaleString()}</td>
+                                    <td>¥{Number(plan.price_per_session || 0).toLocaleString()}</td>
+                                    <td>
+                                      {plan.discount_rate > 0 ? (
+                                        <span className="services-discount-badge">
+                                          {plan.discount_rate}%OFF
+                                        </span>
+                                      ) : (
+                                        <span className="services-text-muted">-</span>
+                                      )}
+                                    </td>
+                                    <td>{plan.validity_days}日</td>
+                                    <td>
+                                      <div className="services-actions">
+                                        <button
+                                          onClick={() => startEditTicketPlan(plan)}
+                                          className="services-btn-icon services-btn-icon--primary"
+                                          disabled={isLoading}
+                                        >
+                                          <Edit2 size={16} />
+                                        </button>
+                                        <button
+                                          onClick={() => handleDeleteTicketPlan(plan.plan_id)}
+                                          className="services-btn-icon services-btn-icon--danger"
+                                          disabled={isLoading}
+                                        >
+                                          <Trash2 size={16} />
+                                        </button>
+                                      </div>
+                                    </td>
+                                  </>
+                                )}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })}
+                </>
+              );
+            })()}
+
+            {ticketPlans.length === 0 && (
+              <div className="services-empty-state">
+                <Package size={48} />
+                <p>回数券プランが登録されていません</p>
+              </div>
             )}
-      
-            {/* クーポンタブ */}
+          </div>
+        </div>
+      )}
+
+      {/* クーポンタブ */}
       {activeTab === 'coupons' && (
         <div className="services-content">
           <div className="services-header">
@@ -1482,13 +1482,13 @@ const handleUpdateTicketPlan = async (planId) => {
                 <div className="services-form-group services-form-group--full">
                   <label>含まれる指定オプション</label>
                   <div className="services-option-selector">
-                    <select 
+                    <select
                       onChange={(e) => e.target.value && addIncludedOption(e.target.value)}
                       value=""
                       className="services-option-dropdown"
                     >
                       <option value="">オプションを選択して追加...</option>
-                      {options.filter(o => o.is_active && 
+                      {options.filter(o => o.is_active &&
                         !couponForm.included_options.find(io => io.option_id === o.option_id)
                       ).map(option => (
                         <option key={option.option_id} value={option.option_id}>
@@ -1497,7 +1497,7 @@ const handleUpdateTicketPlan = async (planId) => {
                       ))}
                     </select>
                   </div>
-                  
+
                   {/* 選択済みオプションリスト */}
                   {couponForm.included_options.length > 0 && (
                     <div className="services-selected-options">
@@ -1605,7 +1605,7 @@ const handleUpdateTicketPlan = async (planId) => {
               </div>
             </div>
           )}
-        
+
 
           {/* クーポン一覧テーブル */}
           <div className="services-table">

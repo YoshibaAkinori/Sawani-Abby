@@ -11,7 +11,7 @@ const OptionsManagement = () => {
   const [success, setSuccess] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  
+
   // フォームデータ
   const [formData, setFormData] = useState({
     name: '',
@@ -38,7 +38,7 @@ const OptionsManagement = () => {
     { name: '炭酸パック【抗酸化・抗炎症・保湿】', duration: 15, price: 1500, category: 'フェイシャル' },
     { name: 'MFIP機器【エイジング・くすみ・むくみ】', duration: 15, price: 2000, category: 'フェイシャル' },
     { name: 'ラジオ波フェイス【新陳代謝UP・脂肪燃焼】', duration: 15, price: 2000, category: 'フェイシャル' },
-    
+
     // ボディメニュー
     { name: 'ドライヘッド【眼精疲労・自律神経・脳疲労】', duration: 20, price: 2000, category: 'ボディ' },
     { name: 'ネックセラピー【スマホ首・首こり・血行促進】', duration: 15, price: 1500, category: 'ボディ' },
@@ -182,14 +182,14 @@ const OptionsManagement = () => {
       }
     } catch (err) {
       // デモモード
-      setOptions(prev => prev.map(opt => 
-        opt.option_id === optionId 
-          ? { 
-              ...opt, 
-              ...formData,
-              price: Number(formData.price),
-              duration_minutes: Number(formData.duration_minutes) || 0
-            } 
+      setOptions(prev => prev.map(opt =>
+        opt.option_id === optionId
+          ? {
+            ...opt,
+            ...formData,
+            price: Number(formData.price),
+            duration_minutes: Number(formData.duration_minutes) || 0
+          }
           : opt
       ));
       setSuccess('更新しました(ローカル保存)');
@@ -295,11 +295,11 @@ const OptionsManagement = () => {
       {showAddForm && (
         <div className="options-form-card">
           <h4>新規オプション登録</h4>
-          
+
           {/* テンプレート選択 */}
           <div className="options-templates">
             <span className="options-template-label">よく使うメニューから選択</span>
-            
+
             {/* フェイシャルメニュー */}
             <div className="options-template-section">
               <h5>フェイシャルメニュー</h5>

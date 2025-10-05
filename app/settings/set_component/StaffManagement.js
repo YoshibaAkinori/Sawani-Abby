@@ -10,7 +10,7 @@ const StaffManagement = () => {
   const [success, setSuccess] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
-  
+
   // フォームデータ
   const [formData, setFormData] = useState({
     name: '',
@@ -158,7 +158,7 @@ const StaffManagement = () => {
       }
     } catch (err) {
       // デモモード: ローカルで更新
-      setStaff(prev => prev.map(s => 
+      setStaff(prev => prev.map(s =>
         s.staff_id === staffId ? { ...s, ...formData } : s
       ));
       setSuccess('更新しました（ローカル保存）');
@@ -460,7 +460,7 @@ const StaffManagement = () => {
                 ) : (
                   <>
                     <td>
-                      <div 
+                      <div
                         className="settings__color-indicator"
                         style={{ backgroundColor: member.color }}
                       />

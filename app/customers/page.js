@@ -43,7 +43,7 @@ const CustomersPage = () => {
     try {
       const response = await fetch(`/api/customers/search?name=${encodeURIComponent(searchName)}`);
       const data = await response.json();
-      
+
       if (data.success) {
         setSearchResults(data.data || []);
         // 結果が1件のみの場合は自動選択
@@ -68,25 +68,25 @@ const CustomersPage = () => {
       // 顧客基本情報
       const customerRes = await fetch(`/api/customers/${customerId}`);
       const customerData = await customerRes.json();
-      
+
       if (customerData.success) {
         setSelectedCustomer(customerData.data);
-        
+
         // 回数券取得
         const ticketsRes = await fetch(`/api/customers/${customerId}/tickets`);
         const ticketsData = await ticketsRes.json();
         setCustomerTickets(ticketsData.data || []);
-        
+
         // クーポン履歴取得
         const couponsRes = await fetch(`/api/customers/${customerId}/coupons`);
         const couponsData = await couponsRes.json();
         setCustomerCoupons(couponsData.data || []);
-        
+
         // 来店履歴取得
         const historyRes = await fetch(`/api/customers/${customerId}/visit-history`);
         const historyData = await historyRes.json();
         setVisitHistory(historyData.data || []);
-        
+
         // 検索結果をクリア
         setSearchResults([]);
         setSearchName('');
@@ -141,7 +141,7 @@ const CustomersPage = () => {
                   onKeyPress={(e) => e.key === 'Enter' && handleNameSearch()}
                   disabled={isLoading}
                 />
-                <button 
+                <button
                   className="customers-page__search-btn"
                   onClick={handleNameSearch}
                   disabled={isLoading}
@@ -338,52 +338,51 @@ const CustomersPage = () => {
               )}
 
               {/* 保有回数券タブ */}
-{activeTab === 'tickets' && (
-  <div className="customers-page__ticket-list">
-    {customerTickets.map(ticket => (
-      <div key={ticket.customer_ticket_id} className="customers-page__ticket-item">
-        <div className="customers-page__ticket-info">
-          <h3>{ticket.plan_name}</h3>
-          <div className="customers-page__ticket-details">
-            <span>購入日: {ticket.purchase_date}</span>
-            <span>有効期限: {ticket.expiry_date}</span>
-            <span>購入価格: ¥{ticket.purchase_price.toLocaleString()}</span>
-            <span>支払済: ¥{ticket.total_paid.toLocaleString()}</span>
-            {ticket.remaining_payment > 0 && (
-              <span style={{ color: '#dc2626', fontWeight: 600 }}>
-                残支払額: ¥{ticket.remaining_payment.toLocaleString()}
-              </span>
-            )}
-            {ticket.remaining_payment === 0 && (
-              <span style={{ color: '#059669', fontWeight: 600 }}>
-                支払済
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="customers-page__ticket-status">
-          <div className="customers-page__ticket-remaining">
-            残り {ticket.sessions_remaining} / {ticket.total_sessions} 回
-          </div>
-          <span className={`customers-page__ticket-badge ${
-            ticket.status === 'active' 
-              ? 'customers-page__ticket-badge--active' 
-              : 'customers-page__ticket-badge--expired'
-          }`}>
-            {ticket.status === 'active' ? '有効' : ticket.status === 'used_up' ? '使用済' : '期限切れ'}
-          </span>
-        </div>
-      </div>
-    ))}
+              {activeTab === 'tickets' && (
+                <div className="customers-page__ticket-list">
+                  {customerTickets.map(ticket => (
+                    <div key={ticket.customer_ticket_id} className="customers-page__ticket-item">
+                      <div className="customers-page__ticket-info">
+                        <h3>{ticket.plan_name}</h3>
+                        <div className="customers-page__ticket-details">
+                          <span>購入日: {ticket.purchase_date}</span>
+                          <span>有効期限: {ticket.expiry_date}</span>
+                          <span>購入価格: ¥{ticket.purchase_price.toLocaleString()}</span>
+                          <span>支払済: ¥{ticket.total_paid.toLocaleString()}</span>
+                          {ticket.remaining_payment > 0 && (
+                            <span style={{ color: '#dc2626', fontWeight: 600 }}>
+                              残支払額: ¥{ticket.remaining_payment.toLocaleString()}
+                            </span>
+                          )}
+                          {ticket.remaining_payment === 0 && (
+                            <span style={{ color: '#059669', fontWeight: 600 }}>
+                              支払済
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="customers-page__ticket-status">
+                        <div className="customers-page__ticket-remaining">
+                          残り {ticket.sessions_remaining} / {ticket.total_sessions} 回
+                        </div>
+                        <span className={`customers-page__ticket-badge ${ticket.status === 'active'
+                            ? 'customers-page__ticket-badge--active'
+                            : 'customers-page__ticket-badge--expired'
+                          }`}>
+                          {ticket.status === 'active' ? '有効' : ticket.status === 'used_up' ? '使用済' : '期限切れ'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
 
-    {customerTickets.length === 0 && (
-      <div className="customers-page__empty-state">
-        <CreditCard size={48} />
-        <p>保有している回数券はありません</p>
-      </div>
-    )}
-  </div>
-)}
+                  {customerTickets.length === 0 && (
+                    <div className="customers-page__empty-state">
+                      <CreditCard size={48} />
+                      <p>保有している回数券はありません</p>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* クーポン利用履歴タブ */}
               {activeTab === 'coupons' && (
@@ -414,83 +413,83 @@ const CustomersPage = () => {
               )}
 
               {/* 来店履歴タブ */}
-{activeTab === 'history' && (
-  <div>
-    <table className="customers-page__history-table">
-      <thead>
-        <tr>
-          <th>来店日</th>
-          <th>施術内容</th>
-          <th>担当スタッフ</th>
-          <th>支払方法</th>
-          <th>金額</th>
-        </tr>
-      </thead>
-      <tbody>
-        {visitHistory.map(visit => {
-          // 回数券購入のみかどうかを判定
-          const isTicketPurchaseOnly = visit.ticket_purchases && 
-                                       visit.ticket_purchases.length > 0 && 
-                                       !visit.service;
-          
-          // 回数券使用で完済済みかどうか
-          const isTicketUseFullyPaid = visit.detail_info?.type === 'ticket_use' && 
-                                       visit.detail_info?.is_fully_paid;
-          
-          // 表示する金額（回数券使用で完済済みの場合は0）
-          const displayAmount = isTicketUseFullyPaid ? 0 : visit.amount;
-          
-          return (
-            <tr key={visit.payment_id}>
-              <td className="customers-page__history-date">
-                {visit.date}
-              </td>
-              <td className="customers-page__history-service">
-                {/* 通常のサービス表示（回数券購入のみの場合は表示しない） */}
-                {!isTicketPurchaseOnly && visit.service && (
-                  <div>
-                    {visit.service}
-                    {visit.price > 0 && (
-                      <span style={{ marginLeft: '0.5rem', color: '#6b7280' }}>
-                        ¥{visit.price.toLocaleString()}
-                      </span>
-                    )}
-                  </div>
-                )}
-                
-                {/* 詳細情報の表示 */}
-                {visit.detail_info && !isTicketPurchaseOnly && (
-  <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
-    {visit.detail_info.type === 'ticket_use' && (
-      <span style={{ color: '#3b82f6' }}>
-        回数券使用: {visit.detail_info.plan_name}
-        {visit.detail_info.remaining_payment > 0 && (
-          <span style={{ color: '#dc2626', marginLeft: '0.5rem' }}>
-            （残金支払い: ¥{visit.detail_info.remaining_payment.toLocaleString()}）
-          </span>
-        )}
-      </span>
-    )}
-                    {visit.detail_info.type === 'coupon' && (
-                      <span>
-                        クーポン: {visit.detail_info.description}
-                        {visit.detail_info.base_service && ` (${visit.detail_info.base_service})`}
-                      </span>
-                    )}
-                    {visit.detail_info.type === 'limited_offer' && (
-                      <span>
-                        期間限定: {visit.detail_info.description}
-                        {visit.detail_info.sessions && ` (${visit.detail_info.sessions}回コース)`}
-                      </span>
-                    )}
-                  </div>
-                )}
-                
-                {/* 回数券購入情報の表示 */}
-                {visit.ticket_purchases && visit.ticket_purchases.length > 0 && (
+              {activeTab === 'history' && (
+                <div>
+                  <table className="customers-page__history-table">
+                    <thead>
+                      <tr>
+                        <th>来店日</th>
+                        <th>施術内容</th>
+                        <th>担当スタッフ</th>
+                        <th>支払方法</th>
+                        <th>金額</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visitHistory.map(visit => {
+                        // 回数券購入のみかどうかを判定
+                        const isTicketPurchaseOnly = visit.ticket_purchases &&
+                          visit.ticket_purchases.length > 0 &&
+                          !visit.service;
+
+                        // 回数券使用で完済済みかどうか
+                        const isTicketUseFullyPaid = visit.detail_info?.type === 'ticket_use' &&
+                          visit.detail_info?.is_fully_paid;
+
+                        // 表示する金額（回数券使用で完済済みの場合は0）
+                        const displayAmount = isTicketUseFullyPaid ? 0 : visit.amount;
+
+                        return (
+                          <tr key={visit.payment_id}>
+                            <td className="customers-page__history-date">
+                              {visit.date}
+                            </td>
+                            <td className="customers-page__history-service">
+                              {/* 通常のサービス表示（回数券購入のみの場合は表示しない） */}
+                              {!isTicketPurchaseOnly && visit.service && (
+                                <div>
+                                  {visit.service}
+                                  {visit.price > 0 && (
+                                    <span style={{ marginLeft: '0.5rem', color: '#6b7280' }}>
+                                      ¥{visit.price.toLocaleString()}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* 詳細情報の表示 */}
+                              {visit.detail_info && !isTicketPurchaseOnly && (
+                                <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                                  {visit.detail_info.type === 'ticket_use' && (
+                                    <span style={{ color: '#3b82f6' }}>
+                                      回数券使用: {visit.detail_info.plan_name}
+                                      {visit.detail_info.remaining_payment > 0 && (
+                                        <span style={{ color: '#dc2626', marginLeft: '0.5rem' }}>
+                                          （残金支払い: ¥{visit.detail_info.remaining_payment.toLocaleString()}）
+                                        </span>
+                                      )}
+                                    </span>
+                                  )}
+                                  {visit.detail_info.type === 'coupon' && (
+                                    <span>
+                                      クーポン: {visit.detail_info.description}
+                                      {visit.detail_info.base_service && ` (${visit.detail_info.base_service})`}
+                                    </span>
+                                  )}
+                                  {visit.detail_info.type === 'limited_offer' && (
+                                    <span>
+                                      期間限定: {visit.detail_info.description}
+                                      {visit.detail_info.sessions && ` (${visit.detail_info.sessions}回コース)`}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* 回数券購入情報の表示 */}
+                              {visit.ticket_purchases && visit.ticket_purchases.length > 0 && (
                                 <div style={{ fontSize: '0.875rem', marginTop: isTicketPurchaseOnly ? 0 : '0.25rem' }}>
                                   {visit.ticket_purchases.map((ticket, idx) => (
-                                    <div key={idx} style={{ color: '#10b981'}}>
+                                    <div key={idx} style={{ color: '#10b981' }}>
                                       {isTicketPurchaseOnly ? '' : '+ '}
                                       回数券購入：{ticket.plan_name}
                                       {/* 支払い金額を表示 */}
@@ -506,53 +505,53 @@ const CustomersPage = () => {
                                   ))}
                                 </div>
                               )}
-                
-                {/* オプション情報の表示 */}
-                {visit.options && visit.options.length > 0 && (
-                  <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                    オプション: {visit.options.map((opt, idx) => (
-                      <span key={idx}>
-                        {opt.option_name}
-                        {opt.is_free ? ' (無料)' : ` (+¥${opt.price.toLocaleString()})`}
-                        {idx < visit.options.length - 1 && ', '}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </td>
-              <td className="customers-page__history-staff">
-                {visit.staff}
-              </td>
-              <td className="customers-page__history-payment">
-  {/* 回数券使用 AND 支払い金額が0の時のみ「回数券」表示 */}
-  {visit.detail_info?.type === 'ticket_use' && visit.amount === 0 ? (
-    <span style={{ color: '#3b82f6', fontWeight: 600 }}>回数券</span>
-  ) : (
-    <>
-      {visit.payment_method === 'cash' && '現金'}
-      {visit.payment_method === 'card' && 'カード'}
-      {visit.payment_method === 'mixed' && '混合'}
-      {!visit.payment_method && '-'}
-    </>
-  )}
-</td>
-<td className="customers-page__history-amount">
-  ¥{visit.amount.toLocaleString()}
-</td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
 
-    {visitHistory.length === 0 && (
-      <div className="customers-page__empty-state">
-        <FileText size={48} />
-        <p>来店履歴はありません</p>
-      </div>
-    )}
-  </div>
-)}
+                              {/* オプション情報の表示 */}
+                              {visit.options && visit.options.length > 0 && (
+                                <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                                  オプション: {visit.options.map((opt, idx) => (
+                                    <span key={idx}>
+                                      {opt.option_name}
+                                      {opt.is_free ? ' (無料)' : ` (+¥${opt.price.toLocaleString()})`}
+                                      {idx < visit.options.length - 1 && ', '}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </td>
+                            <td className="customers-page__history-staff">
+                              {visit.staff}
+                            </td>
+                            <td className="customers-page__history-payment">
+                              {/* 回数券使用 AND 支払い金額が0の時のみ「回数券」表示 */}
+                              {visit.detail_info?.type === 'ticket_use' && visit.amount === 0 ? (
+                                <span style={{ color: '#3b82f6', fontWeight: 600 }}>回数券</span>
+                              ) : (
+                                <>
+                                  {visit.payment_method === 'cash' && '現金'}
+                                  {visit.payment_method === 'card' && 'カード'}
+                                  {visit.payment_method === 'mixed' && '混合'}
+                                  {!visit.payment_method && '-'}
+                                </>
+                              )}
+                            </td>
+                            <td className="customers-page__history-amount">
+                              ¥{visit.amount.toLocaleString()}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+
+                  {visitHistory.length === 0 && (
+                    <div className="customers-page__empty-state">
+                      <FileText size={48} />
+                      <p>来店履歴はありません</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </section>
         ) : (

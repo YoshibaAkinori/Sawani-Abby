@@ -76,32 +76,32 @@ const ShiftManagement = () => {
       const response = await fetch(`/api/shifts?staffId=${selectedStaff}&year=${year}&month=${month}`);
       if (response.ok) {
         const data = await response.json();
-        
+
         console.log('取得したシフトデータ:', data);
         console.log('shifts配列:', data.data.shifts);
-        
+
         // APIデータをコンポーネントの形式に変換
         const shiftData = {};
         data.data.shifts.forEach(record => {
           console.log('処理中のレコード:', record);
-          
+
           // 日付を文字列として使用（タイムゾーン変換なし）
           const dateKey = record.date; // すでにYYYY-MM-DD形式の文字列
-          
+
           console.log('dateKey:', dateKey);
-          
+
           shiftData[dateKey] = {
             startTime: record.start_time || '',
             endTime: record.end_time || '',
             breakMinutes: record.break_minutes || 0,
             transportCost: record.transport_cost || transportAllowance
           };
-          
+
           console.log('変換後:', shiftData[dateKey]);
         });
-        
+
         console.log('最終的なshiftData:', shiftData);
-        
+
         setShifts(shiftData);
         setSavedShifts(JSON.parse(JSON.stringify(shiftData))); // 深いコピーを保存
       }
@@ -158,25 +158,25 @@ const ShiftManagement = () => {
     const year = selectedMonth.getFullYear();
     const month = selectedMonth.getMonth(); // 0-indexed
     const date = new Date(year, month, day);
-    
+
     // ローカル日付をYYYY-MM-DD形式で取得
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
-    
+
     return `${y}-${m}-${d}`;
   };
 
   // 勤務時間を計算（休憩時間を考慮）
   const calculateWorkHours = (startTime, endTime, breakMinutes = 0) => {
     if (!startTime || !endTime) return 0;
-    
+
     const [startHour, startMin] = startTime.split(':').map(Number);
     const [endHour, endMin] = endTime.split(':').map(Number);
-    
+
     const startMinutes = startHour * 60 + startMin;
     const endMinutes = endHour * 60 + endMin;
-    
+
     return ((endMinutes - startMinutes) - breakMinutes) / 60;
   };
 
@@ -288,7 +288,7 @@ const ShiftManagement = () => {
   // 一時保存（ローカルステートに保存）
   const handleTempSave = () => {
     const dateKey = getDateKey(editingDay);
-    
+
     if (formData.startTime && formData.endTime) {
       setShifts(prev => ({
         ...prev,
@@ -305,7 +305,7 @@ const ShiftManagement = () => {
         return newShifts;
       });
     }
-    
+
     setEditingDay(null);
     setFormData({ startTime: '', endTime: '', transportCost: 0 });
   };
@@ -314,9 +314,9 @@ const ShiftManagement = () => {
   const handleShiftChange = (day, field, value) => {
     const dateKey = getDateKey(day);
     const currentShift = shifts[dateKey] || {};
-    
+
     let newShiftData = { ...currentShift, [field]: value };
-    
+
     // 時間が入力された際、交通費が未入力ならデフォルト値を自動セット
     if ((field === 'startTime' || field === 'endTime') && value && newShiftData.transportCost === undefined) {
       newShiftData.transportCost = transportAllowance;
@@ -326,7 +326,7 @@ const ShiftManagement = () => {
     if (field === 'transportCost') {
       newShiftData.transportCost = value === '' ? 0 : Number(value);
     }
-    
+
     // 開始時間と終了時間の両方が空になったら、その日のシフトデータを削除
     if (!newShiftData.startTime && !newShiftData.endTime) {
       setShifts(prev => {
@@ -391,7 +391,7 @@ const ShiftManagement = () => {
       setSavedShifts(shifts);
       setHasUnsavedChanges(false);
       showMessage('success', '1ヶ月分のシフトをまとめて保存しました');
-      
+
       // 保存後、データを再取得して最新状態を反映
       await fetchShifts();
 
@@ -477,7 +477,7 @@ const ShiftManagement = () => {
               ))}
             </select>
           </div>
-          
+
           <div className="shift-month-nav">
             <button onClick={() => changeMonth(-1)} className="shift-nav-btn">
               <ChevronLeft size={20} />
@@ -502,7 +502,7 @@ const ShiftManagement = () => {
           )}
         </div>
       </div>
-      
+
       {/* シフト表 */}
       <div className="shift-table-container">
         <table className="shift-table">
@@ -537,14 +537,14 @@ const ShiftManagement = () => {
                     <input type="time" value={shift?.endTime || ''} onChange={(e) => handleShiftChange(day, 'endTime', e.target.value)} className="shift-input-time" />
                   </td>
                   <td>
-                    <input 
-                      type="time" 
-                      value={formatMinutesToHHMM(shift?.breakMinutes || 0)} 
+                    <input
+                      type="time"
+                      value={formatMinutesToHHMM(shift?.breakMinutes || 0)}
                       onChange={(e) => {
                         const minutes = parseHHMMToMinutes(e.target.value);
                         handleShiftChange(day, 'breakMinutes', minutes);
-                      }} 
-                      className="shift-input-time" 
+                      }}
+                      className="shift-input-time"
                     />
                   </td>
                   <td>{workHours > 0 ? formatHoursToHHMM(workHours) : '0:00'}</td>

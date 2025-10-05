@@ -89,7 +89,7 @@ export async function GET(request) {
 export async function POST(request) {
   const pool = await getConnection();
   const connection = await pool.getConnection();
-  
+
   try {
     const body = await request.json();
 
@@ -151,7 +151,7 @@ export async function POST(request) {
         WHERE ct.customer_ticket_id = ?`,
         [ticket_id]
       );
-      
+
       if (ticketRows.length > 0) {
         // サービス情報がない場合は回数券のサービス情報を使用
         if (!service_id) {
@@ -167,18 +167,18 @@ export async function POST(request) {
     // オプション合計を計算
     let optionsTotal = 0;
     const optionDetails = [];
-    
+
     for (const opt of options) {
       const [optRows] = await connection.execute(
         'SELECT name, category, price, duration_minutes FROM options WHERE option_id = ?',
         [opt.option_id]
       );
-      
+
       if (optRows.length > 0) {
         const optData = optRows[0];
         const optPrice = opt.is_free ? 0 : optData.price * (opt.quantity || 1);
         optionsTotal += optPrice;
-        
+
         optionDetails.push({
           option_id: opt.option_id,
           name: optData.name,
@@ -197,11 +197,11 @@ export async function POST(request) {
     let totalAmount;
     if (payment_type === 'ticket' && payment_amount > 0) {
       // 残金支払いの場合は、実際に支払った金額
-      totalAmount = payment_method === 'mixed' 
-      ? (parseInt(cash_amount) || 0) + (parseInt(card_amount) || 0)
-      : (payment_method === 'cash' ? parseInt(cash_amount) || 0 : parseInt(card_amount) || 0);
+      totalAmount = payment_method === 'mixed'
+        ? (parseInt(cash_amount) || 0) + (parseInt(card_amount) || 0)
+        : (payment_method === 'cash' ? parseInt(cash_amount) || 0 : parseInt(card_amount) || 0);
     } else {
-    // 通常の計算
+      // 通常の計算
       totalAmount = serviceSubtotal + optionsTotal - discount_amount;
     }
 
@@ -336,7 +336,7 @@ export async function POST(request) {
 export async function DELETE(request) {
   const pool = await getConnection();
   const connection = await pool.getConnection();
-  
+
   try {
     const { searchParams } = new URL(request.url);
     const paymentId = searchParams.get('id');
