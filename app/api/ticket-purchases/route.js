@@ -17,7 +17,7 @@ export async function POST(request) {
       card_amount = 0,
       staff_id,
       use_immediately = false,
-      related_payment_id = null,  // ← 追加
+      related_payment_id = null,
       notes = null
     } = body;
 
@@ -102,7 +102,7 @@ export async function POST(request) {
       customer_id,
       staff_id,
       plan.service_id,
-      `${plan.name}（回数券購入）`,
+      `${plan.name}(回数券購入)`,
       fullPrice,
       0,
       'ticket',
@@ -115,9 +115,9 @@ export async function POST(request) {
       payment_method === 'mixed' ? cash_amount : (payment_method === 'cash' ? payment_amount : 0),
       payment_method === 'mixed' ? card_amount : (payment_method === 'card' ? payment_amount : 0),
       use_immediately 
-        ? `回数券購入: ${plan.name}（${plan.total_sessions}回）- 購入時に1回使用済み`
-        : `回数券購入: ${plan.name}（${plan.total_sessions}回）`,
-      related_payment_id  // ← 通常施術のpayment_idを設定
+        ? `回数券購入: ${plan.name}(${plan.total_sessions}回) - 購入時に1回使用済み`
+        : `回数券購入: ${plan.name}(${plan.total_sessions}回)`,
+      related_payment_id
     ]);
 
     // 購入レコードのpayment_idを取得
@@ -152,7 +152,7 @@ export async function POST(request) {
         0,
         0,
         '回数券購入時の初回使用',
-        purchasePaymentId  // ★ 購入レコードと紐付け
+        purchasePaymentId
       ]);
     }
 
@@ -165,6 +165,7 @@ export async function POST(request) {
       success: true,
       data: {
         customer_ticket_id: customerTicketId,
+        payment_id: purchasePaymentId,
         plan_name: plan.name,
         service_name: plan.service_name,
         total_sessions: plan.total_sessions,

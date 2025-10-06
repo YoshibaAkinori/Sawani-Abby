@@ -37,12 +37,12 @@
 }
 
 .customers-page__back-link svg {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
 }
 
 .customers-page__back-link span {
-  font-size: 1rem;
+  font-size: 1.125rem;
 }
 
 .customers-page__header-title {
@@ -52,12 +52,12 @@
 }
 
 .customers-page__header-title svg {
-  width: 2rem;
-  height: 2rem;
+  width: 2.25rem;
+  height: 2.25rem;
 }
 
 .customers-page__header-title h1 {
-  font-size: 1.5rem;
+  font-size: 1.875rem;
   font-weight: 700;
   margin: 0;
 }
@@ -93,7 +93,7 @@
 }
 
 .customers-page__search-label {
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   font-weight: 600;
   color: #374151;
   display: flex;
@@ -102,8 +102,8 @@
 }
 
 .customers-page__search-label svg {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
 }
 
 .customers-page__search-input-group {
@@ -116,12 +116,12 @@
   padding: 1.25rem 1.5rem;
   border: 2px solid #e5e7eb;
   border-radius: 0.5rem;
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   transition: all 0.2s;
 }
 
 .customers-page__search-input::placeholder {
-  font-size: 1rem;
+  font-size: 1.125rem;
 }
 
 .customers-page__search-input:focus {
@@ -136,7 +136,7 @@
   color: white;
   border: none;
   border-radius: 0.5rem;
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -213,20 +213,20 @@
 }
 
 .customers-page__today-booking-time {
-  font-size: 1.25rem;
+  font-size: 1.375rem;
   font-weight: 700;
   color: #3b82f6;
   min-width: 70px;
 }
 
 .customers-page__today-booking-name {
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   font-weight: 600;
   color: #111827;
 }
 
 .customers-page__today-booking-service {
-  font-size: 0.95rem;
+  font-size: 1.0625rem;
   color: #6b7280;
   margin-top: 0.375rem;
 }
@@ -272,13 +272,13 @@
 
 .customers-page__result-name {
   font-weight: 600;
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   color: #111827;
   margin-bottom: 0.625rem;
 }
 
 .customers-page__result-info {
-  font-size: 0.95rem;
+  font-size: 1.0625rem;
   color: #6b7280;
   display: flex;
   align-items: center;
@@ -292,8 +292,8 @@
 }
 
 .customers-page__result-info-item svg {
-  width: 1.125rem;
-  height: 1.125rem;
+  width: 1.25rem;
+  height: 1.25rem;
 }
 
 /* 詳細情報セクション */
@@ -320,12 +320,12 @@
 }
 
 .customers-page__detail-title svg {
-  width: 2rem;
-  height: 2rem;
+  width: 2.25rem;
+  height: 2.25rem;
 }
 
 .customers-page__detail-title h2 {
-  font-size: 1.75rem;
+  font-size: 2rem;
   font-weight: 700;
   color: #111827;
   margin: 0;
@@ -340,7 +340,7 @@
   padding: 0.875rem 1.5rem;
   border: none;
   border-radius: 0.5rem;
-  font-size: 1rem;
+  font-size: 1.125rem;
   font-weight: 600;
   cursor: pointer;
   display: flex;
@@ -351,8 +351,8 @@
 }
 
 .customers-page__action-btn svg {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.375rem;
+  height: 1.375rem;
 }
 
 .customers-page__action-btn--primary {
@@ -388,7 +388,7 @@
   background: none;
   border: none;
   border-bottom: 3px solid transparent;
-  font-size: 1rem;
+  font-size: 1.125rem;
   font-weight: 600;
   color: #6b7280;
   cursor: pointer;
@@ -426,7 +426,7 @@
 }
 
 .customers-page__info-label {
-  font-size: 0.875rem;
+  font-size: 1rem;
   font-weight: 600;
   color: #6b7280;
   text-transform: uppercase;
@@ -434,7 +434,7 @@
 }
 
 .customers-page__info-value {
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   color: #111827;
   font-weight: 500;
   display: flex;
@@ -443,8 +443,8 @@
 }
 
 .customers-page__info-value svg {
-  width: 1.25rem;
-  height: 1.25rem;
+  width: 1.375rem;
+  height: 1.375rem;
   color: #6b7280;
 }
 
@@ -473,7 +473,7 @@
 }
 
 .customers-page__ticket-info h3 {
-  font-size: 1.125rem;
+  font-size: 1.25rem;
   font-weight: 600;
   color: #111827;
   margin: 0 0 0.75rem 0;
@@ -482,7 +482,7 @@
 .customers-page__ticket-details {
   display: flex;
   gap: 1.5rem;
-  font-size: 0.875rem;
+  font-size: 1rem;
   color: #6b7280;
 }
 
@@ -494,13 +494,13 @@
 }
 
 .customers-page__ticket-remaining {
-  font-size: 1.75rem;
+  font-size: 2rem;
   font-weight: 700;
   color: #3b82f6;
 }
 
 .customers-page__ticket-expiry {
-  font-size: 0.875rem;
+  font-size: 1rem;
   color: #6b7280;
 }
 
@@ -508,7 +508,7 @@
   display: inline-block;
   padding: 0.5rem 1rem;
   border-radius: 9999px;
-  font-size: 0.875rem;
+  font-size: 1rem;
   font-weight: 600;
 }
 
@@ -548,20 +548,20 @@
 
 .customers-page__coupon-icon {
   color: #3b82f6;
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.75rem;
+  height: 1.75rem;
   flex-shrink: 0;
 }
 
 .customers-page__coupon-name {
-  font-size: 1rem;
+  font-size: 1.125rem;
   font-weight: 600;
   color: #111827;
   margin-bottom: 0.25rem;
 }
 
 .customers-page__coupon-date {
-  font-size: 0.875rem;
+  font-size: 1rem;
   color: #6b7280;
 }
 
@@ -575,7 +575,7 @@
   background: #f9fafb;
   padding: 1rem 1.25rem;
   text-align: left;
-  font-size: 0.875rem;
+  font-size: 1rem;
   font-weight: 600;
   color: #6b7280;
   text-transform: uppercase;
@@ -585,7 +585,7 @@
 
 .customers-page__history-table td {
   padding: 1.25rem;
-  font-size: 1rem;
+  font-size: 1.125rem;
   border-bottom: 1px solid #f3f4f6;
 }
 
@@ -613,7 +613,7 @@
 .customers-page__history-amount {
   color: #111827;
   font-weight: 700;
-  font-size: 1.125rem;
+  font-size: 1.25rem;
 }
 
 /* 空状態 */
@@ -632,89 +632,7 @@
 
 .customers-page__empty-state p {
   margin: 0;
-  font-size: 1rem;
-}
-
-.customers-page__coupon-icon {
-  color: #3b82f6;
-}
-
-.customers-page__coupon-name {
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #111827;
-}
-
-.customers-page__coupon-date {
-  font-size: 0.75rem;
-  color: #6b7280;
-}
-
-/* 来店履歴テーブル */
-.customers-page__history-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.customers-page__history-table th {
-  background: #f9fafb;
-  padding: 0.75rem;
-  text-align: left;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #6b7280;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.customers-page__history-table td {
-  padding: 0.875rem 0.75rem;
-  font-size: 0.875rem;
-  border-bottom: 1px solid #f3f4f6;
-}
-
-.customers-page__history-table tr:last-child td {
-  border-bottom: none;
-}
-
-.customers-page__history-table tr:hover {
-  background: #f9fafb;
-}
-
-.customers-page__history-date {
-  color: #111827;
-  font-weight: 500;
-}
-
-.customers-page__history-service {
-  color: #374151;
-}
-
-.customers-page__history-staff {
-  color: #6b7280;
-}
-
-.customers-page__history-amount {
-  color: #111827;
-  font-weight: 600;
-}
-
-/* 空状態 */
-.customers-page__empty-state {
-  padding: 3rem;
-  text-align: center;
-  color: #6b7280;
-}
-
-.customers-page__empty-state svg {
-  color: #d1d5db;
-  margin: 0 auto 1rem;
-}
-
-.customers-page__empty-state p {
-  margin: 0;
-  font-size: 0.875rem;
+  font-size: 1.125rem;
 }
 
 /* レスポンシブ */

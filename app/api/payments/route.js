@@ -102,16 +102,16 @@ export async function POST(request) {
       ticket_id,
       coupon_id,
       limited_offer_id,
-      options = [], // [{ option_id, quantity, is_free }]
+      options = [],
       discount_amount = 0,
       payment_method = 'cash',
       cash_amount = 0,
       card_amount = 0,
       notes = '',
-      payment_amount = 0  // ★★★ 回数券の残金支払い額を追加 ★★★
+      payment_amount = 0,
+      related_payment_id = null
     } = body;
 
-    // バリデーション
     if (!customer_id || !staff_id) {
       return NextResponse.json(
         { success: false, error: '顧客とスタッフは必須です' },
@@ -121,7 +121,85 @@ export async function POST(request) {
 
     await connection.beginTransaction();
 
-    // サービス情報を取得(スナップショット用)
+    // ★★★ 残金支払い専用処理（notesに「残金支払い」が含まれる場合）★★★
+    if (notes && notes.includes('残金支払い') && payment_amount > 0) {
+      // 回数券情報を取得
+      const [ticketRows] = await connection.execute(
+        `SELECT 
+          tp.name as plan_name,
+          s.name as service_name
+        FROM customer_tickets ct
+        JOIN ticket_plans tp ON ct.plan_id = tp.plan_id
+        JOIN services s ON tp.service_id = s.service_id
+        WHERE ct.customer_ticket_id = ?`,
+        [ticket_id]
+      );
+
+      const ticketInfo = ticketRows.length > 0 ? ticketRows[0] : { plan_name: '回数券', service_name: '' };
+
+      // paymentsレコード作成（残金支払い専用）
+      const [result] = await connection.execute(
+        `INSERT INTO payments (
+          payment_id,
+          customer_id,
+          staff_id,
+          service_name,
+          service_price,
+          service_duration,
+          payment_type,
+          ticket_id,
+          service_subtotal,
+          options_total,
+          discount_amount,
+          payment_amount,
+          total_amount,
+          payment_method,
+          cash_amount,
+          card_amount,
+          notes,
+          related_payment_id
+        ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          customer_id,
+          staff_id,
+          `${ticketInfo.plan_name} 残金支払い`,
+          0,
+          0,
+          'ticket',
+          ticket_id,
+          0,
+          0,
+          0,
+          payment_amount,
+          payment_amount,
+          payment_method,
+          cash_amount,
+          card_amount,
+          notes,
+          related_payment_id
+        ]
+      );
+
+      const [paymentRow] = await connection.execute(
+        `SELECT payment_id FROM payments 
+         WHERE customer_id = ? AND staff_id = ? 
+         ORDER BY created_at DESC LIMIT 1`,
+        [customer_id, staff_id]
+      );
+
+      await connection.commit();
+
+      return NextResponse.json({
+        success: true,
+        message: '残金支払いを登録しました',
+        data: {
+          payment_id: paymentRow[0].payment_id,
+          total_amount: payment_amount
+        }
+      });
+    }
+
+    // ★★★ 以下は通常の施術会計処理（既存コード） ★★★
     let serviceData = { name: '', price: 0, duration: 0 };
     if (service_id) {
       const [serviceRows] = await connection.execute(
@@ -137,7 +215,6 @@ export async function POST(request) {
       }
     }
 
-    // 回数券使用の場合、回数券情報を取得
     if (payment_type === 'ticket' && ticket_id) {
       const [ticketRows] = await connection.execute(
         `SELECT 
@@ -153,18 +230,16 @@ export async function POST(request) {
       );
 
       if (ticketRows.length > 0) {
-        // サービス情報がない場合は回数券のサービス情報を使用
         if (!service_id) {
           serviceData = {
             name: ticketRows[0].service_name,
-            price: 0, // 回数券使用なので施術自体は0円
+            price: 0,
             duration: ticketRows[0].service_duration
           };
         }
       }
     }
 
-    // オプション合計を計算
     let optionsTotal = 0;
     const optionDetails = [];
 
@@ -191,21 +266,9 @@ export async function POST(request) {
       }
     }
 
-    // 合計金額計算
     const serviceSubtotal = serviceData.price;
-    // ★★★ 回数券の残金支払いも合計に含める ★★★
-    let totalAmount;
-    if (payment_type === 'ticket' && payment_amount > 0) {
-      // 残金支払いの場合は、実際に支払った金額
-      totalAmount = payment_method === 'mixed'
-        ? (parseInt(cash_amount) || 0) + (parseInt(card_amount) || 0)
-        : (payment_method === 'cash' ? parseInt(cash_amount) || 0 : parseInt(card_amount) || 0);
-    } else {
-      // 通常の計算
-      totalAmount = serviceSubtotal + optionsTotal - discount_amount;
-    }
+    const totalAmount = serviceSubtotal + optionsTotal - discount_amount;
 
-    // お会計レコード作成
     const [result] = await connection.execute(
       `INSERT INTO payments (
         payment_id,
@@ -228,8 +291,9 @@ export async function POST(request) {
         payment_method,
         cash_amount,
         card_amount,
-        notes
-      ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        notes,
+        related_payment_id
+      ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         customer_id,
         booking_id || null,
@@ -246,15 +310,15 @@ export async function POST(request) {
         optionsTotal,
         discount_amount,
         payment_amount,
-        totalAmount,  // ★★★ 残金支払いを含めた合計 ★★★
+        totalAmount,
         payment_method,
         cash_amount,
         card_amount,
-        notes
+        notes,
+        related_payment_id
       ]
     );
 
-    // 挿入されたpayment_idを取得
     const [paymentRow] = await connection.execute(
       `SELECT payment_id FROM payments 
        WHERE customer_id = ? AND staff_id = ? 
@@ -263,7 +327,6 @@ export async function POST(request) {
     );
     const paymentId = paymentRow[0].payment_id;
 
-    // オプション詳細を登録
     for (const opt of optionDetails) {
       await connection.execute(
         `INSERT INTO payment_options (
@@ -290,7 +353,6 @@ export async function POST(request) {
       );
     }
 
-    // 回数券使用の場合は残り回数を減らす
     if (ticket_id) {
       await connection.execute(
         `UPDATE customer_tickets 
@@ -300,7 +362,6 @@ export async function POST(request) {
       );
     }
 
-    // 予約のステータスを完了に更新
     if (booking_id) {
       await connection.execute(
         `UPDATE bookings SET status = 'completed' WHERE booking_id = ?`,

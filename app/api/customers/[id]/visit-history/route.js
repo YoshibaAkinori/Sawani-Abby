@@ -8,7 +8,6 @@ export async function GET(request, { params }) {
     const { id: customerId } = await params;
     const connection = await pool.getConnection();
 
-    // 親レコード（related_payment_id IS NULL）のみ取得
     const [payments] = await connection.query(`
       SELECT 
         p.payment_id,
@@ -38,20 +37,40 @@ export async function GET(request, { params }) {
     const visitHistory = [];
 
     for (const payment of payments) {
-      // 子レコード（この payment に紐づく回数券購入・初回使用）を取得
       const [childPayments] = await connection.query(`
         SELECT 
           payment_id,
           service_name,
           total_amount,
           notes,
-          ticket_id
+          ticket_id,
+          payment_type,
+          payment_amount
         FROM payments
         WHERE related_payment_id = ?
         ORDER BY payment_date ASC
       `, [payment.payment_id]);
 
-      // オプション情報取得
+      // 孫レコードも取得
+      const allChildPayments = [...childPayments];
+      for (const child of childPayments) {
+        const [grandChildren] = await connection.query(`
+          SELECT 
+            payment_id,
+            service_name,
+            total_amount,
+            notes,
+            ticket_id,
+            payment_type,
+            payment_amount
+          FROM payments
+          WHERE related_payment_id = ?
+          ORDER BY payment_date ASC
+        `, [child.payment_id]);
+        
+        allChildPayments.push(...grandChildren);
+      }
+
       const [options] = await connection.query(`
         SELECT 
           option_name,
@@ -64,25 +83,27 @@ export async function GET(request, { params }) {
       let serviceDisplay = payment.service_name;
       let detailInfo = null;
       let ticketPurchases = [];
-      let totalAmount = payment.total_amount; // 親の金額から開始
+      let ticketUses = [];
+      let totalAmount = payment.total_amount;
 
-      // 回数券ごとに初回使用があるかをマップで管理
-      const immediateUseMap = new Map(); // ticket_id -> boolean
+      // ★親レコード自体の残金支払い額を加算
+      if (payment.payment_amount > 0) {
+        totalAmount += payment.payment_amount;
+      }
 
-      // まず初回使用レコードをチェック（子レコードから）
-      for (const child of childPayments) {
+      const immediateUseMap = new Map();
+
+      for (const child of allChildPayments) {
         if (child.notes && child.notes.includes('回数券購入時の初回使用') && child.ticket_id) {
           immediateUseMap.set(child.ticket_id, true);
         }
       }
 
-      // 親レコード自体が回数券購入の場合も処理
       const isParentTicketPurchase = payment.payment_type === 'ticket' &&
         payment.service_name &&
         payment.service_name.includes('回数券購入');
 
       if (isParentTicketPurchase && payment.ticket_id) {
-        // 親が回数券購入の場合、その回数券情報を取得
         const [ticketInfo] = await connection.query(`
           SELECT 
             tp.name as plan_name,
@@ -95,9 +116,7 @@ export async function GET(request, { params }) {
         `, [payment.ticket_id]);
 
         if (ticketInfo.length > 0) {
-          // この回数券に初回使用があるかチェック
           const hasImmediateUse = immediateUseMap.get(payment.ticket_id) || false;
-
           ticketPurchases.push({
             plan_name: ticketInfo[0].plan_name,
             service_name: ticketInfo[0].service_name,
@@ -108,14 +127,15 @@ export async function GET(request, { params }) {
         }
       }
 
-      // 子レコードを解析
-      for (const child of childPayments) {
+      const isParentTicketUse = payment.payment_type === 'ticket' && 
+        payment.ticket_id && 
+        !isParentTicketPurchase;
+
+      for (const child of allChildPayments) {
         if (child.notes && child.notes.includes('回数券購入時の初回使用')) {
-          // 初回使用レコード（金額は0なので加算不要）
           continue;
         } else if (child.service_name && child.service_name.includes('回数券購入')) {
-          // 回数券購入レコード（通常メニューと一緒に購入した場合）
-          totalAmount += child.total_amount; // 回数券の金額を加算
+          totalAmount += child.total_amount;
 
           const [ticketInfo] = await connection.query(`
             SELECT 
@@ -129,9 +149,7 @@ export async function GET(request, { params }) {
           `, [child.ticket_id]);
 
           if (ticketInfo.length > 0) {
-            // この回数券に初回使用があるかチェック
             const hasImmediateUse = immediateUseMap.get(child.ticket_id) || false;
-
             ticketPurchases.push({
               plan_name: ticketInfo[0].plan_name,
               service_name: ticketInfo[0].service_name,
@@ -140,32 +158,53 @@ export async function GET(request, { params }) {
               is_immediate_use: hasImmediateUse
             });
           }
+        } else if (child.payment_type === 'ticket' && child.ticket_id) {
+          // ★子レコードの残金支払い額も加算
+          if (child.payment_amount > 0) {
+            totalAmount += child.payment_amount;
+          }
+
+          const [ticketInfo] = await connection.query(`
+            SELECT 
+              tp.name as plan_name
+            FROM customer_tickets ct
+            JOIN ticket_plans tp ON ct.plan_id = tp.plan_id
+            WHERE ct.customer_ticket_id = ?
+          `, [child.ticket_id]);
+
+          if (ticketInfo.length > 0) {
+            ticketUses.push({
+              plan_name: ticketInfo[0].plan_name,
+              remaining_payment: child.payment_amount || 0
+            });
+          }
         }
       }
 
-      // payment_type に応じて詳細情報を取得
-      // app/api/customers/[id]/visit-history/route.js の該当部分を修正
-
-      // payment_type に応じて詳細情報を取得
-      if (payment.payment_type === 'ticket' && payment.ticket_id && !isParentTicketPurchase) {
-        // 回数券使用（購入ではない場合）
+      if (isParentTicketUse) {
         const [ticketInfo] = await connection.query(`
-    SELECT 
-      tp.name as plan_name
-    FROM customer_tickets ct
-    JOIN ticket_plans tp ON ct.plan_id = tp.plan_id
-    WHERE ct.customer_ticket_id = ?
-  `, [payment.ticket_id]);
+          SELECT 
+            tp.name as plan_name
+          FROM customer_tickets ct
+          JOIN ticket_plans tp ON ct.plan_id = tp.plan_id
+          WHERE ct.customer_ticket_id = ?
+        `, [payment.ticket_id]);
 
         if (ticketInfo.length > 0) {
-          detailInfo = {
-            type: 'ticket_use',
+          ticketUses.unshift({
             plan_name: ticketInfo[0].plan_name,
-            remaining_payment: payment.payment_amount || 0 // DBから取得
-          };
+            remaining_payment: payment.payment_amount || 0
+          });
         }
+      }
+
+      if (ticketUses.length > 0) {
+        detailInfo = {
+          type: 'ticket_use',
+          ticket_uses: ticketUses,
+          total_remaining_payment: ticketUses.reduce((sum, t) => sum + (t.remaining_payment || 0), 0)
+        };
       } else if (payment.payment_type === 'coupon' && payment.coupon_id) {
-        // クーポン情報
         const [couponInfo] = await connection.query(`
           SELECT 
             c.name as coupon_name,
@@ -182,7 +221,6 @@ export async function GET(request, { params }) {
           };
         }
       } else if (payment.payment_type === 'limited_offer' && payment.limited_offer_id) {
-        // 期間限定オファー情報
         const [offerInfo] = await connection.query(`
           SELECT 
             name,
@@ -205,12 +243,12 @@ export async function GET(request, { params }) {
       visitHistory.push({
         payment_id: payment.payment_id,
         date: payment.date,
-        service: isParentTicketPurchase ? '' : serviceDisplay, // 回数券購入のみの場合はサービス名を空に
+        service: isParentTicketPurchase ? '' : serviceDisplay,
         price: payment.service_price,
         staff: payment.staff_name || '不明',
         payment_type: payment.payment_type,
         payment_method: payment.payment_method,
-        amount: totalAmount, // 合計金額
+        amount: totalAmount,
         options: options,
         detail_info: detailInfo,
         ticket_purchases: ticketPurchases
