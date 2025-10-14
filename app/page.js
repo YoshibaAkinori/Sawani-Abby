@@ -135,6 +135,8 @@ const SalonBoard = () => {
     switch (serviceType) {
       case 'フェイシャル': return 'salon-board__booking--facial';
       case 'ボディトリート': return 'salon-board__booking--body-treatment';
+      case 'クーポン': return 'salon-board__booking--coupon';
+      case '期間限定': return 'salon-board__booking--limited';
       default: return 'salon-board__booking--other';
     }
   };
@@ -377,8 +379,8 @@ const SalonBoard = () => {
                               <div
                                 key={time}
                                 className={`salon-board__grid-line ${index % 2 === 0
-                                    ? 'salon-board__grid-line--even'
-                                    : 'salon-board__grid-line--odd'
+                                  ? 'salon-board__grid-line--even'
+                                  : 'salon-board__grid-line--odd'
                                   }`}
                               ></div>
                             ))}
@@ -475,19 +477,47 @@ const SalonBoard = () => {
                         <span className="salon-board__stat-value">{bookings.filter(b => b.type === 'booking').length}件</span>
                       </div>
                       <div className="salon-board__stat-item">
-                        <span className="salon-board__stat-label">本日の予定</span>
-                        <span className="salon-board__stat-value">{bookings.filter(b => b.type === 'schedule').length}件</span>
-                      </div>
-                      <div className="salon-board__stat-item">
-                        <span className="salon-board__stat-label">フェイシャル</span>
+                        <span className="salon-board__stat-label">
+                          <span className="salon-board__stat-label-with-icon">
+                            <span className="salon-board__stat-category-indicator salon-board__stat-category-indicator--facial"></span>
+                            フェイシャル
+                          </span>
+                        </span>
                         <span className="salon-board__stat-value">
                           {bookings.filter(b => b.serviceType === 'フェイシャル').length}件
                         </span>
                       </div>
                       <div className="salon-board__stat-item">
-                        <span className="salon-board__stat-label">ボディトリート</span>
+                        <span className="salon-board__stat-label">
+                          <span className="salon-board__stat-label-with-icon">
+                            <span className="salon-board__stat-category-indicator salon-board__stat-category-indicator--body"></span>
+                            ボディトリート
+                          </span>
+                        </span>
                         <span className="salon-board__stat-value">
                           {bookings.filter(b => b.serviceType === 'ボディトリート').length}件
+                        </span>
+                      </div>
+                      <div className="salon-board__stat-item">
+                        <span className="salon-board__stat-label">
+                          <span className="salon-board__stat-label-with-icon">
+                            <span className="salon-board__stat-category-indicator salon-board__stat-category-indicator--coupon"></span>
+                            クーポン
+                          </span>
+                        </span>
+                        <span className="salon-board__stat-value">
+                          {bookings.filter(b => b.serviceType === 'クーポン').length}件
+                        </span>
+                      </div>
+                      <div className="salon-board__stat-item">
+                        <span className="salon-board__stat-label">
+                          <span className="salon-board__stat-label-with-icon">
+                            <span className="salon-board__stat-category-indicator salon-board__stat-category-indicator--limited"></span>
+                            期間限定
+                          </span>
+                        </span>
+                        <span className="salon-board__stat-value">
+                          {bookings.filter(b => b.serviceType === '期間限定').length}件
                         </span>
                       </div>
                     </div>

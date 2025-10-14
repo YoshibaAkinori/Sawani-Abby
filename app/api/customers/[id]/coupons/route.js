@@ -16,10 +16,9 @@ export async function GET(request, { params }) {
         c.name as coupon_name,
         c.description,
         cu.total_discount_amount,
-        p.payment_id
+        cu.payment_id
       FROM coupon_usage cu
       JOIN coupons c ON cu.coupon_id = c.coupon_id
-      LEFT JOIN payments p ON cu.booking_id = p.booking_id
       WHERE cu.customer_id = ?
       ORDER BY cu.used_at DESC`,
       [customerId]

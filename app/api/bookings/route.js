@@ -11,46 +11,63 @@ export async function GET(request) {
     const date = searchParams.get('date');
     const staffId = searchParams.get('staffId');
     const customerId = searchParams.get('customerId');
-    const bookingId = searchParams.get('id'); // 単一予約ID取得用
+    const bookingId = searchParams.get('id');
 
     let query = `
-      SELECT 
-        b.booking_id,
-        b.customer_id,
-        b.staff_id,
-        b.service_id,
-        b.customer_ticket_id,
-        b.date,
-        b.start_time,
-        b.end_time,
-        b.bed_id,
-        b.type,
-        b.status,
-        b.notes,
-        b.created_at,
-        c.last_name,
-        c.first_name,
-        s.name as staff_name,
-        s.color as staff_color,
-        -- 直接のサービス情報（通常予約）
-        sv_direct.name as direct_service_name,
-        sv_direct.category as direct_service_category,
-        -- 回数券情報
-        tp.name as ticket_plan_name,
-        sv_ticket.category as ticket_service_category,
-        -- 表示用の名前（回数券の場合はプラン名、通常はサービス名）
-        COALESCE(tp.name, sv_direct.name) as service_name,
-        -- カテゴリ（直接 or 回数券経由）
-        COALESCE(sv_direct.category, sv_ticket.category) as service_category
-      FROM bookings b
-      LEFT JOIN customers c ON b.customer_id = c.customer_id
-      LEFT JOIN staff s ON b.staff_id = s.staff_id
-      LEFT JOIN services sv_direct ON b.service_id = sv_direct.service_id
-      LEFT JOIN customer_tickets ct ON b.customer_ticket_id = ct.customer_ticket_id
-      LEFT JOIN ticket_plans tp ON ct.plan_id = tp.plan_id
-      LEFT JOIN services sv_ticket ON tp.service_id = sv_ticket.service_id
-      WHERE 1=1
-    `;
+  SELECT 
+    b.booking_id,
+    b.customer_id,
+    b.staff_id,
+    b.service_id,
+    b.customer_ticket_id,
+    b.coupon_id,
+    b.limited_offer_id,
+    b.date,
+    b.start_time,
+    b.end_time,
+    b.bed_id,
+    b.type,
+    b.status,
+    b.notes,
+    b.created_at,
+    c.last_name,
+    c.first_name,
+    s.name as staff_name,
+    s.color as staff_color,
+    -- 直接のサービス情報（通常予約）
+    sv_direct.name as direct_service_name,
+    sv_direct.category as direct_service_category,
+    -- 回数券情報
+    tp.name as ticket_plan_name,
+    sv_ticket.category as ticket_service_category,
+    -- クーポン情報
+    cp.name as coupon_name,
+    cp.description as coupon_description,
+    cp.total_price as coupon_price,
+    -- 期間限定オファー情報
+    lo.name as limited_offer_name,
+    lo.description as limited_offer_description,
+    lo.special_price as limited_offer_price,
+    lo.total_sessions as limited_offer_sessions,
+    -- 表示用の名前（優先順位: クーポン > 期間限定 > 回数券 > 通常サービス）
+    COALESCE(cp.name, lo.name, tp.name, sv_direct.name) as service_name,
+    -- カテゴリ（優先順位: クーポン > 期間限定 > 回数券 > 通常サービス）
+    CASE
+      WHEN cp.coupon_id IS NOT NULL THEN 'クーポン'
+      WHEN lo.offer_id IS NOT NULL THEN '期間限定'
+      ELSE COALESCE(sv_direct.category, sv_ticket.category)
+    END as service_category
+  FROM bookings b
+  LEFT JOIN customers c ON b.customer_id = c.customer_id
+  LEFT JOIN staff s ON b.staff_id = s.staff_id
+  LEFT JOIN services sv_direct ON b.service_id = sv_direct.service_id
+  LEFT JOIN customer_tickets ct ON b.customer_ticket_id = ct.customer_ticket_id
+  LEFT JOIN ticket_plans tp ON ct.plan_id = tp.plan_id
+  LEFT JOIN services sv_ticket ON tp.service_id = sv_ticket.service_id
+  LEFT JOIN coupons cp ON b.coupon_id = cp.coupon_id
+  LEFT JOIN limited_offers lo ON b.limited_offer_id = lo.offer_id
+  WHERE 1=1
+`;
 
     const params = [];
 
@@ -211,6 +228,8 @@ export async function POST(request) {
         staff_id,
         service_id,
         customer_ticket_id,
+        coupon_id,
+        limited_offer_id,
         date,
         start_time,
         end_time,
@@ -218,16 +237,18 @@ export async function POST(request) {
         type,
         status,
         notes
-      ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         finalCustomerId,
         staff_id,
-        service_id ?? null,         // undefinedの場合はnullを渡す
-        customer_ticket_id ?? null, // undefinedの場合はnullを渡す
+        service_id ?? null,
+        customer_ticket_id ?? null,
+        coupon_id ?? null,           // ★追加
+        limited_offer_id ?? null,    // ★追加
         date,
         start_time,
         end_time,
-        bed_id ?? null,             // undefinedの場合はnullを渡す
+        bed_id ?? null,
         type,
         status,
         notes

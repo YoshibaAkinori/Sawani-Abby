@@ -85,7 +85,6 @@ export async function GET(request) {
 }
 
 // お会計新規登録
-
 export async function POST(request) {
   const pool = await getConnection();
   const connection = await pool.getConnection();
@@ -121,7 +120,7 @@ export async function POST(request) {
 
     await connection.beginTransaction();
 
-    // ★★★ 残金支払い専用処理（notesに「残金支払い」が含まれる場合）★★★
+    // ★★★ 残金支払い専用処理(notesに「残金支払い」が含まれる場合) ★★★
     if (notes && notes.includes('残金支払い') && payment_amount > 0) {
       // 回数券情報を取得
       const [ticketRows] = await connection.execute(
@@ -137,7 +136,7 @@ export async function POST(request) {
 
       const ticketInfo = ticketRows.length > 0 ? ticketRows[0] : { plan_name: '回数券', service_name: '' };
 
-      // paymentsレコード作成（残金支払い専用）
+      // paymentsレコード作成(残金支払い専用)
       const [result] = await connection.execute(
         `INSERT INTO payments (
           payment_id,
@@ -199,9 +198,11 @@ export async function POST(request) {
       });
     }
 
-    // ★★★ 以下は通常の施術会計処理（既存コード） ★★★
+    // ★★★ 以下は通常の施術会計処理 ★★★
     let serviceData = { name: '', price: 0, duration: 0 };
-    if (service_id) {
+    
+    // 通常サービスの場合
+    if (service_id && payment_type === 'normal') {
       const [serviceRows] = await connection.execute(
         'SELECT name, price, duration_minutes FROM services WHERE service_id = ?',
         [service_id]
@@ -215,6 +216,37 @@ export async function POST(request) {
       }
     }
 
+    // ★★★ クーポンの場合の処理 ★★★
+    if (payment_type === 'coupon' && coupon_id) {
+      const [couponRows] = await connection.execute(
+        'SELECT name, total_price FROM coupons WHERE coupon_id = ?',
+        [coupon_id]
+      );
+      if (couponRows.length > 0) {
+        serviceData = {
+          name: couponRows[0].name,
+          price: couponRows[0].total_price,
+          duration: 0
+        };
+      }
+    }
+
+    // ★★★ 期間限定オファーの場合の処理 ★★★
+    if (payment_type === 'limited' && limited_offer_id) {
+      const [offerRows] = await connection.execute(
+        'SELECT name, special_price, description FROM limited_offers WHERE offer_id = ?',
+        [limited_offer_id]
+      );
+      if (offerRows.length > 0) {
+        serviceData = {
+          name: offerRows[0].name,
+          price: offerRows[0].special_price,
+          duration: 0
+        };
+      }
+    }
+
+    // ★★★ 回数券使用の場合の処理 ★★★
     if (payment_type === 'ticket' && ticket_id) {
       const [ticketRows] = await connection.execute(
         `SELECT 
@@ -230,16 +262,15 @@ export async function POST(request) {
       );
 
       if (ticketRows.length > 0) {
-        if (!service_id) {
-          serviceData = {
-            name: ticketRows[0].service_name,
-            price: 0,
-            duration: ticketRows[0].service_duration
-          };
-        }
+        serviceData = {
+          name: ticketRows[0].service_name,
+          price: 0, // 回数券使用なので0円
+          duration: ticketRows[0].service_duration
+        };
       }
     }
 
+    // ★★★ オプション処理 ★★★
     let optionsTotal = 0;
     const optionDetails = [];
 
@@ -266,9 +297,17 @@ export async function POST(request) {
       }
     }
 
+    // ★★★ 金額計算 ★★★
     const serviceSubtotal = serviceData.price;
     const totalAmount = serviceSubtotal + optionsTotal - discount_amount;
 
+    // ★★★ payment_typeを正規化（ENUMに合わせる） ★★★
+    let normalizedPaymentType = payment_type;
+    if (payment_type === 'limited') {
+      normalizedPaymentType = 'limited_offer';
+    }
+
+    // ★★★ payments テーブルに登録 ★★★
     const [result] = await connection.execute(
       `INSERT INTO payments (
         payment_id,
@@ -302,7 +341,7 @@ export async function POST(request) {
         serviceData.name,
         serviceData.price,
         serviceData.duration,
-        payment_type,
+        normalizedPaymentType, // ★ 正規化した値を使用
         ticket_id || null,
         coupon_id || null,
         limited_offer_id || null,
@@ -327,6 +366,7 @@ export async function POST(request) {
     );
     const paymentId = paymentRow[0].payment_id;
 
+    // ★★★ オプション登録 ★★★
     for (const opt of optionDetails) {
       await connection.execute(
         `INSERT INTO payment_options (
@@ -353,6 +393,20 @@ export async function POST(request) {
       );
     }
 
+    // ★★★ クーポン使用処理 ★★★
+    if (payment_type === 'coupon' && coupon_id) {
+      await connection.execute(
+        `INSERT INTO coupon_usage (usage_id, coupon_id, customer_id, payment_id, total_discount_amount) VALUES (UUID(), ?, ?, ?, ?)`,
+        [coupon_id, customer_id, paymentId, discount_amount]
+      );
+
+      await connection.execute(
+        `UPDATE coupons SET used_count = used_count + 1 WHERE coupon_id = ?`,
+        [coupon_id]
+      );
+    }
+
+    // ★★★ 回数券使用処理 ★★★
     if (ticket_id) {
       await connection.execute(
         `UPDATE customer_tickets 
@@ -362,6 +416,7 @@ export async function POST(request) {
       );
     }
 
+    // ★★★ 予約ステータス更新 ★★★
     if (booking_id) {
       await connection.execute(
         `UPDATE bookings SET status = 'completed' WHERE booking_id = ?`,

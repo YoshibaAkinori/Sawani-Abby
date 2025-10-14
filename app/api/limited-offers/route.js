@@ -9,21 +9,29 @@ export async function GET(request) {
 
     const [rows] = await pool.execute(
       `SELECT 
-        offer_id,
-        name,
-        description,
-        service_name,
-        total_sessions,
-        special_price,
-        validity_days,
-        sale_end_date,
-        max_sales,
-        current_sales,
-        is_active,
-        created_at,
-        updated_at
-      FROM limited_ticket_offers
-      ORDER BY created_at DESC`
+       lo.offer_id,
+       lo.offer_type,
+       lo.name,
+       lo.description,
+       lo.category,
+       lo.base_plan_id,
+       lo.duration_minutes,
+       lo.original_price,
+       lo.special_price,
+       lo.total_sessions,
+       lo.validity_days,
+       lo.start_date,
+       lo.end_date,
+       lo.max_bookings,
+       lo.current_bookings,
+       lo.is_active,
+       lo.created_at,
+       tp.name as base_plan_name,
+       s.name as base_service_name
+      FROM limited_offers lo
+      LEFT JOIN ticket_plans tp ON lo.base_plan_id = tp.plan_id
+      LEFT JOIN services s ON tp.service_id = s.service_id
+      ORDER BY lo.created_at DESC`
     );
 
     return NextResponse.json({
@@ -46,48 +54,79 @@ export async function POST(request) {
     const body = await request.json();
 
     const {
+      offer_type, // 'service' or 'ticket'
       name,
       description,
-      service_name,
-      total_sessions = 5,
+      category,
+      base_plan_id, // 既存回数券ベースの場合
+      duration_minutes,
+      original_price,
       special_price,
+      total_sessions,
       validity_days = 180,
-      sale_end_date,
+      start_date,
+      end_date,
+      max_bookings,
       max_sales,
       is_active = true
     } = body;
 
     // バリデーション
-    if (!name || !service_name || !special_price) {
+    if (!limitedForm.name || !limitedForm.special_price) {
+      setError('必須項目を入力してください');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    if (limitedForm.creation_mode === 'existing' && !limitedForm.base_plan_id) {
+      setError('ベース回数券プランを選択してください');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    if (offer_type === 'ticket' && !special_price) {
       return NextResponse.json(
-        { success: false, error: '必須項目を入力してください' },
+        { success: false, error: '回数券の場合は特別価格が必要です' },
         { status: 400 }
       );
     }
 
     // 挿入
     await pool.execute(
-      `INSERT INTO limited_ticket_offers (
+      `INSERT INTO limited_offers (
         offer_id,
+        offer_type,
         name,
         description,
-        service_name,
-        total_sessions,
+        category,
+        base_plan_id,
+        duration_minutes,
+        original_price,
         special_price,
+        total_sessions,
         validity_days,
-        sale_end_date,
+        start_date,
+        end_date,
+        max_bookings,
+        current_bookings,
         max_sales,
         current_sales,
         is_active
-      ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+      ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, 0, ?)`,
       [
+        offer_type,
         name,
         description || '',
-        service_name,
-        total_sessions,
-        special_price,
+        category || null,
+        base_plan_id || null,
+        duration_minutes || 0,
+        original_price || null,
+        special_price || null,
+        total_sessions || null,
         validity_days,
-        sale_end_date || null,
+        start_date || null,
+        end_date || null,
+        max_bookings || null,
         max_sales || null,
         is_active
       ]
@@ -100,7 +139,7 @@ export async function POST(request) {
   } catch (error) {
     console.error('期間限定オファー登録エラー:', error);
     return NextResponse.json(
-      { success: false, error: 'データベースエラー' },
+      { success: false, error: 'データベースエラー: ' + error.message },
       { status: 500 }
     );
   }
@@ -114,19 +153,25 @@ export async function PUT(request) {
 
     const {
       offer_id,
+      offer_type,
       name,
       description,
-      service_name,
-      total_sessions,
+      category,
+      base_plan_id,
+      duration_minutes,
+      original_price,
       special_price,
+      total_sessions,
       validity_days,
-      sale_end_date,
+      start_date,
+      end_date,
+      max_bookings,
       max_sales,
       is_active
     } = body;
 
     // バリデーション
-    if (!offer_id || !name || !service_name || !special_price) {
+    if (!offer_id || !name) {
       return NextResponse.json(
         { success: false, error: '必須項目を入力してください' },
         { status: 400 }
@@ -135,25 +180,37 @@ export async function PUT(request) {
 
     // 更新
     await pool.execute(
-      `UPDATE limited_ticket_offers 
-       SET name = ?, 
+      `UPDATE limited_offers 
+       SET offer_type = ?,
+           name = ?, 
            description = ?,
-           service_name = ?,
-           total_sessions = ?,
+           category = ?,
+           base_plan_id = ?,
+           duration_minutes = ?,
+           original_price = ?,
            special_price = ?,
+           total_sessions = ?,
            validity_days = ?,
-           sale_end_date = ?,
+           start_date = ?,
+           end_date = ?,
+           max_bookings = ?,
            max_sales = ?,
            is_active = ?
        WHERE offer_id = ?`,
       [
+        offer_type,
         name,
         description || '',
-        service_name,
-        total_sessions,
-        special_price,
+        category || null,
+        base_plan_id || null,
+        duration_minutes || 0,
+        original_price || null,
+        special_price || null,
+        total_sessions || null,
         validity_days,
-        sale_end_date || null,
+        start_date || null,
+        end_date || null,
+        max_bookings || null,
         max_sales || null,
         is_active,
         offer_id
@@ -187,27 +244,32 @@ export async function DELETE(request) {
       );
     }
 
-    // 購入履歴があるかチェック
+    // 予約または購入履歴があるかチェック
+    const [bookings] = await pool.execute(
+      'SELECT COUNT(*) as count FROM bookings WHERE limited_ticket_id = ?',
+      [offerId]
+    );
+
     const [purchases] = await pool.execute(
       'SELECT COUNT(*) as count FROM limited_ticket_purchases WHERE offer_id = ?',
       [offerId]
     );
 
-    if (purchases[0].count > 0) {
-      // 購入履歴がある場合は無効化のみ
+    if (bookings[0].count > 0 || purchases[0].count > 0) {
+      // 使用履歴がある場合は無効化のみ
       await pool.execute(
-        'UPDATE limited_ticket_offers SET is_active = FALSE WHERE offer_id = ?',
+        'UPDATE limited_offers SET is_active = FALSE WHERE offer_id = ?',
         [offerId]
       );
       return NextResponse.json({
         success: true,
-        message: '購入履歴があるため無効化しました'
+        message: '使用履歴があるため無効化しました'
       });
     }
 
     // 削除実行
     await pool.execute(
-      'DELETE FROM limited_ticket_offers WHERE offer_id = ?',
+      'DELETE FROM limited_offers WHERE offer_id = ?',
       [offerId]
     );
 

@@ -11,6 +11,7 @@ export async function POST(request) {
     const {
       customer_id,
       plan_id,
+      purchase_price,
       payment_amount,
       payment_method,
       cash_amount = 0,
@@ -78,7 +79,7 @@ export async function POST(request) {
       purchaseDate.toISOString().split('T')[0],
       expiryDate.toISOString().split('T')[0],
       initialSessions,
-      fullPrice
+      purchase_price
     ]);
 
     // 5. ticket_payments レコード作成（初回支払い）

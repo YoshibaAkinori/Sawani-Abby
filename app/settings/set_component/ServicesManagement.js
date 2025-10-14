@@ -60,15 +60,22 @@ const ServicesManagement = () => {
     is_active: true
   });
 
-  // 期間限定フォームデータ（簡略化）
+  // 期間限定フォームデータ
   const [limitedForm, setLimitedForm] = useState({
+    offer_type: 'ticket', // 'service' or 'ticket'
+    creation_mode: 'existing', // 'existing' or 'new'
+    base_plan_id: '', // 既存回数券ベース
     name: '',
     description: '',
+    category: '',
     service_name: '',
-    total_sessions: 5,
-    special_price: '', // 販売価格のみ
+    duration_minutes: 0,
+    original_price: '',
+    total_sessions: 1,
+    special_price: '',
     validity_days: 180,
-    sale_end_date: '',
+    start_date: '',
+    end_date: '',
     max_sales: '',
     is_active: true
   });
@@ -263,6 +270,25 @@ const ServicesManagement = () => {
   // 期間限定フォーム入力処理
   const handleLimitedInputChange = (e) => {
     const { name, value, type, checked } = e.target;
+
+    // 既存回数券選択時の自動入力
+    if (name === 'base_plan_id' && value) {
+      const selectedPlan = ticketPlans.find(p => p.plan_id === value);
+      if (selectedPlan) {
+        setLimitedForm(prev => ({
+          ...prev,
+          base_plan_id: value,
+          name: `【期間限定】${selectedPlan.name}`,
+          service_name: selectedPlan.service_name,
+          total_sessions: selectedPlan.total_sessions,
+          original_price: selectedPlan.price,
+          special_price: '', // ユーザーが入力
+          validity_days: selectedPlan.validity_days
+        }));
+        return;
+      }
+    }
+
     setLimitedForm(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
@@ -663,20 +689,51 @@ const ServicesManagement = () => {
     }
   };
 
-  // 期間限定オファー追加（簡略化版）
+  // 期間限定オファー追加（拡張版）
   const handleAddLimitedOffer = async () => {
-    if (!limitedForm.name || !limitedForm.service_name || !limitedForm.special_price) {
+    // バリデーション
+    if (!limitedForm.name || !limitedForm.special_price) {
       setError('必須項目を入力してください');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    if (limitedForm.creation_mode === 'existing' && !limitedForm.base_plan_id) {
+      setError('ベース回数券プランを選択してください');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    if (limitedForm.creation_mode === 'new' && !limitedForm.service_name) {
+      setError('サービス名を入力してください');
       setTimeout(() => setError(''), 3000);
       return;
     }
 
     setIsLoading(true);
     try {
+      // APIに送信するデータを整形
+      const requestData = {
+        offer_type: 'ticket', // 回数券タイプ固定
+        name: limitedForm.name,
+        description: limitedForm.description,
+        category: limitedForm.category || null,
+        base_plan_id: limitedForm.creation_mode === 'existing' ? limitedForm.base_plan_id : null,
+        duration_minutes: limitedForm.duration_minutes || 0,
+        original_price: limitedForm.original_price || null,
+        special_price: Number(limitedForm.special_price),
+        total_sessions: Number(limitedForm.total_sessions),
+        validity_days: Number(limitedForm.validity_days),
+        start_date: limitedForm.start_date || null,
+        end_date: limitedForm.end_date || null,
+        max_sales: limitedForm.max_sales ? Number(limitedForm.max_sales) : null,
+        is_active: limitedForm.is_active
+      };
+
       const response = await fetch('/api/limited-offers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(limitedForm)
+        body: JSON.stringify(requestData)
       });
 
       if (response.ok) {
@@ -689,17 +746,7 @@ const ServicesManagement = () => {
         throw new Error(data.error || '登録に失敗しました');
       }
     } catch (err) {
-      // デモモード
-      const newOffer = {
-        offer_id: Date.now().toString(),
-        ...limitedForm,
-        special_price: Number(limitedForm.special_price),
-        price_per_session: Math.floor(Number(limitedForm.special_price) / limitedForm.total_sessions)
-      };
-      setLimitedOffers(prev => [...prev, newOffer]);
-      setSuccess('期間限定オファーを登録しました（ローカル保存）');
-      setShowLimitedForm(false);
-      resetLimitedForm();
+      setError(err.message);
     } finally {
       setIsLoading(false);
       setTimeout(() => { setSuccess(''); setError(''); }, 3000);
@@ -752,13 +799,20 @@ const ServicesManagement = () => {
 
   const resetLimitedForm = () => {
     setLimitedForm({
+      offer_type: 'ticket',
+      creation_mode: 'existing',
+      base_plan_id: '',
       name: '',
       description: '',
+      category: '',
       service_name: '',
-      total_sessions: 5,
+      duration_minutes: 0,
+      original_price: '',
+      total_sessions: 1,
       special_price: '',
       validity_days: 180,
-      sale_end_date: '',
+      start_date: '',
+      end_date: '',
       max_sales: '',
       is_active: true
     });
@@ -1732,7 +1786,7 @@ const ServicesManagement = () => {
                   <th>自由オプション</th>
                   <th>パック価格</th>
                   <th>有効期限</th>
-                  <th>使用状況</th>
+                  <th>使用状況/上限</th>
                   <th>ステータス</th>
                   <th>操作</th>
                 </tr>
@@ -1804,6 +1858,8 @@ const ServicesManagement = () => {
       )}
 
       {/* 期間限定タブ */}
+      {/* 新規期間限定追加フォーム */}
+      {/* 期間限定タブ */}
       {activeTab === 'limited' && (
         <div className="services-content">
           <div className="services-header">
@@ -1824,7 +1880,47 @@ const ServicesManagement = () => {
           {showLimitedForm && (
             <div className="services-form-card">
               <h4>新規期間限定オファー登録</h4>
+
+              {/* 作成モード選択タブ */}
+              <div className="services-creation-mode-tabs">
+                <button
+                  type="button"
+                  className={`services-mode-tab ${limitedForm.creation_mode === 'existing' ? 'services-mode-tab--active' : ''}`}
+                  onClick={() => setLimitedForm(prev => ({ ...prev, creation_mode: 'existing', base_plan_id: '' }))}
+                >
+                  <Package size={16} />
+                  既存回数券ベース
+                </button>
+                <button
+                  type="button"
+                  className={`services-mode-tab ${limitedForm.creation_mode === 'new' ? 'services-mode-tab--active' : ''}`}
+                  onClick={() => setLimitedForm(prev => ({ ...prev, creation_mode: 'new', base_plan_id: '' }))}
+                >
+                  <Plus size={16} />
+                  新規作成
+                </button>
+              </div>
+
               <div className="services-form-grid">
+                {/* 既存回数券ベースの場合 */}
+                {limitedForm.creation_mode === 'existing' && (
+                  <div className="services-form-group services-form-group--full">
+                    <label>ベース回数券プラン *</label>
+                    <select
+                      name="base_plan_id"
+                      value={limitedForm.base_plan_id}
+                      onChange={handleLimitedInputChange}
+                    >
+                      <option value="">選択してください</option>
+                      {ticketPlans.map(plan => (
+                        <option key={plan.plan_id} value={plan.plan_id}>
+                          {plan.name} ({plan.total_sessions}回 - ¥{plan.price.toLocaleString()})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
                 <div className="services-form-group services-form-group--full">
                   <label>オファー名 *</label>
                   <input
@@ -1836,33 +1932,100 @@ const ServicesManagement = () => {
                   />
                 </div>
 
-                <div className="services-form-group">
-                  <label>サービス名 *</label>
-                  <input
-                    type="text"
-                    name="service_name"
-                    value={limitedForm.service_name}
-                    onChange={handleLimitedInputChange}
-                    placeholder="例: 上半身ケア+小顔コルギ50分"
-                  />
-                </div>
+                {/* 新規作成の場合のみ表示 */}
+                {limitedForm.creation_mode === 'new' && (
+                  <>
+                    <div className="services-form-group">
+                      <label>カテゴリ</label>
+                      <select
+                        name="category"
+                        value={limitedForm.category}
+                        onChange={handleLimitedInputChange}
+                      >
+                        <option value="">選択してください</option>
+                        <option value="フェイシャル">フェイシャル</option>
+                        <option value="ボディトリート">ボディトリート</option>
+                        <option value="その他">その他</option>
+                      </select>
+                    </div>
+
+                    <div className="services-form-group">
+                      <label>施術時間(分)</label>
+                      <input
+                        type="number"
+                        name="duration_minutes"
+                        value={limitedForm.duration_minutes}
+                        onChange={handleLimitedInputChange}
+                        min="0"
+                        step="5"
+                      />
+                    </div>
+
+                    <div className="services-form-group">
+                      <label>回数 *</label>
+                      <select
+                        name="total_sessions"
+                        value={limitedForm.total_sessions}
+                        onChange={handleLimitedInputChange}
+                      >
+                        <option value="1">1回</option>
+                        <option value="3">3回</option>
+                        <option value="5">5回</option>
+                        <option value="8">8回</option>
+                        <option value="10">10回</option>
+                      </select>
+                    </div>
+
+                    <div className="services-form-group">
+                      <label>通常価格(参考)</label>
+                      <input
+                        type="number"
+                        name="original_price"
+                        value={limitedForm.original_price}
+                        onChange={handleLimitedInputChange}
+                        placeholder="50000"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {/* 既存回数券ベースの場合に表示 */}
+                {limitedForm.creation_mode === 'existing' && limitedForm.base_plan_id && (
+                  <>
+                    <div className="services-form-group">
+                      <label>サービス名</label>
+                      <input
+                        type="text"
+                        value={limitedForm.service_name}
+                        disabled
+                        className="services-input-disabled"
+                      />
+                    </div>
+
+                    <div className="services-form-group">
+                      <label>回数</label>
+                      <input
+                        type="text"
+                        value={`${limitedForm.total_sessions}回`}
+                        disabled
+                        className="services-input-disabled"
+                      />
+                    </div>
+
+                    <div className="services-form-group">
+                      <label>通常価格</label>
+                      <input
+                        type="text"
+                        value={`¥${Number(limitedForm.original_price || 0).toLocaleString()}`}
+                        disabled
+                        className="services-input-disabled"
+                      />
+                    </div>
+                  </>
+                )}
 
                 <div className="services-form-group">
-                  <label>回数 *</label>
-                  <select
-                    name="total_sessions"
-                    value={limitedForm.total_sessions}
-                    onChange={handleLimitedInputChange}
-                  >
-                    <option value="5">5回</option>
-                    <option value="10">10回</option>
-                    <option value="15">15回</option>
-                    <option value="20">20回</option>
-                  </select>
-                </div>
-
-                <div className="services-form-group">
-                  <label>販売価格 *</label>
+                  <label>特別価格(販売価格) *</label>
                   <input
                     type="number"
                     name="special_price"
@@ -1873,17 +2036,24 @@ const ServicesManagement = () => {
                   {limitedForm.special_price && limitedForm.total_sessions && (
                     <div className="services-price-info">
                       <span>1回あたり: ¥{Math.floor(limitedForm.special_price / limitedForm.total_sessions).toLocaleString()}</span>
+                      {limitedForm.original_price && (
+                        <span className="services-discount-badge">
+                          {Math.round((1 - (limitedForm.special_price / limitedForm.original_price)) * 100)}%OFF
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
 
                 <div className="services-form-group">
-                  <label>有効期限（日数） *</label>
+                  <label>有効期限(日数) *</label>
                   <select
                     name="validity_days"
                     value={limitedForm.validity_days}
                     onChange={handleLimitedInputChange}
                   >
+                    <option value="30">1ヶ月</option>
+                    <option value="60">2ヶ月</option>
                     <option value="90">3ヶ月</option>
                     <option value="180">6ヶ月</option>
                     <option value="365">1年</option>
@@ -1891,11 +2061,21 @@ const ServicesManagement = () => {
                 </div>
 
                 <div className="services-form-group">
+                  <label>販売開始日</label>
+                  <input
+                    type="date"
+                    name="start_date"
+                    value={limitedForm.start_date}
+                    onChange={handleLimitedInputChange}
+                  />
+                </div>
+
+                <div className="services-form-group">
                   <label>販売終了日</label>
                   <input
                     type="date"
-                    name="sale_end_date"
-                    value={limitedForm.sale_end_date}
+                    name="end_date"
+                    value={limitedForm.end_date}
                     onChange={handleLimitedInputChange}
                   />
                 </div>
@@ -1966,16 +2146,25 @@ const ServicesManagement = () => {
                     <td className="services-table-name">
                       <Clock size={14} />
                       {offer.name}
+                      {offer.base_plan_name && (
+                        <span className="services-description">
+                          元プラン: {offer.base_plan_name}
+                        </span>
+                      )}
                     </td>
-                    <td>{offer.service_name}</td>
+                    <td>{offer.service_name || offer.base_service_name || '-'}</td>
                     <td>{offer.total_sessions}回</td>
-                    <td>¥{offer.special_price.toLocaleString()}</td>
-                    <td>¥{offer.price_per_session ? offer.price_per_session.toLocaleString() : Math.floor(offer.special_price / offer.total_sessions).toLocaleString()}</td>
+                    <td>¥{(offer.special_price || 0).toLocaleString()}</td>
                     <td>
-                      {offer.sale_end_date ? new Date(offer.sale_end_date).toLocaleDateString('ja-JP') : '無期限'}
+                      ¥{offer.total_sessions > 0
+                        ? Math.floor((offer.special_price || 0) / offer.total_sessions).toLocaleString()
+                        : '0'}
                     </td>
                     <td>
-                      {offer.current_sales || 0} / {offer.max_sales || '∞'}
+                      {offer.end_date ? new Date(offer.end_date).toLocaleDateString('ja-JP') : '無期限'}
+                    </td>
+                    <td>
+                      {offer.current_bookings || 0} / {offer.max_bookings || '∞'}
                     </td>
                     <td>
                       <span className={`services-status-badge ${offer.is_active ? 'services-status-badge--active' : 'services-status-badge--inactive'}`}>

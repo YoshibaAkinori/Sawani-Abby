@@ -7,14 +7,14 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
   const [formData, setFormData] = useState({
     // 予約タイプ（booking: 予約, schedule: 予定）
     bookingType: 'booking',
-    
+
     // 予約情報
     date: selectedSlot?.date || new Date().toISOString().split('T')[0],
     startTime: selectedSlot?.timeSlot || new Date().toTimeString().slice(0, 5),
     endTime: '',
     staffId: selectedSlot?.staffId || '',
     bedId: '1',
-    
+
     // 顧客情報
     customerId: '',
     lastName: '',
@@ -23,17 +23,17 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
     firstNameKana: '',
     phoneNumber: '',
     email: '',
-    
+
     // 施術情報
     serviceId: '',
     serviceType: 'normal', // normal, ticket, coupon, limited
     optionIds: [],
-    
+
     // 支払い情報
     ticketId: '',
     couponId: '',
     limitedOfferId: '',
-    
+
     // 備考
     notes: '',
     scheduleTitle: '' // 予定用タイトル
@@ -100,11 +100,11 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
   // 顧客検索（名前検索）
   const searchCustomers = async () => {
     if (!searchName.trim()) return;
-    
+
     try {
       const response = await fetch(`/api/customers/search?name=${encodeURIComponent(searchName)}`);
       const data = await response.json();
-      
+
       if (data.success) {
         setSearchResults(data.data || []);
         // 検索結果が1件の場合は自動選択
@@ -174,7 +174,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
     } else if (updatedFormData.serviceType === 'coupon' && updatedFormData.couponId) {
       // クーポン - total_duration_minutesを優先的に使用
       const coupon = coupons.find(c => c.coupon_id === updatedFormData.couponId);
-      
+
       if (coupon?.total_duration_minutes) {
         // クーポンテーブルに直接登録されている施術時間を使用
         duration = coupon.total_duration_minutes;
@@ -191,9 +191,8 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
     } else if (updatedFormData.serviceType === 'limited' && updatedFormData.limitedOfferId) {
       // 期間限定オファー - service_name から施術時間を推定
       const offer = limitedOffers.find(o => o.offer_id === updatedFormData.limitedOfferId);
-      if (offer?.service_name) {
-        const service = services.find(s => s.name === offer.service_name);
-        duration = service?.duration_minutes || 60;
+      if (offer?.duration_minutes) {
+        duration = offer?.duration_minutes || 60;
       } else {
         duration = 60; // デフォルト
       }
@@ -206,7 +205,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
     }, 0);
 
     const totalMinutes = duration + optionMinutes;
-    
+
     if (totalMinutes === 0) return updatedFormData.endTime;
 
     const [hour, minute] = updatedFormData.startTime.split(':').map(Number);
@@ -222,7 +221,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
   const handleInputChange = (field, value) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
-      
+
       // サービスタイプ変更時にIDをリセット
       if (field === 'serviceType') {
         updated.serviceId = '';
@@ -230,13 +229,13 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
         updated.couponId = '';
         updated.limitedOfferId = '';
       }
-      
+
       // 予約モードの場合のみ終了時間を再計算
-      if (updated.bookingType === 'booking' && 
-          ['serviceId', 'serviceType', 'ticketId', 'couponId', 'limitedOfferId', 'startTime'].includes(field)) {
+      if (updated.bookingType === 'booking' &&
+        ['serviceId', 'serviceType', 'ticketId', 'couponId', 'limitedOfferId', 'startTime'].includes(field)) {
         updated.endTime = calculateEndTime(updated);
       }
-      
+
       return updated;
     });
   };
@@ -270,7 +269,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
         setTimeout(() => setError(''), 3000);
         return;
       }
-  
+
       setIsLoading(true);
       try {
         const scheduleData = {
@@ -285,7 +284,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
           status: 'blocked',
           notes: formData.scheduleTitle || '予定'
         };
-    
+
         const response = await fetch('/api/bookings', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -348,14 +347,14 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
             email: formData.email
           })
         });
-        
+
         const customerData = await customerResponse.json();
         if (customerData.success) {
           customerId = customerData.data.customer_id;
         }
       }
 
-      // 予約登録
+      // 予約登録データを構築
       const bookingData = {
         customer_id: customerId,
         staff_id: formData.staffId,
@@ -365,18 +364,22 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
         bed_id: formData.bedId,
         option_ids: formData.optionIds,
         notes: formData.notes,
-        status: 'confirmed'
+        status: 'confirmed',
+        type: 'booking',
+        // ★初期値としてすべてnullを設定
+        service_id: null,
+        customer_ticket_id: null,
+        coupon_id: null,
+        limited_offer_id: null
       };
 
-      // サービスタイプに応じてIDを設定
+      // サービスタイプに応じて適切なIDを設定
       if (formData.serviceType === 'normal') {
         bookingData.service_id = formData.serviceId;
       } else if (formData.serviceType === 'ticket') {
         bookingData.customer_ticket_id = formData.ticketId;
       } else if (formData.serviceType === 'coupon') {
         bookingData.coupon_id = formData.couponId;
-        const coupon = coupons.find(c => c.coupon_id === formData.couponId);
-        bookingData.service_id = coupon?.base_service_id;
       } else if (formData.serviceType === 'limited') {
         bookingData.limited_offer_id = formData.limitedOfferId;
       }
@@ -427,39 +430,39 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
       <div className="booking-page">
         <div className="booking-page-content">
           {/* ヘッダー */}
-        <div className="booking-page-header">
-          <h2>新規登録</h2>
-          <button onClick={onClose} className="booking-page-close">
-            <X size={20} />
-            閉じる
-          </button>
-        </div>
-
-        {/* 予約タイプ選択 */}
-        <div className="booking-type-selector">
-          <button
-            className={`booking-type-btn ${formData.bookingType === 'booking' ? 'booking-type-btn--active' : ''}`}
-            onClick={() => setFormData(prev => ({ ...prev, bookingType: 'booking' }))}
-          >
-            <CalendarCheck size={20} />
-            予約
-          </button>
-          <button
-            className={`booking-type-btn ${formData.bookingType === 'schedule' ? 'booking-type-btn--active' : ''}`}
-            onClick={() => setFormData(prev => ({ ...prev, bookingType: 'schedule' }))}
-          >
-            <CalendarPlus size={20} />
-            予定
-          </button>
-        </div>
-
-        {error && (
-          <div className="booking-alert booking-alert--error">
-            <AlertCircle size={16} />
-            <span>{error}</span>
-            <button onClick={() => setError('')}>×</button>
+          <div className="booking-page-header">
+            <h2>新規登録</h2>
+            <button onClick={onClose} className="booking-page-close">
+              <X size={20} />
+              閉じる
+            </button>
           </div>
-        )}
+
+          {/* 予約タイプ選択 */}
+          <div className="booking-type-selector">
+            <button
+              className={`booking-type-btn ${formData.bookingType === 'booking' ? 'booking-type-btn--active' : ''}`}
+              onClick={() => setFormData(prev => ({ ...prev, bookingType: 'booking' }))}
+            >
+              <CalendarCheck size={20} />
+              予約
+            </button>
+            <button
+              className={`booking-type-btn ${formData.bookingType === 'schedule' ? 'booking-type-btn--active' : ''}`}
+              onClick={() => setFormData(prev => ({ ...prev, bookingType: 'schedule' }))}
+            >
+              <CalendarPlus size={20} />
+              予定
+            </button>
+          </div>
+
+          {error && (
+            <div className="booking-alert booking-alert--error">
+              <AlertCircle size={16} />
+              <span>{error}</span>
+              <button onClick={() => setError('')}>×</button>
+            </div>
+          )}
           <div className="booking-page-grid">
             {/* 左側: 予約情報入力 */}
             <div className="booking-page-main">
@@ -509,7 +512,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                           className={`staff-select-card ${formData.staffId === s.staff_id ? 'selected' : ''}`}
                           onClick={() => handleInputChange('staffId', s.staff_id)}
                         >
-                          <div 
+                          <div
                             className="staff-select-color"
                             style={{ backgroundColor: s.color }}
                           />
@@ -598,7 +601,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                           <div key={category} className="menu-category-group">
                             <div className="menu-category-header">{category}</div>
                             {categoryServices.map(service => (
-                              <div 
+                              <div
                                 key={service.service_id}
                                 className={`menu-select-item ${formData.serviceId === service.service_id ? 'selected' : ''}`}
                                 onClick={() => handleInputChange('serviceId', service.service_id)}
@@ -607,7 +610,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                                   type="radio"
                                   name="service"
                                   checked={formData.serviceId === service.service_id}
-                                  onChange={() => {}}
+                                  onChange={() => { }}
                                   className="menu-radio"
                                 />
                                 <div className="menu-info">
@@ -633,7 +636,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                       <div className="menu-select-list">
                         {customerTickets.length > 0 ? (
                           customerTickets.map(ticket => (
-                            <div 
+                            <div
                               key={ticket.customer_ticket_id}
                               className={`menu-select-item ${formData.ticketId === ticket.customer_ticket_id ? 'selected' : ''}`}
                               onClick={() => handleInputChange('ticketId', ticket.customer_ticket_id)}
@@ -642,7 +645,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                                 type="radio"
                                 name="ticket"
                                 checked={formData.ticketId === ticket.customer_ticket_id}
-                                onChange={() => {}}
+                                onChange={() => { }}
                                 className="menu-radio"
                               />
                               <div className="menu-info">
@@ -665,7 +668,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                     {formData.serviceType === 'coupon' && (
                       <div className="menu-select-list">
                         {coupons.filter(c => c.is_active).map(coupon => (
-                          <div 
+                          <div
                             key={coupon.coupon_id}
                             className={`menu-select-item ${formData.couponId === coupon.coupon_id ? 'selected' : ''}`}
                             onClick={() => handleInputChange('couponId', coupon.coupon_id)}
@@ -674,7 +677,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                               type="radio"
                               name="coupon"
                               checked={formData.couponId === coupon.coupon_id}
-                              onChange={() => {}}
+                              onChange={() => { }}
                               className="menu-radio"
                             />
                             <div className="menu-info">
@@ -696,7 +699,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                     {formData.serviceType === 'limited' && (
                       <div className="menu-select-list">
                         {limitedOffers.filter(o => o.is_active).map(offer => (
-                          <div 
+                          <div
                             key={offer.offer_id}
                             className={`menu-select-item ${formData.limitedOfferId === offer.offer_id ? 'selected' : ''}`}
                             onClick={() => handleInputChange('limitedOfferId', offer.offer_id)}
@@ -705,7 +708,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                               type="radio"
                               name="limited"
                               checked={formData.limitedOfferId === offer.offer_id}
-                              onChange={() => {}}
+                              onChange={() => { }}
                               className="menu-radio"
                             />
                             <div className="menu-info">
@@ -791,7 +794,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                             検索
                           </button>
                         </div>
-                        
+
                         {/* 検索結果 */}
                         {searchResults.length > 0 && (
                           <div className="search-results">
@@ -945,12 +948,12 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                         </span>
                       </div>
                     </div>
-                    
+
                     <div className="schedule-note">
                       <AlertCircle size={16} />
                       <span>この時間帯は予約を受け付けません</span>
                     </div>
-                    
+
                     <div className="form-row">
                       <label className="form-label">メモ</label>
                       <textarea

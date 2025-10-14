@@ -16,6 +16,9 @@ const RegisterPage = () => {
   const [selectedStaff, setSelectedStaff] = useState(null);
   const [selectedBookingId, setSelectedBookingId] = useState(null);
   const [ticketUseOnPurchase, setTicketUseOnPurchase] = useState({});
+  // 個別価格を管理するState
+  const [ticketCustomPrices, setTicketCustomPrices] = useState({});
+  const [useMonitorPrice, setUseMonitorPrice] = useState({});
 
   // 新規顧客登録フォーム
   const [newCustomer, setNewCustomer] = useState({
@@ -142,12 +145,16 @@ const RegisterPage = () => {
       if (bookingData.success && bookingData.data && bookingData.data.length > 0) {
         const bookingDetail = bookingData.data[0];
 
+        // ★★★ end_timeをここで利用する場合の例（必要に応じて）★★★
+        console.log('予約時間:', bookingDetail.start_time, '〜', bookingDetail.end_time);
+
+        // 通常サービス
         if (bookingDetail.service_id) {
           const service = services.find(s => s.service_id === bookingDetail.service_id);
           if (service) {
             setSelectedMenu(service);
             setSelectedMenuType('normal');
-            setTicketUseList([]); // 回数券使用リストをクリア
+            setTicketUseList([]);
 
             if (bookingDetail.options && bookingDetail.options.length > 0) {
               const optionIds = bookingDetail.options.map(opt => opt.option_id);
@@ -165,13 +172,57 @@ const RegisterPage = () => {
               }
             }
           }
-        } else if (bookingDetail.customer_ticket_id) {
+        }
+        // 期間限定オファーの処理
+        else if (bookingDetail.limited_offer_id) {
+          const offer = limitedOffers.find(o => o.offer_id === bookingDetail.limited_offer_id);
+          if (offer) {
+            setSelectedMenu({
+              ...offer,
+              special_price: bookingDetail.limited_offer_price || offer.special_price
+            });
+            setSelectedMenuType('limited');
+            setTicketUseList([]);
+
+            if (bookingDetail.options && bookingDetail.options.length > 0) {
+              const optionIds = bookingDetail.options.map(opt => opt.option_id);
+              setSelectedFreeOptions([]);
+              setSelectedPaidOptions(optionIds);
+            }
+          }
+        }
+        // クーポンの処理
+        else if (bookingDetail.coupon_id) {
+          const coupon = coupons.find(c => c.coupon_id === bookingDetail.coupon_id);
+          if (coupon) {
+            setSelectedMenu(coupon);
+            setSelectedMenuType('coupon');
+            setTicketUseList([]);
+
+            if (bookingDetail.options && bookingDetail.options.length > 0) {
+              const optionIds = bookingDetail.options.map(opt => opt.option_id);
+              const maxFreeOptions = coupon.free_option_count || 0;
+
+              if (maxFreeOptions > 0 && optionIds.length <= maxFreeOptions) {
+                setSelectedFreeOptions(optionIds);
+                setSelectedPaidOptions([]);
+              } else if (maxFreeOptions > 0) {
+                setSelectedFreeOptions(optionIds.slice(0, maxFreeOptions));
+                setSelectedPaidOptions(optionIds.slice(maxFreeOptions));
+              } else {
+                setSelectedFreeOptions([]);
+                setSelectedPaidOptions(optionIds);
+              }
+            }
+          }
+        }
+        // 回数券の処理
+        else if (bookingDetail.customer_ticket_id) {
           await fetchCustomerTickets(booking.customer_id);
 
           setTimeout(() => {
             const ticket = ownedTickets.find(t => t.customer_ticket_id === bookingDetail.customer_ticket_id);
             if (ticket) {
-              // 回数券使用リストに追加
               setTicketUseList([ticket]);
               setSelectedMenu(null);
               setSelectedMenuType('normal');
@@ -200,14 +251,31 @@ const RegisterPage = () => {
     }
 
     await fetchCustomerTickets(booking.customer_id);
+    await fetchAvailableCoupons(booking.customer_id);
   };
 
-  // 検索結果から顧客選択
+  // 顧客選択時の処理を修正
   const handleSelectCustomer = async (customer) => {
     setSelectedCustomer(customer);
     setSelectedBookingId(null);
     await fetchCustomerTickets(customer.customer_id);
+    await fetchAvailableCoupons(customer.customer_id);
   };
+
+  // 顧客IDを使って、その顧客が利用可能なクーポンリストを取得する
+  const fetchAvailableCoupons = async (customerId) => {
+    try {
+      // APIにcustomerIdを渡してクーポンを取得
+      const response = await fetch(`/api/coupons?customerId=${customerId}`);
+      const data = await response.json();
+      if (data.success) {
+        setCoupons(data.data || []);
+      }
+    } catch (err) {
+      console.error('クーポン取得エラー:', err);
+    }
+  };
+
 
   // 顧客の回数券を取得
   const fetchCustomerTickets = async (customerId) => {
@@ -373,9 +441,10 @@ const RegisterPage = () => {
       name: plan.name,
       service_name: plan.service_name,
       total_sessions: plan.total_sessions,
+      price: plan.price,
       full_price: plan.price,
       already_paid: 0,
-      payment_amount: plan.price,
+      payment_amount: '',
       service_category: plan.service_category,
       service_id: plan.service_id
     };
@@ -407,6 +476,13 @@ const RegisterPage = () => {
     setTicketPurchaseList(prev =>
       prev.map(t => t.id === ticketId ? { ...t, payment_amount: parseInt(amount) || '' } : t)
     );
+  };
+  // 価格変更ハンドラー
+  const handleTicketPriceChange = (ticketId, price) => {
+    setTicketCustomPrices(prev => ({
+      ...prev,
+      [ticketId]: parseInt(price) || 0
+    }));
   };
 
   // オプション選択（自由選択）
@@ -445,20 +521,31 @@ const RegisterPage = () => {
 
   // 合計金額計算
   const calculateTotal = () => {
+    console.log('selectedMenu:', selectedMenu);
+    console.log('selectedMenuType:', selectedMenuType);
+    if (selectedMenuType === 'coupon') {
+      console.log('クーポンのtotal_price:', selectedMenu?.total_price);
+    }
+    if (selectedMenuType === 'limited') {
+      console.log('期間限定のspecial_price:', selectedMenu?.special_price);
+    }
+
     let total = 0;
 
-    // 通常メニュー・クーポンなど
+    // 通常メニュー・クーポン・期間限定など
     if (selectedMenu) {
       if (selectedMenuType === 'normal') {
         total += selectedMenu.price || 0;
       } else if (selectedMenuType === 'coupon') {
         total += selectedMenu.total_price || 0;
+      } else if (selectedMenuType === 'limited') {
+        total += selectedMenu.special_price || 0;
       }
     }
 
     // 回数券購入リストの合計
     ticketPurchaseList.forEach(ticket => {
-      total += ticket.payment_amount || 0;
+      total += (ticket.payment_amount || 0);
     });
 
     // 追加オプション
@@ -511,7 +598,6 @@ const RegisterPage = () => {
   };
 
   // お会計処理
-  // お会計処理
   const handleCheckout = async () => {
     if (!selectedCustomer) {
       setError('お客様を選択してください');
@@ -556,7 +642,8 @@ const RegisterPage = () => {
             body: JSON.stringify({
               customer_id: selectedCustomer.customer_id,
               plan_id: ticket.plan_id,
-              payment_amount: ticket.payment_amount,
+              purchase_price: ticketCustomPrices[ticket.id] || ticket.price,
+              payment_amount: ticket.payment_amount || 0, // ★空白の場合は0
               payment_method: paymentMethod,
               cash_amount: cashAmt,
               card_amount: cardAmt,
@@ -655,7 +742,7 @@ const RegisterPage = () => {
             payment_method: 'cash',
             cash_amount: 0,
             card_amount: 0,
-            payment_amount: 0,
+            payment_amount: '',
             related_payment_id: mainPaymentId
           })
         });
@@ -669,7 +756,7 @@ const RegisterPage = () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               customer_ticket_id: ticket.customer_ticket_id,
-              payment_amount: ticket.payment_amount,
+              payment_amount: '',
               payment_method: paymentMethod,
               notes: '回数券使用時の未払い分支払い'
             })
@@ -740,6 +827,8 @@ const RegisterPage = () => {
     setOwnedTickets([]);
     setTicketPurchaseList([]);
     setTicketUseOnPurchase({});
+    setTicketCustomPrices({}); // ★追加
+    setUseMonitorPrice({});
     if (staffList.length > 0) {
       setSelectedStaff(staffList[0]);
     }
@@ -817,25 +906,28 @@ const RegisterPage = () => {
 
                 {customerTab === 'today' ? (
                   <div className="customer-quick-list">
-                    {todayBookings.map(booking => (
-                      <div
-                        key={booking.booking_id}
-                        className={`customer-item ${selectedCustomer?.customer_id === booking.customer_id ? 'customer-item--selected' : ''} ${booking.is_paid ? 'customer-item--paid' : ''}`}
-                        onClick={() => handleSelectFromBooking(booking)}
-                      >
-                        <div className="customer-item__header">
-                          <div className="customer-item__name">
-                            {booking.last_name} {booking.first_name} 様
+                    {todayBookings.map(booking => {
+                      console.log('予約表示:', booking); // ★デバッグ用
+                      return (
+                        <div
+                          key={booking.booking_id}
+                          className={`customer-item ${selectedCustomer?.customer_id === booking.customer_id ? 'customer-item--selected' : ''} ${booking.is_paid ? 'customer-item--paid' : ''}`}
+                          onClick={() => handleSelectFromBooking(booking)}
+                        >
+                          <div className="customer-item__header">
+                            <div className="customer-item__name">
+                              {booking.last_name} {booking.first_name} 様
+                            </div>
+                            {booking.is_paid && (
+                              <span className="customer-item__paid-badge">会計済</span>
+                            )}
                           </div>
-                          {booking.is_paid && (
-                            <span className="customer-item__paid-badge">会計済</span>
-                          )}
+                          <div className="customer-item__info">
+                            {booking.start_time?.substring(0, 5)} - {booking.end_time?.substring(0, 5)}
+                          </div>
                         </div>
-                        <div className="customer-item__info">
-                          {booking.start_time?.substring(0, 5)} - {booking.service_name}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <>
@@ -976,12 +1068,20 @@ const RegisterPage = () => {
                     {menuTab === 'coupon' && coupons.map(coupon => (
                       <div
                         key={coupon.coupon_id}
-                        className={`menu-card ${selectedMenu?.coupon_id === coupon.coupon_id && selectedMenuType === 'coupon' ? 'menu-card--selected' : ''}`}
-                        onClick={() => handleSelectMenu(coupon, 'coupon')}
+                        // is_selectableフラグで選択可否を判定
+                        className={`menu-card ${selectedMenu?.coupon_id === coupon.coupon_id && selectedMenuType === 'coupon' ? 'menu-card--selected' : ''} ${!coupon.is_selectable ? 'menu-card--disabled' : ''}`}
+                        onClick={() => coupon.is_selectable && handleSelectMenu(coupon, 'coupon')}
                       >
                         <div className="menu-card__name">{coupon.name}</div>
                         <div className="menu-card__info">{coupon.description}</div>
                         <div className="menu-card__price">¥{coupon.total_price?.toLocaleString()}</div>
+
+                        {/* 使用不可の理由を表示 */}
+                        {!coupon.is_selectable && (
+                          <div className="menu-card__badge-used">
+                            {coupon.usage_limit === 1 ? '使用済み' : '上限到達'}
+                          </div>
+                        )}
                       </div>
                     ))}
 
@@ -1135,7 +1235,15 @@ const RegisterPage = () => {
                     </div>
                     <div className="payment-summary__item payment-summary__item--sub">
                       <span>料金</span>
-                      <span>¥{(selectedMenuType === 'ticket' || selectedMenuType === 'limited' ? 0 : (selectedMenu.price || selectedMenu.total_price || selectedMenu.special_price || 0)).toLocaleString()}</span>
+                      <span>¥{(
+                        selectedMenuType === 'ticket'
+                          ? 0
+                          : selectedMenuType === 'coupon'
+                            ? (selectedMenu.total_price || 0)
+                            : selectedMenuType === 'limited'
+                              ? (selectedMenu.special_price || 0)
+                              : (selectedMenu.price || 0)
+                      ).toLocaleString()}</span>
                     </div>
 
                     {selectedFreeOptions.length > 0 && (
@@ -1287,9 +1395,54 @@ const RegisterPage = () => {
                           <div className="ticket-purchase-item__info">
                             {ticket.service_name} × {ticket.total_sessions}回
                           </div>
-                          <div className="ticket-purchase-item__price">
-                            <span>定価: ¥{ticket.full_price.toLocaleString()}</span>
+
+                          {/* 価格表示部分 */}
+                          <div className="ticket-pricing">
+                            <div className={`original-price ${useMonitorPrice[ticket.id] ? 'original-price--strikethrough' : ''}`}>
+                              定価: ¥{(ticket.price || 0).toLocaleString()}
+                            </div>
+
+                            {/* モニター価格チェックボックス */}
+                            <div className="monitor-price-toggle">
+                              <label className="checkbox-label">
+                                <input
+                                  type="checkbox"
+                                  checked={useMonitorPrice[ticket.id] || false}
+                                  onChange={(e) => {
+                                    setUseMonitorPrice(prev => ({
+                                      ...prev,
+                                      [ticket.id]: e.target.checked
+                                    }));
+                                    // チェックを外した時は定価に戻す
+                                    if (!e.target.checked) {
+                                      setTicketCustomPrices(prev => {
+                                        const newPrices = { ...prev };
+                                        delete newPrices[ticket.id];
+                                        return newPrices;
+                                      });
+                                    }
+                                  }}
+                                />
+                                <span className="checkbox-text">販売価格を変更（モニター価格等）</span>
+                              </label>
+                            </div>
+
+                            {/* チェックした時だけ価格入力欄を表示 */}
+                            {useMonitorPrice[ticket.id] && (
+                              <div className="custom-price-input">
+                                <label>販売価格:</label>
+                                <input
+                                  type="number"
+                                  value={ticketCustomPrices[ticket.id] || ''}
+                                  onChange={(e) => handleTicketPriceChange(ticket.id, e.target.value)}
+                                  className="price-input"
+                                  placeholder={(ticket.price || 0).toString()}
+                                />
+                                <span>円</span>
+                              </div>
+                            )}
                           </div>
+
                           {!ticket.is_additional_payment && (
                             <div className="ticket-purchase-item__use-now">
                               <label className="checkbox-label">
@@ -1305,6 +1458,7 @@ const RegisterPage = () => {
                               </label>
                             </div>
                           )}
+
                           <div className="ticket-purchase-item__payment">
                             <label>今回支払額</label>
                             <input
@@ -1312,13 +1466,14 @@ const RegisterPage = () => {
                               className="form-input"
                               value={ticket.payment_amount}
                               onChange={(e) => handleUpdateTicketPayment(ticket.id, e.target.value)}
-                              placeholder="0"
-                              max={ticket.full_price}
+                              placeholder={(ticketCustomPrices[ticket.id] || ticket.price || 0).toString()}
+                              max={ticketCustomPrices[ticket.id] || ticket.price || 0}
                             />
                           </div>
-                          {ticket.payment_amount < ticket.full_price && (
+
+                          {(ticket.payment_amount || 0) < ((ticketCustomPrices[ticket.id] || ticket.price || 0)) && (
                             <div className="ticket-purchase-item__remaining">
-                              残額: ¥{(ticket.full_price - (ticket.already_paid || 0) - ticket.payment_amount).toLocaleString()}
+                              残額: ¥{(((ticketCustomPrices[ticket.id] || ticket.price || 0)) - (ticket.already_paid || 0) - (ticket.payment_amount || 0)).toLocaleString()}
                             </div>
                           )}
                         </div>
