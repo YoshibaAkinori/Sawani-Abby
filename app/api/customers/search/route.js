@@ -19,16 +19,23 @@ export async function GET(request) {
 
     let query = `
       SELECT 
-        customer_id,
-        last_name,
-        first_name,
-        last_name_kana,
-        first_name_kana,
-        phone_number,
-        email,
-        birth_date,
-        created_at
-      FROM customers
+        c.customer_id,
+        c.last_name,
+        c.first_name,
+        c.last_name_kana,
+        c.first_name_kana,
+        c.phone_number,
+        c.email,
+        c.birth_date,
+        c.base_visit_count,
+        c.created_at,
+        COUNT(CASE 
+          WHEN p.is_cancelled = FALSE 
+            AND (p.related_payment_id IS NULL OR p.related_payment_id = '') 
+          THEN 1 
+        END) as payment_count
+      FROM customers c
+      LEFT JOIN payments p ON c.customer_id = p.customer_id
       WHERE 1=1
     `;
     
@@ -36,30 +43,36 @@ export async function GET(request) {
 
     if (name) {
       query += ` AND (
-        last_name LIKE ? OR 
-        first_name LIKE ? OR 
-        CONCAT(last_name, first_name) LIKE ? OR
-        CONCAT(last_name, ' ', first_name) LIKE ? OR
-        last_name_kana LIKE ? OR
-        first_name_kana LIKE ? OR
-        CONCAT(last_name_kana, first_name_kana) LIKE ?
+        c.last_name LIKE ? OR 
+        c.first_name LIKE ? OR 
+        CONCAT(c.last_name, c.first_name) LIKE ? OR
+        CONCAT(c.last_name, ' ', c.first_name) LIKE ? OR
+        c.last_name_kana LIKE ? OR
+        c.first_name_kana LIKE ? OR
+        CONCAT(c.last_name_kana, c.first_name_kana) LIKE ?
       )`;
       const searchTerm = `%${name}%`;
       params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
     if (phone) {
-      query += ' AND phone_number LIKE ?';
+      query += ' AND c.phone_number LIKE ?';
       params.push(`%${phone.replace(/-/g, '')}%`);
     }
 
-    query += ' ORDER BY created_at DESC LIMIT 50';
+    query += ' GROUP BY c.customer_id ORDER BY c.created_at DESC LIMIT 50';
 
     const [rows] = await pool.execute(query, params);
 
+    // visit_countを計算して追加
+    const customersWithVisitCount = rows.map(customer => ({
+      ...customer,
+      visit_count: (customer.base_visit_count || 0) + customer.payment_count
+    }));
+
     return NextResponse.json({
       success: true,
-      data: rows
+      data: customersWithVisitCount
     });
   } catch (error) {
     console.error('顧客検索エラー:', error);

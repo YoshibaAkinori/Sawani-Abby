@@ -1,92 +1,58 @@
-// app/api/customers/route.js
+// app/api/customers/today-bookings/route.js
 import { NextResponse } from 'next/server';
-import { getConnection } from '../../../lib/db';
+import { getConnection } from '../../../../lib/db';
 
-export async function POST(request) {
-  const pool = await getConnection();
-
+export async function GET(request) {
   try {
-    const body = await request.json();
+    const pool = await getConnection();
+    const today = new Date().toISOString().split('T')[0];
 
-    const {
-      last_name,
-      first_name,
-      last_name_kana,
-      first_name_kana,
-      phone_number,
-      email,
-      birth_date,
-      notes,
-      line_user_id
-    } = body;
-
-    // バリデーション: 姓名は必須
-    if (!last_name || !first_name) {
-      return NextResponse.json(
-        { success: false, error: '姓と名は必須です' },
-        { status: 400 }
-      );
-    }
-
-    // SQLインジェクション対策として、全ての値をプレースホルダ(?)で渡す
-    const query = `
-      INSERT INTO customers (
-        customer_id,
-        line_user_id,
-        last_name,
-        first_name,
-        last_name_kana,
-        first_name_kana,
-        phone_number,
-        email,
-        birth_date,
-        notes,
-        created_at,
-        updated_at
-      ) VALUES (
-        UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW()
-      )
-    `;
-
-    const params = [
-      line_user_id ?? null,
-      last_name,
-      first_name,
-      last_name_kana ?? null,
-      first_name_kana ?? null,
-      phone_number ?? null,
-      email ?? null,
-      birth_date ?? null,
-      notes ?? null
-    ];
-
-    await pool.execute(query, params);
-
-    // 登録した顧客の情報を取得して返す
+    // ★★★ SELECT文に customer_ticket_id と limited_offer_id を追加 ★★★
     const [rows] = await pool.execute(
-      'SELECT * FROM customers WHERE phone_number = ? ORDER BY created_at DESC LIMIT 1',
-      [phone_number]
+      `SELECT 
+        b.booking_id,
+        b.customer_id,
+        b.start_time,
+        b.end_time,
+        b.service_id,
+        b.customer_ticket_id,
+        b.limited_offer_id,
+        b.status,
+        c.last_name,
+        c.first_name,
+        s.name as service_name,
+        st.name as staff_name,
+        CASE 
+          WHEN EXISTS (
+            SELECT 1 FROM payments p 
+            WHERE p.booking_id = b.booking_id AND p.is_cancelled = FALSE
+          ) THEN 1
+          ELSE 0
+        END as is_paid
+      FROM bookings b
+      JOIN customers c ON b.customer_id = c.customer_id
+      LEFT JOIN services s ON b.service_id = s.service_id
+      LEFT JOIN staff st ON b.staff_id = st.staff_id
+      WHERE b.date = ? 
+        AND b.status IN ('pending', 'confirmed', 'completed')
+        AND b.type = 'booking'
+      ORDER BY b.start_time ASC`,
+      [today]
     );
 
-    if (rows.length === 0) {
-      throw new Error('登録した顧客の取得に失敗しました');
-    }
+    const bookingsWithPaidStatus = rows.map(row => ({
+      ...row,
+      is_paid: Boolean(row.is_paid)
+    }));
 
-    const newCustomer = rows[0];
-
-    return NextResponse.json(
-      {
-        success: true,
-        message: '顧客を登録しました',
-        data: newCustomer
-      },
-      { status: 201 } // 201 Created ステータスを返すのがRESTful
-    );
-
+    return NextResponse.json({
+      success: true,
+      data: bookingsWithPaidStatus
+    });
   } catch (error) {
-    console.error('顧客登録エラー:', error);
+    console.error('今日の予約者取得エラー:', error);
     return NextResponse.json(
-      { success: false, error: 'データベースエラー: ' + error.message },
+      { success: false, error: 'データベースエラー' },
       { status: 500 }
     );
   }

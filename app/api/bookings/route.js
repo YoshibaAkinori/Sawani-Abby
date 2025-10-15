@@ -34,24 +34,24 @@ export async function GET(request) {
     c.first_name,
     s.name as staff_name,
     s.color as staff_color,
-    -- 直接のサービス情報（通常予約）
+    -- 直接のサービス情報(通常予約)
     sv_direct.name as direct_service_name,
     sv_direct.category as direct_service_category,
-    -- 回数券情報
+    -- 回数券情報(後方互換性用・最初の1つのみ)
     tp.name as ticket_plan_name,
     sv_ticket.category as ticket_service_category,
     -- クーポン情報
     cp.name as coupon_name,
     cp.description as coupon_description,
     cp.total_price as coupon_price,
-    -- 期間限定オファー情報
+    -- 期間限定オファー情報(後方互換性用・最初の1つのみ)
     lo.name as limited_offer_name,
     lo.description as limited_offer_description,
     lo.special_price as limited_offer_price,
     lo.total_sessions as limited_offer_sessions,
-    -- 表示用の名前（優先順位: クーポン > 期間限定 > 回数券 > 通常サービス）
+    -- 表示用の名前(優先順位: クーポン > 期間限定 > 回数券 > 通常サービス)
     COALESCE(cp.name, lo.name, tp.name, sv_direct.name) as service_name,
-    -- カテゴリ（優先順位: クーポン > 期間限定 > 回数券 > 通常サービス）
+    -- カテゴリ(優先順位: クーポン > 期間限定 > 回数券 > 通常サービス)
     CASE
       WHEN cp.coupon_id IS NOT NULL THEN 'クーポン'
       WHEN lo.offer_id IS NOT NULL THEN '期間限定'
@@ -95,8 +95,9 @@ export async function GET(request) {
 
     const [rows] = await pool.execute(query, params);
 
-    // 各予約のオプション情報も取得
+    // 各予約の追加情報を取得
     for (let booking of rows) {
+      // オプション情報を取得
       const [options] = await pool.execute(
         `SELECT 
           bo.booking_option_id,
@@ -111,6 +112,59 @@ export async function GET(request) {
         [booking.booking_id]
       );
       booking.options = options;
+
+      // 複数の回数券情報を取得
+      const [tickets] = await pool.execute(
+        `SELECT 
+          bt.booking_ticket_id,
+          bt.customer_ticket_id,
+          ct.customer_id,
+          tp.name as plan_name,
+          tp.total_sessions,
+          ct.sessions_remaining,
+          ct.expiry_date,
+          s.name as service_name,
+          s.category as service_category,
+          s.duration_minutes,
+          s.price
+        FROM booking_tickets bt
+        JOIN customer_tickets ct ON bt.customer_ticket_id = ct.customer_ticket_id
+        JOIN ticket_plans tp ON ct.plan_id = tp.plan_id
+        JOIN services s ON tp.service_id = s.service_id
+        WHERE bt.booking_id = ?`,
+        [booking.booking_id]
+      );
+      booking.tickets = tickets;
+
+      // 複数の期間限定オファー情報を取得
+      const [limitedOffers] = await pool.execute(
+        `SELECT 
+          blo.booking_limited_offer_id,
+          blo.offer_id,
+          lo.offer_type,
+          lo.name,
+          lo.description,
+          lo.category,
+          lo.duration_minutes,
+          lo.special_price,
+          lo.total_sessions
+        FROM booking_limited_offers blo
+        JOIN limited_offers lo ON blo.offer_id = lo.offer_id
+        WHERE blo.booking_id = ?`,
+        [booking.booking_id]
+      );
+      booking.limited_offers = limitedOffers;
+
+      // service_nameを複数の回数券・期間限定がある場合は更新
+      if (tickets.length > 0) {
+        const ticketNames = tickets.map(t => t.plan_name).join(' + ');
+        booking.service_name = ticketNames;
+        booking.service_category = '回数券';
+      } else if (limitedOffers.length > 0) {
+        const offerNames = limitedOffers.map(o => o.name).join(' + ');
+        booking.service_name = offerNames;
+        booking.service_category = '期間限定';
+      }
     }
 
     return NextResponse.json({
@@ -138,9 +192,9 @@ export async function POST(request) {
       customer_id,
       staff_id,
       service_id,
-      customer_ticket_id,
+      customer_ticket_ids, // ← 配列に変更
       coupon_id,
-      limited_offer_id,
+      limited_offer_ids, // ← 配列に変更
       date,
       start_time,
       end_time,
@@ -169,7 +223,7 @@ export async function POST(request) {
         );
       }
 
-      // 予約の場合は顧客情報も必要（ただしcustomer_idは後で生成する場合もある）
+      // 予約の場合は顧客情報も必要(ただしcustomer_idは後で生成する場合もある)
       if (!customer_id && !body.last_name && !body.first_name) {
         return NextResponse.json(
           { success: false, error: '顧客情報を入力してください' },
@@ -178,7 +232,10 @@ export async function POST(request) {
       }
 
       // サービスまたはチケット/クーポン/期間限定のいずれかが必要
-      if (!service_id && !customer_ticket_id && !coupon_id && !limited_offer_id) {
+      const hasTickets = customer_ticket_ids && customer_ticket_ids.length > 0;
+      const hasLimitedOffers = limited_offer_ids && limited_offer_ids.length > 0;
+
+      if (!service_id && !hasTickets && !coupon_id && !hasLimitedOffers) {
         return NextResponse.json(
           { success: false, error: '施術メニューを選択してください' },
           { status: 400 }
@@ -220,7 +277,7 @@ export async function POST(request) {
       finalCustomerId = customerRow[0].customer_id;
     }
 
-    // 予約/予定登録
+    // 予約/予定登録（既存カラムは互換性のため保持、最初の要素のみ設定）
     const [result] = await connection.execute(
       `INSERT INTO bookings (
         booking_id,
@@ -242,9 +299,9 @@ export async function POST(request) {
         finalCustomerId,
         staff_id,
         service_id ?? null,
-        customer_ticket_id ?? null,
-        coupon_id ?? null,           // ★追加
-        limited_offer_id ?? null,    // ★追加
+        customer_ticket_ids && customer_ticket_ids.length > 0 ? customer_ticket_ids[0] : null, // 互換性のため最初の1つ
+        coupon_id ?? null,
+        limited_offer_ids && limited_offer_ids.length > 0 ? limited_offer_ids[0] : null, // 互換性のため最初の1つ
         date,
         start_time,
         end_time,
@@ -264,6 +321,32 @@ export async function POST(request) {
     );
     const bookingId = bookingRow[0].booking_id;
 
+    // 複数の回数券を中間テーブルに登録
+    if (customer_ticket_ids && customer_ticket_ids.length > 0) {
+      for (const ticketId of customer_ticket_ids) {
+        // booking_tickets テーブルに記録するだけ（残回数は減らさない）
+        await pool.execute(
+          `INSERT INTO booking_tickets (booking_id, customer_ticket_id)
+       VALUES (?, ?)`,
+          [bookingId, ticketId]
+        );
+      }
+    }
+
+    // 複数の期間限定オファーを中間テーブルに登録
+    if (limited_offer_ids && limited_offer_ids.length > 0) {
+      for (const offerId of limited_offer_ids) {
+        await connection.execute(
+          `INSERT INTO booking_limited_offers (
+            booking_limited_offer_id,
+            booking_id,
+            offer_id
+          ) VALUES (UUID(), ?, ?)`,
+          [bookingId, offerId]
+        );
+      }
+    }
+
     // 予約の場合のみオプション登録
     if (type === 'booking' && option_ids && option_ids.length > 0) {
       for (const optionId of option_ids) {
@@ -276,16 +359,6 @@ export async function POST(request) {
           [bookingId, optionId]
         );
       }
-    }
-
-    // 回数券使用の場合は残り回数を減らす
-    if (customer_ticket_id) {
-      await connection.execute(
-        `UPDATE customer_tickets 
-         SET sessions_remaining = sessions_remaining - 1
-         WHERE customer_ticket_id = ? AND sessions_remaining > 0`,
-        [customer_ticket_id]
-      );
     }
 
     await connection.commit();
@@ -306,8 +379,6 @@ export async function POST(request) {
       { status: 500 }
     );
   } finally {
-    // ★★★ 修正点 ★★★
-    // connectionが存在する場合のみreleaseを呼び出す
     if (connection) {
       connection.release();
     }
@@ -390,7 +461,6 @@ export async function PUT(request) {
 }
 // 予約削除/キャンセル
 export async function DELETE(request) {
-  // ★★★ 修正点 ★★★
   const pool = await getConnection();
   const connection = await pool.getConnection();
 
@@ -420,13 +490,28 @@ export async function DELETE(request) {
       );
     }
 
-    // 回数券使用の予約の場合は回数を戻す
+    // 回数券使用の予約の場合は回数を戻す（後方互換性用）
     if (booking[0].customer_ticket_id) {
       await connection.execute(
         `UPDATE customer_tickets 
          SET sessions_remaining = sessions_remaining + 1
          WHERE customer_ticket_id = ?`,
         [booking[0].customer_ticket_id]
+      );
+    }
+
+    // 中間テーブルに登録されている回数券の回数を戻す
+    const [bookingTickets] = await connection.execute(
+      'SELECT customer_ticket_id FROM booking_tickets WHERE booking_id = ?',
+      [bookingId]
+    );
+
+    for (const ticket of bookingTickets) {
+      await connection.execute(
+        `UPDATE customer_tickets 
+         SET sessions_remaining = sessions_remaining + 1
+         WHERE customer_ticket_id = ?`,
+        [ticket.customer_ticket_id]
       );
     }
 
@@ -441,7 +526,7 @@ export async function DELETE(request) {
       [bookingId, JSON.stringify(booking[0])]
     );
 
-    // 予約を削除（またはステータスをキャンセルに）
+    // 予約をキャンセルに
     await connection.execute(
       `UPDATE bookings SET status = 'cancelled' WHERE booking_id = ?`,
       [bookingId]
@@ -461,7 +546,6 @@ export async function DELETE(request) {
       { status: 500 }
     );
   } finally {
-    // ★★★ 修正点 ★★★
     if (connection) {
       connection.release();
     }

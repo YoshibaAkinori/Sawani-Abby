@@ -5,7 +5,7 @@ import './BookingModal.css';
 const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => {
   // フォームの状態管理
   const [formData, setFormData] = useState({
-    // 予約タイプ（booking: 予約, schedule: 予定）
+    // 予約タイプ(booking: 予約, schedule: 予定)
     bookingType: 'booking',
 
     // 予約情報
@@ -17,6 +17,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
 
     // 顧客情報
     customerId: '',
+    visitCount: 0,
     lastName: '',
     firstName: '',
     lastNameKana: '',
@@ -30,13 +31,13 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
     optionIds: [],
 
     // 支払い情報
-    ticketId: '',
+    ticketIds: [], // ← 配列に変更
     couponId: '',
-    limitedOfferId: '',
+    limitedOfferIds: [], // ← 配列に変更
 
     // 備考
     notes: '',
-    scheduleTitle: '' // 予定用タイトル
+    scheduleTitle: ''
   });
 
   // マスタデータ
@@ -123,6 +124,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
     setFormData(prev => ({
       ...prev,
       customerId: customer.customer_id,
+      visitCount: customer.visit_count || 0, // ← 追加
       lastName: customer.last_name,
       firstName: customer.first_name,
       lastNameKana: customer.last_name_kana,
@@ -147,7 +149,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
     setSearchName('');
   };
 
-  // 施術時間から終了時間を計算（修正版）
+  // 施術時間から終了時間を計算(修正版)
   const calculateEndTime = (updatedFormData) => {
     let duration = 0;
 
@@ -161,41 +163,50 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
       // 通常メニュー
       const service = services.find(s => s.service_id === updatedFormData.serviceId);
       duration = service?.duration_minutes || 0;
-    } else if (updatedFormData.serviceType === 'ticket' && updatedFormData.ticketId) {
-      // 回数券 - 回数券プランからサービスIDを取得して施術時間を取得
-      const ticket = customerTickets.find(t => t.customer_ticket_id === updatedFormData.ticketId);
-      if (ticket) {
-        // ticket.service_name から対応するサービスを検索
-        const service = services.find(s => s.name === ticket.service_name);
-        duration = service?.duration_minutes || 60;
-      } else {
-        duration = 60; // デフォルト
-      }
     } else if (updatedFormData.serviceType === 'coupon' && updatedFormData.couponId) {
-      // クーポン - total_duration_minutesを優先的に使用
+      // クーポン
       const coupon = coupons.find(c => c.coupon_id === updatedFormData.couponId);
 
       if (coupon?.total_duration_minutes) {
-        // クーポンテーブルに直接登録されている施術時間を使用
         duration = coupon.total_duration_minutes;
       } else if (coupon?.service_duration) {
-        // JOINで取得したベースサービスの時間を使用
         duration = coupon.service_duration;
       } else if (coupon?.base_service_id) {
-        // それでもない場合はservicesから検索
         const service = services.find(s => s.service_id === coupon.base_service_id);
         duration = service?.duration_minutes || 60;
       } else {
-        duration = 60; // デフォルト
+        duration = 60;
       }
-    } else if (updatedFormData.serviceType === 'limited' && updatedFormData.limitedOfferId) {
-      // 期間限定オファー - service_name から施術時間を推定
-      const offer = limitedOffers.find(o => o.offer_id === updatedFormData.limitedOfferId);
-      if (offer?.duration_minutes) {
-        duration = offer?.duration_minutes || 60;
-      } else {
-        duration = 60; // デフォルト
+    } else {
+      // 回数券と期間限定の両方を考慮（どちらか一方でも可）
+      let maxDuration = 0;
+
+      // 回数券の最長時間を取得
+      if (updatedFormData.ticketIds && updatedFormData.ticketIds.length > 0) {
+        updatedFormData.ticketIds.forEach(ticketId => {
+          const ticket = customerTickets.find(t => t.customer_ticket_id === ticketId);
+          if (ticket) {
+            const service = services.find(s => s.name === ticket.service_name);
+            const ticketDuration = service?.duration_minutes || 60;
+            if (ticketDuration > maxDuration) {
+              maxDuration = ticketDuration;
+            }
+          }
+        });
       }
+
+      // 期間限定の最長時間を取得
+      if (updatedFormData.limitedOfferIds && updatedFormData.limitedOfferIds.length > 0) {
+        updatedFormData.limitedOfferIds.forEach(offerId => {
+          const offer = limitedOffers.find(o => o.offer_id === offerId);
+          const offerDuration = offer?.duration_minutes || 60;
+          if (offerDuration > maxDuration) {
+            maxDuration = offerDuration;
+          }
+        });
+      }
+
+      duration = maxDuration;
     }
 
     // オプションの時間を加算
@@ -216,28 +227,87 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
 
     return `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
   };
-
-  // フォーム入力処理（修正版）
+  // フォーム入力処理(修正版)
   const handleInputChange = (field, value) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
 
-      // サービスタイプ変更時にIDをリセット
+      // サービスタイプ変更時の処理
       if (field === 'serviceType') {
-        updated.serviceId = '';
-        updated.ticketId = '';
-        updated.couponId = '';
-        updated.limitedOfferId = '';
+        // 通常メニューまたはクーポンに切り替えた時のみ、回数券・期間限定をクリア
+        if (value === 'normal') {
+          updated.serviceId = '';
+          updated.ticketIds = [];
+          updated.couponId = '';
+          updated.limitedOfferIds = [];
+        } else if (value === 'coupon') {
+          updated.serviceId = '';
+          updated.ticketIds = [];
+          updated.couponId = '';
+          updated.limitedOfferIds = [];
+        } else if (value === 'ticket') {
+          // 回数券タブに切り替え: 通常とクーポンのみクリア、期間限定は保持
+          updated.serviceId = '';
+          updated.couponId = '';
+          // ticketIdsは保持、limitedOfferIdsも保持
+        } else if (value === 'limited') {
+          // 期間限定タブに切り替え: 通常とクーポンのみクリア、回数券は保持
+          updated.serviceId = '';
+          updated.couponId = '';
+          // limitedOfferIdsは保持、ticketIdsも保持
+        }
       }
 
       // 予約モードの場合のみ終了時間を再計算
       if (updated.bookingType === 'booking' &&
-        ['serviceId', 'serviceType', 'ticketId', 'couponId', 'limitedOfferId', 'startTime'].includes(field)) {
+        ['serviceId', 'serviceType', 'ticketIds', 'couponId', 'limitedOfferIds', 'startTime'].includes(field)) {
         updated.endTime = calculateEndTime(updated);
       }
 
       return updated;
     });
+  };
+  // 回数券トグル処理(新規追加)
+  const handleTicketToggle = (ticketId) => {
+    setFormData(prev => {
+      const updated = { ...prev };
+      if (prev.ticketIds.includes(ticketId)) {
+        updated.ticketIds = prev.ticketIds.filter(id => id !== ticketId);
+      } else {
+        updated.ticketIds = [...prev.ticketIds, ticketId];
+      }
+      // 終了時間を再計算
+      updated.endTime = calculateEndTime(updated);
+      return updated;
+    });
+  };
+  // 期間限定オファートグル処理(新規追加)
+  const handleLimitedOfferToggle = (offerId) => {
+    const offer = limitedOffers.find(o => o.offer_id === offerId);
+
+    // offer_type が 'ticket' の場合のみ複数選択可能
+    if (offer?.offer_type === 'ticket') {
+      setFormData(prev => {
+        const updated = { ...prev };
+        if (prev.limitedOfferIds.includes(offerId)) {
+          updated.limitedOfferIds = prev.limitedOfferIds.filter(id => id !== offerId);
+        } else {
+          updated.limitedOfferIds = [...prev.limitedOfferIds, offerId];
+        }
+        updated.endTime = calculateEndTime(updated);
+        return updated;
+      });
+    } else {
+      // 'service' タイプは単一選択
+      setFormData(prev => {
+        const updated = {
+          ...prev,
+          limitedOfferIds: prev.limitedOfferIds.includes(offerId) ? [] : [offerId]
+        };
+        updated.endTime = calculateEndTime(updated);
+        return updated;
+      });
+    }
   };
 
   // オプション選択処理（修正版）
@@ -309,7 +379,10 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
     }
 
     // 通常の予約バリデーション
-    if (!formData.serviceId && !formData.ticketId && !formData.couponId && !formData.limitedOfferId) {
+    const hasTickets = formData.ticketIds.length > 0;
+    const hasLimitedOffers = formData.limitedOfferIds.length > 0;
+
+    if (!formData.serviceId && !hasTickets && !formData.couponId && !hasLimitedOffers) {
       setError('施術メニューを選択してください');
       setTimeout(() => setError(''), 3000);
       return;
@@ -368,20 +441,25 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
         type: 'booking',
         // ★初期値としてすべてnullを設定
         service_id: null,
-        customer_ticket_id: null,
+        customer_ticket_ids: null,
         coupon_id: null,
-        limited_offer_id: null
+        limited_offer_ids: null
       };
 
       // サービスタイプに応じて適切なIDを設定
-      if (formData.serviceType === 'normal') {
+      if (formData.serviceType === 'normal' && formData.serviceId) {
         bookingData.service_id = formData.serviceId;
-      } else if (formData.serviceType === 'ticket') {
-        bookingData.customer_ticket_id = formData.ticketId;
-      } else if (formData.serviceType === 'coupon') {
+      }
+      if (formData.serviceType === 'coupon' && formData.couponId) {
         bookingData.coupon_id = formData.couponId;
-      } else if (formData.serviceType === 'limited') {
-        bookingData.limited_offer_id = formData.limitedOfferId;
+      }
+
+      // ★回数券と期間限定は常にチェック（serviceTypeに関わらず）
+      if (formData.ticketIds.length > 0) {
+        bookingData.customer_ticket_ids = formData.ticketIds;
+      }
+      if (formData.limitedOfferIds.length > 0) {
+        bookingData.limited_offer_ids = formData.limitedOfferIds;
       }
 
       const bookingResponse = await fetch('/api/bookings', {
@@ -558,6 +636,39 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                 </div>
               </div>
 
+              {/* メニュータイプ選択タブ */}
+              <div className="menu-type-tabs">
+                <button
+                  className={`menu-type-tab ${formData.serviceType === 'normal' ? 'active' : ''}`}
+                  onClick={() => handleInputChange('serviceType', 'normal')}
+                >
+                  通常メニュー
+                </button>
+                <button
+                  className={`menu-type-tab ${formData.serviceType === 'ticket' ? 'active' : ''}`}
+                  onClick={() => handleInputChange('serviceType', 'ticket')}
+                >
+                  回数券
+                  {formData.ticketIds.length > 0 && (
+                    <span className="menu-tab-badge">{formData.ticketIds.length}</span>
+                  )}
+                </button>
+                <button
+                  className={`menu-type-tab ${formData.serviceType === 'coupon' ? 'active' : ''}`}
+                  onClick={() => handleInputChange('serviceType', 'coupon')}
+                >
+                  クーポン
+                </button>
+                <button
+                  className={`menu-type-tab ${formData.serviceType === 'limited' ? 'active' : ''}`}
+                  onClick={() => handleInputChange('serviceType', 'limited')}
+                >
+                  期間限定
+                  {formData.limitedOfferIds.length > 0 && (
+                    <span className="menu-tab-badge">{formData.limitedOfferIds.length}</span>
+                  )}
+                </button>
+              </div>
               {/* 施術メニューセクション - 予約モードのみ表示 */}
               {formData.bookingType === 'booking' && (
                 <div className="booking-section">
@@ -566,34 +677,6 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                     施術メニュー
                   </div>
                   <div className="section-content">
-                    {/* メニュータイプ選択タブ */}
-                    <div className="menu-type-tabs">
-                      <button
-                        className={`menu-type-tab ${formData.serviceType === 'normal' ? 'active' : ''}`}
-                        onClick={() => handleInputChange('serviceType', 'normal')}
-                      >
-                        通常メニュー
-                      </button>
-                      <button
-                        className={`menu-type-tab ${formData.serviceType === 'ticket' ? 'active' : ''}`}
-                        onClick={() => handleInputChange('serviceType', 'ticket')}
-                      >
-                        回数券
-                      </button>
-                      <button
-                        className={`menu-type-tab ${formData.serviceType === 'coupon' ? 'active' : ''}`}
-                        onClick={() => handleInputChange('serviceType', 'coupon')}
-                      >
-                        クーポン
-                      </button>
-                      <button
-                        className={`menu-type-tab ${formData.serviceType === 'limited' ? 'active' : ''}`}
-                        onClick={() => handleInputChange('serviceType', 'limited')}
-                      >
-                        期間限定
-                      </button>
-                    </div>
-
                     {/* 通常メニューリスト */}
                     {formData.serviceType === 'normal' && (
                       <div className="menu-select-list">
@@ -638,13 +721,12 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                           customerTickets.map(ticket => (
                             <div
                               key={ticket.customer_ticket_id}
-                              className={`menu-select-item ${formData.ticketId === ticket.customer_ticket_id ? 'selected' : ''}`}
-                              onClick={() => handleInputChange('ticketId', ticket.customer_ticket_id)}
+                              className={`menu-select-item ${formData.ticketIds.includes(ticket.customer_ticket_id) ? 'selected' : ''}`}
+                              onClick={() => handleTicketToggle(ticket.customer_ticket_id)}
                             >
                               <input
-                                type="radio"
-                                name="ticket"
-                                checked={formData.ticketId === ticket.customer_ticket_id}
+                                type="checkbox"
+                                checked={formData.ticketIds.includes(ticket.customer_ticket_id)}
                                 onChange={() => { }}
                                 className="menu-radio"
                               />
@@ -698,33 +780,43 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                     {/* 期間限定リスト */}
                     {formData.serviceType === 'limited' && (
                       <div className="menu-select-list">
-                        {limitedOffers.filter(o => o.is_active).map(offer => (
-                          <div
-                            key={offer.offer_id}
-                            className={`menu-select-item ${formData.limitedOfferId === offer.offer_id ? 'selected' : ''}`}
-                            onClick={() => handleInputChange('limitedOfferId', offer.offer_id)}
-                          >
-                            <input
-                              type="radio"
-                              name="limited"
-                              checked={formData.limitedOfferId === offer.offer_id}
-                              onChange={() => { }}
-                              className="menu-radio"
-                            />
-                            <div className="menu-info">
-                              <div className="menu-name">
-                                <Timer size={14} />
-                                {offer.name}
+                        {limitedOffers.filter(o => o.is_active).map(offer => {
+                          const isTicketType = offer.offer_type === 'ticket';
+                          const isSelected = formData.limitedOfferIds.includes(offer.offer_id);
+
+                          return (
+                            <div
+                              key={offer.offer_id}
+                              className={`menu-select-item ${isSelected ? 'selected' : ''}`}
+                              onClick={() => handleLimitedOfferToggle(offer.offer_id)}
+                            >
+                              <input
+                                type={isTicketType ? "checkbox" : "radio"}
+                                name={isTicketType ? undefined : "limited"}
+                                checked={isSelected}
+                                onChange={() => { }}
+                                className="menu-radio"
+                              />
+                              <div className="menu-info">
+                                <div className="menu-name">
+                                  <Timer size={14} />
+                                  {offer.name}
+                                  {isTicketType && (
+                                    <span style={{ marginLeft: '0.5rem', fontSize: '0.75rem', color: '#3b82f6' }}>
+                                      (複数選択可)
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="menu-details">
+                                  {offer.total_sessions}回券 / 販売終了: {offer.sale_end_date || '無期限'}
+                                </div>
                               </div>
-                              <div className="menu-details">
-                                {offer.total_sessions}回券 / 販売終了: {offer.sale_end_date || '無期限'}
+                              <div className="menu-price">
+                                ¥{offer.special_price.toLocaleString()}
                               </div>
                             </div>
-                            <div className="menu-price">
-                              ¥{offer.special_price.toLocaleString()}
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
@@ -892,6 +984,15 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                         <input
                           type="text"
                           value={formData.customerId || '（新規顧客）'}
+                          disabled
+                          className="form-input form-input--disabled"
+                        />
+                      </div>
+                      <div className="form-row">
+                        <label className="form-label">来店回数</label>
+                        <input
+                          type="text"
+                          value={formData.customerId ? `${formData.visitCount}回` : '-'}
                           disabled
                           className="form-input form-input--disabled"
                         />

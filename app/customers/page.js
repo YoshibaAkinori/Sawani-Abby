@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Users, Search, Calendar, Phone, Mail, CreditCard, Tag, Clock, Edit2, Plus, FileText } from 'lucide-react';
+import { ArrowLeft, Users, Search, Calendar, Phone, Mail, CreditCard, Tag, Clock, Edit2, Plus, FileText, Save, X } from 'lucide-react';
 import './customers.css';
 
 const CustomersPage = () => {
@@ -11,6 +11,24 @@ const CustomersPage = () => {
   const [searchResults, setSearchResults] = useState([]);
   const [todayBookings, setTodayBookings] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  // 編集モード関連
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    last_name: '',
+    first_name: '',
+    last_name_kana: '',
+    first_name_kana: '',
+    phone_number: '',
+    email: '',
+    birth_date: '',
+    notes: '',
+    base_visit_count: '',
+    line_user_id: ''
+  });
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   // 顧客詳細データ
   const [customerTickets, setCustomerTickets] = useState([]);
@@ -64,6 +82,7 @@ const CustomersPage = () => {
   // 顧客選択
   const handleSelectCustomer = async (customerId) => {
     setIsLoading(true);
+    setIsEditMode(false); // 編集モードをリセット
     try {
       // 顧客基本情報
       const customerRes = await fetch(`/api/customers/${customerId}`);
@@ -104,6 +123,88 @@ const CustomersPage = () => {
     handleSelectCustomer(customerId);
   };
 
+  // 編集モード開始
+  const handleStartEdit = () => {
+    setEditFormData({
+      last_name: selectedCustomer.last_name || '',
+      first_name: selectedCustomer.first_name || '',
+      last_name_kana: selectedCustomer.last_name_kana || '',
+      first_name_kana: selectedCustomer.first_name_kana || '',
+      phone_number: selectedCustomer.phone_number || '',
+      email: selectedCustomer.email || '',
+      birth_date: selectedCustomer.birth_date || '',
+      notes: selectedCustomer.notes || '',
+      base_visit_count: selectedCustomer.base_visit_count || '',
+      line_user_id: selectedCustomer.line_user_id || ''
+    });
+    setIsEditMode(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+  };
+
+  // 編集キャンセル
+  const handleCancelEdit = () => {
+    setIsEditMode(false);
+    setEditFormData({
+      last_name: '',
+      first_name: '',
+      last_name_kana: '',
+      first_name_kana: '',
+      phone_number: '',
+      email: '',
+      birth_date: '',
+      notes: '',
+      base_visit_count: '',
+      line_user_id: ''
+    });
+    setErrorMessage('');
+    setSuccessMessage('');
+  };
+
+  // 保存処理
+  const handleSaveEdit = async () => {
+    // バリデーション
+    if (!editFormData.last_name || !editFormData.first_name || !editFormData.phone_number) {
+      setErrorMessage('姓・名・電話番号は必須です');
+      return;
+    }
+
+    setIsSaving(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    try {
+      const response = await fetch(`/api/customers/${selectedCustomer.customer_id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(editFormData)
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setSuccessMessage('顧客情報を更新しました');
+        setIsEditMode(false);
+        // 最新情報を再取得
+        await handleSelectCustomer(selectedCustomer.customer_id);
+
+        // 成功メッセージを3秒後に消す
+        setTimeout(() => {
+          setSuccessMessage('');
+        }, 3000);
+      } else {
+        setErrorMessage(result.error || '更新に失敗しました');
+      }
+    } catch (error) {
+      console.error('更新エラー:', error);
+      setErrorMessage('更新中にエラーが発生しました');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="customers-page">
       {/* ヘッダー */}
@@ -129,13 +230,13 @@ const CustomersPage = () => {
             <div className="customers-page__search-box">
               <label className="customers-page__search-label">
                 <Search size={16} />
-                お客様検索（名前）
+                お客様検索(名前)
               </label>
               <div className="customers-page__search-input-group">
                 <input
                   type="text"
                   className="customers-page__search-input"
-                  placeholder="姓名を入力（例: 田中、田中花子）"
+                  placeholder="姓名を入力(例: 田中、田中花子)"
                   value={searchName}
                   onChange={(e) => setSearchName(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleNameSearch()}
@@ -162,7 +263,7 @@ const CustomersPage = () => {
                     >
                       <div className="customers-page__result-name">
                         {customer.last_name} {customer.first_name}
-                        （{customer.last_name_kana} {customer.first_name_kana}）
+                        ({customer.last_name_kana} {customer.first_name_kana})
                       </div>
                       <div className="customers-page__result-info">
                         <div className="customers-page__result-info-item">
@@ -234,40 +335,91 @@ const CustomersPage = () => {
                 <h2>{selectedCustomer.last_name} {selectedCustomer.first_name} 様</h2>
               </div>
               <div className="customers-page__detail-actions">
-                <button className="customers-page__action-btn customers-page__action-btn--secondary">
-                  <Edit2 size={16} />
-                  編集
-                </button>
-                <button className="customers-page__action-btn customers-page__action-btn--primary">
-                  <Plus size={16} />
-                  新規予約
-                </button>
+                {!isEditMode ? (
+                  <>
+                    <button
+                      className="customers-page__action-btn customers-page__action-btn--secondary"
+                      onClick={handleStartEdit}
+                      disabled={activeTab !== 'basic'}
+                    >
+                      <Edit2 size={16} />
+                      編集
+                    </button>
+                    <button className="customers-page__action-btn customers-page__action-btn--primary">
+                      <Plus size={16} />
+                      新規予約
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      className="customers-page__action-btn customers-page__action-btn--secondary"
+                      onClick={handleCancelEdit}
+                      disabled={isSaving}
+                    >
+                      <X size={16} />
+                      キャンセル
+                    </button>
+                    <button
+                      className="customers-page__action-btn customers-page__action-btn--primary"
+                      onClick={handleSaveEdit}
+                      disabled={isSaving}
+                    >
+                      <Save size={16} />
+                      {isSaving ? '保存中...' : '保存'}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
+
+            {/* エラー・成功メッセージ */}
+            {errorMessage && (
+              <div className="customers-page__message customers-page__message--error">
+                {errorMessage}
+              </div>
+            )}
+            {successMessage && (
+              <div className="customers-page__message customers-page__message--success">
+                {successMessage}
+              </div>
+            )}
 
             {/* タブナビゲーション */}
             <div className="customers-page__tabs">
               <button
                 className={`customers-page__tab ${activeTab === 'basic' ? 'customers-page__tab--active' : ''}`}
-                onClick={() => setActiveTab('basic')}
+                onClick={() => {
+                  setActiveTab('basic');
+                  if (isEditMode) handleCancelEdit();
+                }}
               >
                 基本情報
               </button>
               <button
                 className={`customers-page__tab ${activeTab === 'tickets' ? 'customers-page__tab--active' : ''}`}
-                onClick={() => setActiveTab('tickets')}
+                onClick={() => {
+                  setActiveTab('tickets');
+                  if (isEditMode) handleCancelEdit();
+                }}
               >
                 保有回数券
               </button>
               <button
                 className={`customers-page__tab ${activeTab === 'coupons' ? 'customers-page__tab--active' : ''}`}
-                onClick={() => setActiveTab('coupons')}
+                onClick={() => {
+                  setActiveTab('coupons');
+                  if (isEditMode) handleCancelEdit();
+                }}
               >
                 クーポン利用履歴
               </button>
               <button
                 className={`customers-page__tab ${activeTab === 'history' ? 'customers-page__tab--active' : ''}`}
-                onClick={() => setActiveTab('history')}
+                onClick={() => {
+                  setActiveTab('history');
+                  if (isEditMode) handleCancelEdit();
+                }}
               >
                 来店履歴
               </button>
@@ -278,61 +430,205 @@ const CustomersPage = () => {
               {/* 基本情報タブ */}
               {activeTab === 'basic' && (
                 <div className="customers-page__info-grid">
+                  {/* 来店回数 */}
                   <div className="customers-page__info-item">
-                    <div className="customers-page__info-label">来店回数</div>
-                    <div className="customers-page__info-value" style={{ color: '#3b82f6', fontWeight: 700 }}>
-                      {selectedCustomer.visit_count} 回
-                    </div>
-                  </div>
-                  <div className="customers-page__info-item">
-                    <div className="customers-page__info-label">フリガナ</div>
-                    <div className="customers-page__info-value">
-                      {selectedCustomer.last_name_kana} {selectedCustomer.first_name_kana}
-                    </div>
-                  </div>
-                  <div className="customers-page__info-item">
-                    <div className="customers-page__info-label">電話番号</div>
-                    <div className="customers-page__info-value">
-                      <Phone size={20} />
-                      {selectedCustomer.phone_number}
-                    </div>
-                  </div>
-                  <div className="customers-page__info-item">
-                    <div className="customers-page__info-label">メールアドレス</div>
-                    <div className="customers-page__info-value">
-                      {selectedCustomer.email ? (
-                        <>
-                          <Mail size={20} />
-                          {selectedCustomer.email}
-                        </>
-                      ) : (
-                        <span className="customers-page__info-value--empty">未登録</span>
+                    <div className="customers-page__info-label">
+                      来店回数
+                      {isEditMode && (
+                        <span style={{ fontSize: '0.75rem', color: '#6b7280', marginLeft: '0.5rem' }}>
+                          (初回値調整)
+                        </span>
                       )}
                     </div>
+                    {isEditMode ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <input
+                            type="number"
+                            className="customers-page__info-input"
+                            // ★★★ この行を追加 ★★★
+                            placeholder={selectedCustomer.base_visit_count || 0}
+                            value={editFormData.base_visit_count}
+                            onChange={(e) => setEditFormData({
+                              ...editFormData,
+                              base_visit_count: parseInt(e.target.value) || ''
+                            })}
+                            min="0"
+                            style={{ width: '120px' }}
+                          />
+                          <span style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+                            回 (来店記録分は自動加算)
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="customers-page__info-value" style={{ color: '#3b82f6', fontWeight: 700 }}>
+                        {selectedCustomer.visit_count} 回
+                      </div>
+                    )}
                   </div>
+
+                  {/* 姓名 */}
+                  <div className="customers-page__info-item">
+                    <div className="customers-page__info-label">
+                      氏名 {isEditMode && <span className="customers-page__form-required">*</span>}
+                    </div>
+                    {isEditMode ? (
+                      <div style={{ display: 'flex', gap: '0.75rem' }}>
+                        <input
+                          type="text"
+                          className="customers-page__info-input"
+                          value={editFormData.last_name}
+                          onChange={(e) => setEditFormData({ ...editFormData, last_name: e.target.value })}
+                          placeholder="姓"
+                        />
+                        <input
+                          type="text"
+                          className="customers-page__info-input"
+                          value={editFormData.first_name}
+                          onChange={(e) => setEditFormData({ ...editFormData, first_name: e.target.value })}
+                          placeholder="名"
+                        />
+                      </div>
+                    ) : (
+                      <div className="customers-page__info-value">
+                        {selectedCustomer.last_name} {selectedCustomer.first_name}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* フリガナ */}
+                  <div className="customers-page__info-item">
+                    <div className="customers-page__info-label">フリガナ</div>
+                    {isEditMode ? (
+                      <div style={{ display: 'flex', gap: '0.75rem' }}>
+                        <input
+                          type="text"
+                          className="customers-page__info-input"
+                          value={editFormData.last_name_kana}
+                          onChange={(e) => setEditFormData({ ...editFormData, last_name_kana: e.target.value })}
+                          placeholder="セイ"
+                        />
+                        <input
+                          type="text"
+                          className="customers-page__info-input"
+                          value={editFormData.first_name_kana}
+                          onChange={(e) => setEditFormData({ ...editFormData, first_name_kana: e.target.value })}
+                          placeholder="メイ"
+                        />
+                      </div>
+                    ) : (
+                      <div className="customers-page__info-value">
+                        {selectedCustomer.last_name_kana} {selectedCustomer.first_name_kana}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 電話番号 */}
+                  <div className="customers-page__info-item">
+                    <div className="customers-page__info-label">
+                      電話番号 {isEditMode && <span className="customers-page__form-required">*</span>}
+                    </div>
+                    {isEditMode ? (
+                      <input
+                        type="tel"
+                        className="customers-page__info-input"
+                        value={editFormData.phone_number}
+                        onChange={(e) => setEditFormData({ ...editFormData, phone_number: e.target.value })}
+                        placeholder="090-0000-0000"
+                      />
+                    ) : (
+                      <div className="customers-page__info-value">
+                        <Phone size={20} />
+                        {selectedCustomer.phone_number}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* メールアドレス */}
+                  <div className="customers-page__info-item">
+                    <div className="customers-page__info-label">メールアドレス</div>
+                    {isEditMode ? (
+                      <input
+                        type="email"
+                        className="customers-page__info-input"
+                        value={editFormData.email}
+                        onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                        placeholder="example@email.com"
+                      />
+                    ) : (
+                      <div className="customers-page__info-value">
+                        {selectedCustomer.email ? (
+                          <>
+                            <Mail size={20} />
+                            {selectedCustomer.email}
+                          </>
+                        ) : (
+                          <span className="customers-page__info-value--empty">未登録</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 生年月日 */}
                   <div className="customers-page__info-item">
                     <div className="customers-page__info-label">生年月日</div>
-                    <div className="customers-page__info-value">
-                      {selectedCustomer.birth_date || <span className="customers-page__info-value--empty">未登録</span>}
-                    </div>
+                    {isEditMode ? (
+                      <input
+                        type="date"
+                        className="customers-page__info-input"
+                        value={editFormData.birth_date}
+                        onChange={(e) => setEditFormData({ ...editFormData, birth_date: e.target.value })}
+                      />
+                    ) : (
+                      <div className="customers-page__info-value">
+                        {selectedCustomer.birth_date || <span className="customers-page__info-value--empty">未登録</span>}
+                      </div>
+                    )}
                   </div>
+
+                  {/* 初回登録日 - 編集不可 */}
                   <div className="customers-page__info-item">
                     <div className="customers-page__info-label">初回登録日</div>
                     <div className="customers-page__info-value">
                       {new Date(selectedCustomer.created_at).toLocaleDateString('ja-JP')}
                     </div>
                   </div>
+
+                  {/* LINE ユーザーID */}
                   <div className="customers-page__info-item">
                     <div className="customers-page__info-label">LINE ユーザーID</div>
-                    <div className="customers-page__info-value">
-                      {selectedCustomer.line_user_id || <span className="customers-page__info-value--empty">未登録</span>}
-                    </div>
+                    {isEditMode ? (
+                      <input
+                        type="text"
+                        className="customers-page__info-input"
+                        value={editFormData.line_user_id}
+                        onChange={(e) => setEditFormData({ ...editFormData, line_user_id: e.target.value })}
+                        placeholder="LINE連携時に自動入力されます"
+                      />
+                    ) : (
+                      <div className="customers-page__info-value">
+                        {selectedCustomer.line_user_id || <span className="customers-page__info-value--empty">未登録</span>}
+                      </div>
+                    )}
                   </div>
+
+                  {/* 備考 */}
                   <div className="customers-page__info-item" style={{ gridColumn: '1 / -1' }}>
                     <div className="customers-page__info-label">備考</div>
-                    <div className="customers-page__info-value">
-                      {selectedCustomer.notes || <span className="customers-page__info-value--empty">なし</span>}
-                    </div>
+                    {isEditMode ? (
+                      <textarea
+                        className="customers-page__info-textarea"
+                        value={editFormData.notes}
+                        onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
+                        placeholder="特記事項があれば記入してください"
+                        rows={4}
+                      />
+                    ) : (
+                      <div className="customers-page__info-value">
+                        {selectedCustomer.notes || <span className="customers-page__info-value--empty">なし</span>}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -490,7 +786,8 @@ const CustomersPage = () => {
                                   {visit.ticket_purchases.map((ticket, idx) => (
                                     <div key={idx} style={{ color: '#10b981' }}>
                                       {isTicketPurchaseOnly ? '' : '+ '}
-                                      回数券購入: {ticket.plan_name}
+                                      回数券購入: {
+                                        ticket.plan_name}
                                       <span style={{ color: '#6b7280', marginLeft: '0.5rem' }}>
                                         (¥{ticket.amount.toLocaleString()})
                                       </span>

@@ -1,47 +1,43 @@
-/* 分析ページのベーススタイル */
+/* analytics.css */
 .analytics {
   min-height: 100vh;
-  background-color: #f9fafb;
+  background: #f9fafb;
 }
 
 /* ヘッダー */
 .analytics__header {
-  background: linear-gradient(to right, #3b82f6, #2563eb);
-  color: white;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  padding: 1rem 0;
 }
 
 .analytics__header-container {
-  max-width: 1280px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 0 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  height: 4rem;
+  padding: 0 1.5rem;
+}
+
+.analytics__header-nav {
+  margin-bottom: 1rem;
 }
 
 .analytics__back-link {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.75rem;
-  color: white;
+  gap: 0.5rem;
+  color: #6b7280;
   text-decoration: none;
   transition: color 0.2s;
+  font-size: 0.875rem;
 }
 
 .analytics__back-link:hover {
-  color: #bfdbfe;
+  color: #3b82f6;
 }
 
 .analytics__back-icon {
-  width: 1.25rem;
-  height: 1.25rem;
-}
-
-.analytics__back-link span {
-  font-size: 0.875rem;
-  font-weight: 500;
+  width: 16px;
+  height: 16px;
 }
 
 .analytics__header-title {
@@ -51,89 +47,342 @@
 }
 
 .analytics__header-icon {
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 28px;
+  height: 28px;
+  color: #3b82f6;
 }
 
 .analytics__header-title h1 {
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   font-weight: 700;
+  color: #111827;
   margin: 0;
 }
 
 /* メインコンテンツ */
 .analytics__main {
-  max-width: 1280px;
+  max-width: 1400px;
   margin: 0 auto;
-  padding: 2rem 1rem;
+  padding: 2rem 1.5rem;
 }
 
-.analytics__content-card {
-  background-color: white;
+/* コントロールパネル */
+.analytics__controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.analytics__date-range {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: white;
+  padding: 0.5rem 1rem;
   border-radius: 0.5rem;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
   border: 1px solid #e5e7eb;
-  padding: 2rem;
-  text-align: center;
 }
 
-.analytics__content-header {
+.analytics__date-input {
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  padding: 0.5rem;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.analytics__date-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.analytics__period-toggle {
+  display: flex;
+  background: white;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+  overflow: hidden;
+}
+
+.analytics__period-btn {
+  padding: 0.5rem 1.25rem;
+  border: none;
+  background: white;
+  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-right: 1px solid #e5e7eb;
+}
+
+.analytics__period-btn:last-child {
+  border-right: none;
+}
+
+.analytics__period-btn:hover {
+  background: #f9fafb;
+}
+
+.analytics__period-btn--active {
+  background: #3b82f6;
+  color: white;
+}
+
+.analytics__export-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1.25rem;
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-left: auto;
+}
+
+.analytics__export-btn:hover:not(:disabled) {
+  background: #059669;
+}
+
+.analytics__export-btn:disabled {
+  background: #d1d5db;
+  cursor: not-allowed;
+}
+
+/* タブナビゲーション */
+.analytics__tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  overflow-x: auto;
+  padding-bottom: 0.5rem;
+}
+
+.analytics__tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.analytics__tab:hover {
+  background: #f9fafb;
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.analytics__tab--active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
+/* コンテンツエリア */
+.analytics__content {
+  background: white;
+  border-radius: 0.75rem;
+  border: 1px solid #e5e7eb;
+  padding: 1.5rem;
+  min-height: 500px;
+}
+
+.analytics__loading,
+.analytics__no-data {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 500px;
+  color: #6b7280;
+  font-size: 1rem;
+}
+
+/* カード共通スタイル */
+.analytics-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
   margin-bottom: 1.5rem;
 }
 
-.analytics__content-icon {
-  width: 4rem;
-  height: 4rem;
-  color: #3b82f6;
-  margin: 0 auto 1rem auto;
+.analytics-card__title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0 0 1rem 0;
 }
 
-.analytics__content-title {
-  font-size: 1.5rem;
+.analytics-card__subtitle {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin: 0 0 1rem 0;
+}
+
+/* メトリクスグリッド */
+.analytics-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.analytics-metric {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 1.25rem;
+}
+
+.analytics-metric__label {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.analytics-metric__value {
+  font-size: 1.875rem;
   font-weight: 700;
   color: #111827;
-  margin: 0 0 0.5rem 0;
+  display: block;
 }
 
-.analytics__content-description {
+.analytics-metric__unit {
+  font-size: 1rem;
+  font-weight: 400;
   color: #6b7280;
-  margin: 0;
+  margin-left: 0.25rem;
 }
 
-.analytics__content-status {
+/* テーブル */
+.analytics-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+.analytics-table th {
+  background: #f9fafb;
+  padding: 0.75rem;
+  text-align: left;
   font-size: 0.875rem;
-  color: #9ca3af;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 2px solid #e5e7eb;
 }
 
-/* レスポンシブ対応 */
+.analytics-table td {
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  color: #111827;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.analytics-table tr:hover {
+  background: #f9fafb;
+}
+
+.analytics-table__number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* チャートコンテナ */
+.analytics-chart {
+  margin-top: 1.5rem;
+  min-height: 400px;
+}
+
+/* バッジ */
+.analytics-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.analytics-badge--active {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.analytics-badge--inactive {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.analytics-badge--warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+/* プログレスバー */
+.analytics-progress {
+  width: 100%;
+  height: 8px;
+  background: #f3f4f6;
+  border-radius: 9999px;
+  overflow: hidden;
+  margin-top: 0.5rem;
+}
+
+.analytics-progress__bar {
+  height: 100%;
+  background: #3b82f6;
+  transition: width 0.3s;
+}
+
+/* レスポンシブ */
 @media (max-width: 768px) {
-  .analytics__header-container {
-    padding: 0 1rem;
-    flex-direction: column;
-    gap: 0.5rem;
-    height: auto;
-    padding-top: 1rem;
-    padding-bottom: 1rem;
-  }
-  
-  .analytics__header-title h1 {
-    font-size: 1.125rem;
-  }
-  
   .analytics__main {
     padding: 1rem;
   }
-  
-  .analytics__content-card {
-    padding: 1.5rem;
+
+  .analytics__controls {
+    flex-direction: column;
+    align-items: stretch;
   }
-  
-  .analytics__content-icon {
-    width: 3rem;
-    height: 3rem;
+
+  .analytics__export-btn {
+    margin-left: 0;
   }
-  
-  .analytics__content-title {
-    font-size: 1.25rem;
+
+  .analytics__tabs {
+    flex-wrap: nowrap;
+  }
+
+  .analytics-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .analytics__content {
+    padding: 1rem;
+  }
+
+  .analytics-table {
+    font-size: 0.75rem;
+  }
+
+  .analytics-table th,
+  .analytics-table td {
+    padding: 0.5rem;
   }
 }
