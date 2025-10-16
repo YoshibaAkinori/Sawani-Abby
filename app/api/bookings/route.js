@@ -67,6 +67,7 @@ export async function GET(request) {
   LEFT JOIN coupons cp ON b.coupon_id = cp.coupon_id
   LEFT JOIN limited_offers lo ON b.limited_offer_id = lo.offer_id
   WHERE 1=1
+  AND b.status NOT IN ('cancelled', 'no_show')
 `;
 
     const params = [];
@@ -387,7 +388,6 @@ export async function POST(request) {
 
 // 予約更新
 export async function PUT(request) {
-  // ★★★ 修正点 ★★★
   const pool = await getConnection();
   const connection = await pool.getConnection();
 
@@ -414,6 +414,21 @@ export async function PUT(request) {
 
     await connection.beginTransaction();
 
+    // 変更前のデータを取得
+    const [beforeData] = await connection.execute(
+      'SELECT * FROM bookings WHERE booking_id = ?',
+      [booking_id]
+    );
+
+    if (beforeData.length === 0) {
+      return NextResponse.json(
+        { success: false, error: '予約が見つかりません' },
+        { status: 404 }
+      );
+    }
+
+    const before = beforeData[0];
+
     // 予約を更新
     await connection.execute(
       `UPDATE bookings 
@@ -428,6 +443,28 @@ export async function PUT(request) {
       [date, start_time, end_time, staff_id, bed_id, status, notes, booking_id]
     );
 
+    // 変更内容を記録
+    const changes = {
+      before: {
+        date: before.date,
+        start_time: before.start_time,
+        end_time: before.end_time,
+        staff_id: before.staff_id,
+        bed_id: before.bed_id,
+        status: before.status,
+        notes: before.notes
+      },
+      after: {
+        date,
+        start_time,
+        end_time,
+        staff_id,
+        bed_id,
+        status,
+        notes
+      }
+    };
+
     // 履歴を記録
     await connection.execute(
       `INSERT INTO booking_history (
@@ -436,7 +473,7 @@ export async function PUT(request) {
         change_type,
         details
       ) VALUES (UUID(), ?, 'update', ?)`,
-      [booking_id, JSON.stringify({ date, start_time, end_time, staff_id, bed_id, status })]
+      [booking_id, JSON.stringify(changes)]
     );
 
     await connection.commit();
@@ -453,7 +490,6 @@ export async function PUT(request) {
       { status: 500 }
     );
   } finally {
-    // ★★★ 修正点 ★★★
     if (connection) {
       connection.release();
     }
@@ -467,6 +503,7 @@ export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
     const bookingId = searchParams.get('id');
+    const cancelType = searchParams.get('cancelType'); // 'with_contact' or 'no_contact'
 
     if (!bookingId) {
       return NextResponse.json(
@@ -490,53 +527,53 @@ export async function DELETE(request) {
       );
     }
 
-    // 回数券使用の予約の場合は回数を戻す（後方互換性用）
-    if (booking[0].customer_ticket_id) {
-      await connection.execute(
-        `UPDATE customer_tickets 
-         SET sessions_remaining = sessions_remaining + 1
-         WHERE customer_ticket_id = ?`,
-        [booking[0].customer_ticket_id]
-      );
-    }
+    const bookingData = booking[0];
 
-    // 中間テーブルに登録されている回数券の回数を戻す
-    const [bookingTickets] = await connection.execute(
-      'SELECT customer_ticket_id FROM booking_tickets WHERE booking_id = ?',
-      [bookingId]
-    );
+    // ★★★ 重要: 予約キャンセル時は回数券の回数を戻さない ★★★
+    // 理由: 予約時に回数を減らしていないため、キャンセル時も何もしない
+    // 回数券は会計（支払い）時に初めて減らされる
 
-    for (const ticket of bookingTickets) {
-      await connection.execute(
-        `UPDATE customer_tickets 
-         SET sessions_remaining = sessions_remaining + 1
-         WHERE customer_ticket_id = ?`,
-        [ticket.customer_ticket_id]
-      );
-    }
+    // 参考: もし既に会計済み（completed）の予約をキャンセルする場合は
+    // 会計データも取り消す必要があるが、それは別の処理として実装すべき
 
-    // 履歴を記録
+    // キャンセル理由を含めた履歴を記録
+    const cancelDetails = {
+      ...bookingData,
+      cancel_type: cancelType || 'unknown', // 'with_contact', 'no_contact', 'unknown'
+      cancelled_at: new Date().toISOString()
+    };
+
     await connection.execute(
       `INSERT INTO booking_history (
         history_id,
         booking_id,
         change_type,
         details
-      ) VALUES (UUID(), ?, 'cancel', ?)`,
-      [bookingId, JSON.stringify(booking[0])]
+      ) VALUES (UUID(), ?, ?, ?)`,
+      [
+        bookingId,
+        cancelType === 'no_contact' ? 'no_show' : 'cancel',
+        JSON.stringify(cancelDetails)
+      ]
     );
 
-    // 予約をキャンセルに
+    // 予約をキャンセルに（statusも区別する場合）
+    const cancelStatus = cancelType === 'no_contact' ? 'no_show' : 'cancelled';
+
     await connection.execute(
-      `UPDATE bookings SET status = 'cancelled' WHERE booking_id = ?`,
-      [bookingId]
+      `UPDATE bookings SET status = ? WHERE booking_id = ?`,
+      [cancelStatus, bookingId]
     );
 
     await connection.commit();
 
+    const message = cancelType === 'no_contact'
+      ? '予約をキャンセルしました（無断キャンセル）'
+      : '予約をキャンセルしました';
+
     return NextResponse.json({
       success: true,
-      message: '予約をキャンセルしました'
+      message
     });
   } catch (error) {
     await connection.rollback();

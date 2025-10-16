@@ -12,7 +12,7 @@ export async function GET(request) {
         b.booking_id,
         b.customer_id,
         b.start_time,
-        b.end_time,        -- ★この行を追加
+        b.end_time,
         b.service_id,
         b.status,
         c.last_name,
@@ -34,6 +34,7 @@ export async function GET(request) {
       LEFT JOIN staff st ON b.staff_id = st.staff_id
       WHERE b.date = ?
         AND b.status IN ('pending', 'confirmed', 'completed')
+        AND b.status NOT IN ('cancelled', 'no_show')
         AND b.type = 'booking'
       ORDER BY b.start_time ASC`,
       [today]

@@ -96,7 +96,6 @@ const SalonBoard = () => {
     timeSlots.push(`${hour.toString().padStart(2, '0')}:30`);
   }
 
-  const getBookingsByDate = (date) => bookingsDatabase.filter(booking => booking.date === date);
 
   // 時間ヘッダー用の無記名スタッフデータ
   const headerRowData = {
@@ -185,6 +184,33 @@ const SalonBoard = () => {
       date: selectedDate
     });
     setActiveModal('booking');
+  };
+  // 予約カードクリック処理を追加
+  const handleBookingClick = async (bookingId) => {
+    try {
+      // 予約詳細を取得
+      const response = await fetch(`/api/bookings?id=${bookingId}`);
+      const data = await response.json();
+
+      if (data.success && data.data.length > 0) {
+        const booking = data.data[0];
+
+        setSelectedSlot({
+          bookingId: booking.booking_id,
+          isEdit: true, // 編集モードフラグ
+          staffId: booking.staff_id,
+          staffName: booking.staff_name,
+          date: booking.date.split('T')[0],
+          timeSlot: booking.start_time,
+          // 予約の全データを渡す
+          bookingData: booking
+        });
+        setActiveModal('booking');
+      }
+    } catch (err) {
+      console.error('予約詳細取得エラー:', err);
+      alert('予約情報の取得に失敗しました');
+    }
   };
 
   // モーダルを閉じる
@@ -335,7 +361,13 @@ const SalonBoard = () => {
                                 const { left, width } = calculateBookingPosition(booking.startTime, booking.endTime);
                                 const serviceColorClass = getServiceColorClass(booking.serviceType);
                                 return (
-                                  <div key={booking.id} className={`salon-board__booking ${serviceColorClass}`} style={{ left, width }}>
+                                  // スタッフ別スケジュールの予約カード
+                                  <div
+                                    key={booking.id}
+                                    className={`salon-board__booking ${serviceColorClass}`}
+                                    onClick={() => handleBookingClick(booking.id)} // 追加
+                                    style={{ left, width, cursor: 'pointer' }} // cursor追加
+                                  >
                                     <div className="salon-board__booking-content">
                                       {booking.type === 'schedule' ? (
                                         <div className="salon-board__booking-client">{booking.service}</div>

@@ -67,8 +67,6 @@ const SalesTrendChart = ({ data, period }) => {
                 <th>期間</th>
                 <th className="analytics-table__number">取引数</th>
                 <th className="analytics-table__number">総売上</th>
-                <th className="analytics-table__number">現金</th>
-                <th className="analytics-table__number">カード</th>
                 <th className="analytics-table__number">平均単価</th>
                 <th className="analytics-table__number">顧客数</th>
               </tr>

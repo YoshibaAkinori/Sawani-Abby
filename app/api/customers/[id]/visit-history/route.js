@@ -5,9 +5,11 @@ import { getConnection } from '../../../../../lib/db';
 export async function GET(request, { params }) {
   try {
     const pool = await getConnection();
-    const { id: customerId } = await params;
+    const { id } = await params;
+    const customerId = id;
     const connection = await pool.getConnection();
 
+    // 1. 会計済み来店履歴を取得
     const [payments] = await connection.query(`
       SELECT 
         p.payment_id,
@@ -34,8 +36,41 @@ export async function GET(request, { params }) {
       ORDER BY p.payment_date DESC
     `, [customerId]);
 
+    // 2. キャンセルされた予約を取得
+    const [cancelledBookings] = await connection.query(`
+      SELECT 
+        b.booking_id,
+        b.date,
+        b.start_time,
+        b.status,
+        b.notes,
+        s.name as staff_name,
+        COALESCE(
+          cp.name,
+          lo.name,
+          tp.name,
+          sv.name,
+          b.notes
+        ) as service_name,
+        bh.changed_at as cancelled_at
+      FROM bookings b
+      LEFT JOIN staff s ON b.staff_id = s.staff_id
+      LEFT JOIN services sv ON b.service_id = sv.service_id
+      LEFT JOIN customer_tickets ct ON b.customer_ticket_id = ct.customer_ticket_id
+      LEFT JOIN ticket_plans tp ON ct.plan_id = tp.plan_id
+      LEFT JOIN coupons cp ON b.coupon_id = cp.coupon_id
+      LEFT JOIN limited_offers lo ON b.limited_offer_id = lo.offer_id
+      LEFT JOIN booking_history bh ON b.booking_id = bh.booking_id 
+        AND bh.change_type IN ('cancel', 'no_show')
+      WHERE b.customer_id = ?
+        AND b.status IN ('cancelled', 'no_show')
+        AND b.type = 'booking'
+      ORDER BY b.date DESC
+    `, [customerId]);
+
     const visitHistory = [];
 
+    // 会計済み来店履歴を処理
     for (const payment of payments) {
       const [childPayments] = await connection.query(`
         SELECT 
@@ -51,7 +86,6 @@ export async function GET(request, { params }) {
         ORDER BY payment_date ASC
       `, [payment.payment_id]);
 
-      // 孫レコードも取得
       const allChildPayments = [...childPayments];
       for (const child of childPayments) {
         const [grandChildren] = await connection.query(`
@@ -86,7 +120,6 @@ export async function GET(request, { params }) {
       let ticketUses = [];
       let totalAmount = payment.total_amount;
 
-      // ★親レコード自体の残金支払い額を加算
       if (payment.payment_amount > 0) {
         totalAmount += payment.payment_amount;
       }
@@ -159,7 +192,6 @@ export async function GET(request, { params }) {
             });
           }
         } else if (child.payment_type === 'ticket' && child.ticket_id) {
-          // ★子レコードの残金支払い額も加算
           if (child.payment_amount > 0) {
             totalAmount += child.payment_amount;
           }
@@ -241,6 +273,7 @@ export async function GET(request, { params }) {
       }
 
       visitHistory.push({
+        type: 'completed',
         payment_id: payment.payment_id,
         date: payment.date,
         service: isParentTicketPurchase ? '' : serviceDisplay,
@@ -254,6 +287,24 @@ export async function GET(request, { params }) {
         ticket_purchases: ticketPurchases
       });
     }
+
+    // キャンセル履歴を追加
+    for (const cancel of cancelledBookings) {
+      visitHistory.push({
+        type: 'cancelled',
+        booking_id: cancel.booking_id,
+        date: cancel.date,
+        time: cancel.start_time,
+        service: cancel.service_name || 'サービス情報なし',
+        staff: cancel.staff_name || '不明',
+        cancel_type: cancel.status, // 'cancelled' or 'no_show'
+        cancelled_at: cancel.cancelled_at,
+        notes: cancel.notes
+      });
+    }
+
+    // 日付でソート
+    visitHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     connection.release();
 

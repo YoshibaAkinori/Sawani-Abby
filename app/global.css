@@ -294,7 +294,7 @@
   box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.1);
   border-left: 4px solid;
   cursor: pointer;
-  height: 86px;
+  height: 66px;
   transition: box-shadow 0.2s, transform 0.2s;
 }
 
@@ -732,7 +732,7 @@
 .salon-board__booking-in-scroll {
   position: absolute;
   top: 2px;
-  height: 86px;
+  height: 66px;
   border-radius: 6px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
   border-left: 4px solid;

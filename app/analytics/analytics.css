@@ -386,3 +386,139 @@
     padding: 0.5rem;
   }
 }
+/* テーブルスタイル */
+.analytics-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed; /* 重要: 列幅を固定 */
+}
+
+.analytics-table thead {
+  background: #f9fafb;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.analytics-table th {
+  padding: 0.875rem 1rem;
+  text-align: left;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  border-bottom: 2px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+/* 列幅の指定 */
+.analytics-table th:first-child {
+  width: 40%; /* 名前/日付列 */
+}
+
+.analytics-table th:nth-child(2) {
+  width: 20%; /* 総キャンセル/取引数など */
+  text-align: right;
+}
+
+.analytics-table th:nth-child(3) {
+  width: 20%; /* 連絡あり */
+  text-align: right;
+}
+
+.analytics-table th:nth-child(4) {
+  width: 20%; /* 無断 */
+  text-align: right;
+}
+
+/* 数値列は右寄せ */
+.analytics-table th.analytics-table__number {
+  text-align: right;
+}
+
+.analytics-table tbody tr {
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.15s;
+}
+
+.analytics-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.analytics-table td {
+  padding: 1rem;
+  font-size: 0.9375rem;
+  color: #1f2937;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 数値セルは右寄せ */
+.analytics-table td.analytics-table__number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* スタッフ名セル */
+.analytics-table__staff-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow: hidden;
+}
+
+.analytics-table__staff-color {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.analytics-table__staff-cell span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* カラー別の数値 */
+.analytics-table__number--with-contact {
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.analytics-table__number--no-show {
+  color: #ef4444;
+  font-weight: 600;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+  .analytics-table {
+    font-size: 0.875rem;
+  }
+  
+  .analytics-table th,
+  .analytics-table td {
+    padding: 0.75rem 0.5rem;
+  }
+  
+  .analytics-table th:first-child,
+  .analytics-table td:first-child {
+    width: 35%;
+  }
+}
+
+/* テーブルコンテナ */
+.analytics-table-container {
+  overflow-x: auto;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+/* 空データメッセージ */
+.no-data-message {
+  text-align: center;
+  padding: 3rem;
+  color: #9ca3af;
+  font-size: 0.9375rem;
+}

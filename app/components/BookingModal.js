@@ -1,21 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { X, Search, Calendar, Clock, User, Phone, Mail, AlertCircle, Tag, Package, Timer, Settings2, CalendarPlus, CalendarCheck } from 'lucide-react';
+import { X, Search, Calendar, Clock, User, Phone, Mail, AlertCircle, Tag, Package, Timer, Settings2, CalendarPlus, CalendarCheck, Ban, AlertTriangle } from 'lucide-react';
 import './BookingModal.css';
 
 const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => {
+  // 編集モードかどうか
+  const isEditMode = selectedSlot?.isEdit || false;
+  const bookingId = selectedSlot?.bookingId || null;
+
   // フォームの状態管理
   const [formData, setFormData] = useState({
-    // 予約タイプ(booking: 予約, schedule: 予定)
     bookingType: 'booking',
-
-    // 予約情報
     date: selectedSlot?.date || new Date().toISOString().split('T')[0],
     startTime: selectedSlot?.timeSlot || new Date().toTimeString().slice(0, 5),
     endTime: '',
     staffId: selectedSlot?.staffId || '',
     bedId: '1',
-
-    // 顧客情報
     customerId: '',
     visitCount: 0,
     lastName: '',
@@ -24,21 +23,19 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
     firstNameKana: '',
     phoneNumber: '',
     email: '',
-
-    // 施術情報
     serviceId: '',
-    serviceType: 'normal', // normal, ticket, coupon, limited
+    serviceType: 'normal',
     optionIds: [],
-
-    // 支払い情報
-    ticketIds: [], // ← 配列に変更
+    ticketIds: [],
     couponId: '',
-    limitedOfferIds: [], // ← 配列に変更
-
-    // 備考
+    limitedOfferIds: [],
     notes: '',
     scheduleTitle: ''
   });
+
+  // キャンセルモーダルの状態
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelType, setCancelType] = useState(''); // 'with_contact' or 'no_contact'
 
   // マスタデータ
   const [services, setServices] = useState([]);
@@ -50,7 +47,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
   const [customers, setCustomers] = useState([]);
   const [customerTickets, setCustomerTickets] = useState([]);
 
-  // UI状態
+  // UIステート
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchName, setSearchName] = useState('');
@@ -60,14 +57,97 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
   useEffect(() => {
     if (activeModal === 'booking') {
       fetchMasterData();
+
+      // 編集モードの場合は予約データをフォームにセット
+      if (isEditMode && selectedSlot?.bookingData) {
+        loadBookingData(selectedSlot.bookingData);
+      }
     }
-  }, [activeModal]);
+  }, [activeModal, isEditMode]);
+
+  // 予約データをフォームにロード
+  const loadBookingData = async (booking) => {
+    console.log('loadBookingData開始:', booking); // デバッグ用
+    setIsLoading(true);
+    try {
+      // 基本情報をセット
+      const baseFormData = {
+        bookingType: booking.type || 'booking',
+        date: booking.date?.split('T')[0] || '',
+        startTime: booking.start_time || '',
+        endTime: booking.end_time || '',
+        staffId: booking.staff_id || '',
+        bedId: booking.bed_id?.toString() || '1',
+        customerId: booking.customer_id || '',
+        visitCount: 0,
+        lastName: booking.last_name || '',
+        firstName: booking.first_name || '',
+        lastNameKana: '',
+        firstNameKana: '',
+        phoneNumber: '',
+        email: '',
+        serviceId: booking.service_id || '',
+        serviceType: booking.coupon_id ? 'coupon' :
+          (booking.tickets?.length > 0) ? 'ticket' :
+            (booking.limited_offers?.length > 0) ? 'limited' : 'normal',
+        optionIds: booking.options?.map(o => o.option_id) || [],
+        ticketIds: booking.tickets?.map(t => t.customer_ticket_id) || [],
+        couponId: booking.coupon_id || '',
+        limitedOfferIds: booking.limited_offers?.map(lo => lo.offer_id) || [],
+        notes: booking.notes || '',
+        scheduleTitle: booking.notes || ''
+      };
+
+      console.log('基本フォームデータ:', baseFormData); // デバッグ用
+      setFormData(baseFormData);
+
+      // 顧客詳細情報を取得
+      if (booking.customer_id) {
+        try {
+          const customerResponse = await fetch(`/api/customers/${booking.customer_id}`);
+          const customerData = await customerResponse.json();
+
+          console.log('顧客データ:', customerData); // デバッグ用
+
+          if (customerData.success && customerData.data) {
+            const customer = customerData.data;
+            setFormData(prev => ({
+              ...prev,
+              visitCount: customer.visit_count || 0,
+              lastNameKana: customer.last_name_kana || '',
+              firstNameKana: customer.first_name_kana || '',
+              phoneNumber: customer.phone_number || '',
+              email: customer.email || ''
+            }));
+
+            // 顧客の回数券情報も取得
+            try {
+              const ticketsResponse = await fetch(`/api/customers/${booking.customer_id}/tickets`);
+              const ticketsData = await ticketsResponse.json();
+              if (ticketsData.success) {
+                setCustomerTickets(ticketsData.data || []);
+              }
+            } catch (ticketErr) {
+              console.error('回数券取得エラー:', ticketErr);
+            }
+          }
+        } catch (customerErr) {
+          console.error('顧客情報取得エラー:', customerErr);
+        }
+      }
+    } catch (err) {
+      console.error('予約データ読み込みエラー:', err);
+      setError('予約情報の読み込みに失敗しました');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // マスタデータ一括取得
   const fetchMasterData = async () => {
     setIsLoading(true);
     try {
-      // 並列でAPIを呼び出し
       const [servicesRes, optionsRes, staffRes, couponsRes, ticketsRes, limitedRes] = await Promise.all([
         fetch('/api/services'),
         fetch('/api/options'),
@@ -98,7 +178,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
     }
   };
 
-  // 顧客検索（名前検索）
+  // 顧客検索(名前検索)
   const searchCustomers = async () => {
     if (!searchName.trim()) return;
 
@@ -108,7 +188,6 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
 
       if (data.success) {
         setSearchResults(data.data || []);
-        // 検索結果が1件の場合は自動選択
         if (data.data?.length === 1) {
           selectCustomer(data.data[0]);
         }
@@ -124,7 +203,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
     setFormData(prev => ({
       ...prev,
       customerId: customer.customer_id,
-      visitCount: customer.visit_count || 0, // ← 追加
+      visitCount: customer.visit_count || 0,
       lastName: customer.last_name,
       firstName: customer.first_name,
       lastNameKana: customer.last_name_kana,
@@ -133,7 +212,6 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
       email: customer.email
     }));
 
-    // 顧客の回数券情報を取得
     try {
       const response = await fetch(`/api/customers/${customer.customer_id}/tickets`);
       const data = await response.json();
@@ -144,29 +222,23 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
       console.error('回数券情報取得エラー:', err);
     }
 
-    // 検索結果をクリア
     setSearchResults([]);
     setSearchName('');
   };
 
-  // 施術時間から終了時間を計算(修正版)
+  // 施術時間から終了時間を計算
   const calculateEndTime = (updatedFormData) => {
     let duration = 0;
 
-    // 予定モードの場合は計算しない
     if (updatedFormData.bookingType === 'schedule') {
       return updatedFormData.endTime;
     }
 
-    // サービスタイプに応じて時間を計算
     if (updatedFormData.serviceType === 'normal' && updatedFormData.serviceId) {
-      // 通常メニュー
       const service = services.find(s => s.service_id === updatedFormData.serviceId);
       duration = service?.duration_minutes || 0;
     } else if (updatedFormData.serviceType === 'coupon' && updatedFormData.couponId) {
-      // クーポン
       const coupon = coupons.find(c => c.coupon_id === updatedFormData.couponId);
-
       if (coupon?.total_duration_minutes) {
         duration = coupon.total_duration_minutes;
       } else if (coupon?.service_duration) {
@@ -178,10 +250,8 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
         duration = 60;
       }
     } else {
-      // 回数券と期間限定の両方を考慮（どちらか一方でも可）
       let maxDuration = 0;
 
-      // 回数券の最長時間を取得
       if (updatedFormData.ticketIds && updatedFormData.ticketIds.length > 0) {
         updatedFormData.ticketIds.forEach(ticketId => {
           const ticket = customerTickets.find(t => t.customer_ticket_id === ticketId);
@@ -195,7 +265,6 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
         });
       }
 
-      // 期間限定の最長時間を取得
       if (updatedFormData.limitedOfferIds && updatedFormData.limitedOfferIds.length > 0) {
         updatedFormData.limitedOfferIds.forEach(offerId => {
           const offer = limitedOffers.find(o => o.offer_id === offerId);
@@ -209,7 +278,6 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
       duration = maxDuration;
     }
 
-    // オプションの時間を加算
     const optionMinutes = updatedFormData.optionIds.reduce((sum, optId) => {
       const option = options.find(o => o.option_id === optId);
       return sum + (option?.duration_minutes || 0);
@@ -227,14 +295,13 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
 
     return `${String(endHour).padStart(2, '0')}:${String(endMinute).padStart(2, '0')}`;
   };
-  // フォーム入力処理(修正版)
+
+  // フォーム入力処理
   const handleInputChange = (field, value) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
 
-      // サービスタイプ変更時の処理
       if (field === 'serviceType') {
-        // 通常メニューまたはクーポンに切り替えた時のみ、回数券・期間限定をクリア
         if (value === 'normal') {
           updated.serviceId = '';
           updated.ticketIds = [];
@@ -246,19 +313,14 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
           updated.couponId = '';
           updated.limitedOfferIds = [];
         } else if (value === 'ticket') {
-          // 回数券タブに切り替え: 通常とクーポンのみクリア、期間限定は保持
           updated.serviceId = '';
           updated.couponId = '';
-          // ticketIdsは保持、limitedOfferIdsも保持
         } else if (value === 'limited') {
-          // 期間限定タブに切り替え: 通常とクーポンのみクリア、回数券は保持
           updated.serviceId = '';
           updated.couponId = '';
-          // limitedOfferIdsは保持、ticketIdsも保持
         }
       }
 
-      // 予約モードの場合のみ終了時間を再計算
       if (updated.bookingType === 'booking' &&
         ['serviceId', 'serviceType', 'ticketIds', 'couponId', 'limitedOfferIds', 'startTime'].includes(field)) {
         updated.endTime = calculateEndTime(updated);
@@ -267,7 +329,8 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
       return updated;
     });
   };
-  // 回数券トグル処理(新規追加)
+
+  // 回数券トグル処理
   const handleTicketToggle = (ticketId) => {
     setFormData(prev => {
       const updated = { ...prev };
@@ -276,16 +339,15 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
       } else {
         updated.ticketIds = [...prev.ticketIds, ticketId];
       }
-      // 終了時間を再計算
       updated.endTime = calculateEndTime(updated);
       return updated;
     });
   };
-  // 期間限定オファートグル処理(新規追加)
+
+  // 期間限定オファートグル処理
   const handleLimitedOfferToggle = (offerId) => {
     const offer = limitedOffers.find(o => o.offer_id === offerId);
 
-    // offer_type が 'ticket' の場合のみ複数選択可能
     if (offer?.offer_type === 'ticket') {
       setFormData(prev => {
         const updated = { ...prev };
@@ -298,7 +360,6 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
         return updated;
       });
     } else {
-      // 'service' タイプは単一選択
       setFormData(prev => {
         const updated = {
           ...prev,
@@ -310,7 +371,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
     }
   };
 
-  // オプション選択処理（修正版）
+  // オプション選択処理
   const handleOptionToggle = (optionId) => {
     setFormData(prev => {
       const updated = { ...prev };
@@ -319,10 +380,80 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
       } else {
         updated.optionIds = [...prev.optionIds, optionId];
       }
-      // 終了時間を再計算
       updated.endTime = calculateEndTime(updated);
       return updated;
     });
+  };
+
+  // 予約更新処理
+  const handleUpdate = async () => {
+    if (!bookingId) return;
+
+    setIsLoading(true);
+    try {
+      const updateData = {
+        booking_id: bookingId,
+        date: formData.date,
+        start_time: formData.startTime,
+        end_time: formData.endTime,
+        staff_id: formData.staffId,
+        bed_id: formData.bedId,
+        status: 'confirmed',
+        notes: formData.notes
+      };
+
+      const response = await fetch('/api/bookings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updateData)
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        alert('予約を更新しました');
+        onClose();
+        window.location.reload();
+      } else {
+        throw new Error(result.error || '予約更新に失敗しました');
+      }
+    } catch (err) {
+      console.error('予約更新エラー:', err);
+      setError(err.message || '予約更新中にエラーが発生しました');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // キャンセル処理
+  const handleCancel = async () => {
+    if (!bookingId || !cancelType) return;
+
+    setIsLoading(true);
+    try {
+      // cancelTypeをクエリパラメータで送信
+      const response = await fetch(`/api/bookings?id=${bookingId}&cancelType=${cancelType}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        const cancelMessage = cancelType === 'with_contact'
+          ? '予約をキャンセルしました(連絡あり)'
+          : '予約をキャンセルしました(無断キャンセル)';
+        alert(cancelMessage);
+        onClose();
+        window.location.reload();
+      } else {
+        throw new Error(result.error || 'キャンセルに失敗しました');
+      }
+    } catch (err) {
+      console.error('キャンセルエラー:', err);
+      setError(err.message || 'キャンセル中にエラーが発生しました');
+    } finally {
+      setIsLoading(false);
+      setShowCancelModal(false);
+    }
   };
 
   // 予約登録処理
@@ -405,7 +536,6 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
 
     setIsLoading(true);
     try {
-      // 新規顧客の場合は先に顧客を登録
       let customerId = formData.customerId;
       if (!customerId) {
         const customerResponse = await fetch('/api/customers', {
@@ -427,7 +557,6 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
         }
       }
 
-      // 予約登録データを構築
       const bookingData = {
         customer_id: customerId,
         staff_id: formData.staffId,
@@ -439,22 +568,18 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
         notes: formData.notes,
         status: 'confirmed',
         type: 'booking',
-        // ★初期値としてすべてnullを設定
         service_id: null,
         customer_ticket_ids: null,
         coupon_id: null,
         limited_offer_ids: null
       };
 
-      // サービスタイプに応じて適切なIDを設定
       if (formData.serviceType === 'normal' && formData.serviceId) {
         bookingData.service_id = formData.serviceId;
       }
       if (formData.serviceType === 'coupon' && formData.couponId) {
         bookingData.coupon_id = formData.couponId;
       }
-
-      // ★回数券と期間限定は常にチェック（serviceTypeに関わらず）
       if (formData.ticketIds.length > 0) {
         bookingData.customer_ticket_ids = formData.ticketIds;
       }
@@ -502,6 +627,69 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
 
   if (!activeModal) return null;
 
+  // キャンセル確認モーダル
+  if (showCancelModal) {
+    return (
+      <div className="booking-page">
+        <div className="cancel-modal-overlay">
+          <div className="cancel-modal">
+            <div className="cancel-modal-header">
+              <AlertTriangle size={24} color="#ef4444" />
+              <h3>予約キャンセル</h3>
+            </div>
+
+            <div className="cancel-modal-content">
+              <p>キャンセルの種類を選択してください</p>
+
+              <div className="cancel-type-buttons">
+                <button
+                  className={`cancel-type-btn ${cancelType === 'with_contact' ? 'selected' : ''}`}
+                  onClick={() => setCancelType('with_contact')}
+                >
+                  <Phone size={20} />
+                  <div>
+                    <div className="cancel-type-title">連絡ありキャンセル</div>
+                    <div className="cancel-type-desc">お客様から事前に連絡があった</div>
+                  </div>
+                </button>
+
+                <button
+                  className={`cancel-type-btn cancel-type-btn--no-contact ${cancelType === 'no_contact' ? 'selected' : ''}`}
+                  onClick={() => setCancelType('no_contact')}
+                >
+                  <Ban size={20} />
+                  <div>
+                    <div className="cancel-type-title">無断キャンセル</div>
+                    <div className="cancel-type-desc">連絡なく来店されなかった</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            <div className="cancel-modal-actions">
+              <button
+                onClick={() => {
+                  setShowCancelModal(false);
+                  setCancelType('');
+                }}
+                className="action-btn action-btn--cancel"
+              >
+                戻る
+              </button>
+              <button
+                onClick={handleCancel}
+                className="action-btn action-btn--danger"
+                disabled={!cancelType || isLoading}
+              >
+                {isLoading ? 'キャンセル中...' : '確定してキャンセル'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // 新規予約/予定ページ
   if (activeModal === 'booking') {
     return (
@@ -509,30 +697,32 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
         <div className="booking-page-content">
           {/* ヘッダー */}
           <div className="booking-page-header">
-            <h2>新規登録</h2>
+            <h2>{isEditMode ? '予約編集' : '新規登録'}</h2>
             <button onClick={onClose} className="booking-page-close">
               <X size={20} />
               閉じる
             </button>
           </div>
 
-          {/* 予約タイプ選択 */}
-          <div className="booking-type-selector">
-            <button
-              className={`booking-type-btn ${formData.bookingType === 'booking' ? 'booking-type-btn--active' : ''}`}
-              onClick={() => setFormData(prev => ({ ...prev, bookingType: 'booking' }))}
-            >
-              <CalendarCheck size={20} />
-              予約
-            </button>
-            <button
-              className={`booking-type-btn ${formData.bookingType === 'schedule' ? 'booking-type-btn--active' : ''}`}
-              onClick={() => setFormData(prev => ({ ...prev, bookingType: 'schedule' }))}
-            >
-              <CalendarPlus size={20} />
-              予定
-            </button>
-          </div>
+          {/* 予約タイプ選択 - 新規作成時のみ表示 */}
+          {!isEditMode && (
+            <div className="booking-type-selector">
+              <button
+                className={`booking-type-btn ${formData.bookingType === 'booking' ? 'booking-type-btn--active' : ''}`}
+                onClick={() => setFormData(prev => ({ ...prev, bookingType: 'booking' }))}
+              >
+                <CalendarCheck size={20} />
+                予約
+              </button>
+              <button
+                className={`booking-type-btn ${formData.bookingType === 'schedule' ? 'booking-type-btn--active' : ''}`}
+                onClick={() => setFormData(prev => ({ ...prev, bookingType: 'schedule' }))}
+              >
+                <CalendarPlus size={20} />
+                予定
+              </button>
+            </div>
+          )}
 
           {error && (
             <div className="booking-alert booking-alert--error">
@@ -541,6 +731,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
               <button onClick={() => setError('')}>×</button>
             </div>
           )}
+
           <div className="booking-page-grid">
             {/* 左側: 予約情報入力 */}
             <div className="booking-page-main">
@@ -574,7 +765,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                         value={formData.endTime}
                         onChange={(e) => handleInputChange('endTime', e.target.value)}
                         className="form-input form-input--time"
-                        readOnly={formData.bookingType === 'booking'}
+                        readOnly={formData.bookingType === 'booking' && !isEditMode}
                       />
                     </div>
                   </div>
@@ -636,41 +827,164 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                 </div>
               </div>
 
-              {/* メニュータイプ選択タブ */}
-              <div className="menu-type-tabs">
-                <button
-                  className={`menu-type-tab ${formData.serviceType === 'normal' ? 'active' : ''}`}
-                  onClick={() => handleInputChange('serviceType', 'normal')}
-                >
-                  通常メニュー
-                </button>
-                <button
-                  className={`menu-type-tab ${formData.serviceType === 'ticket' ? 'active' : ''}`}
-                  onClick={() => handleInputChange('serviceType', 'ticket')}
-                >
-                  回数券
-                  {formData.ticketIds.length > 0 && (
-                    <span className="menu-tab-badge">{formData.ticketIds.length}</span>
-                  )}
-                </button>
-                <button
-                  className={`menu-type-tab ${formData.serviceType === 'coupon' ? 'active' : ''}`}
-                  onClick={() => handleInputChange('serviceType', 'coupon')}
-                >
-                  クーポン
-                </button>
-                <button
-                  className={`menu-type-tab ${formData.serviceType === 'limited' ? 'active' : ''}`}
-                  onClick={() => handleInputChange('serviceType', 'limited')}
-                >
-                  期間限定
-                  {formData.limitedOfferIds.length > 0 && (
-                    <span className="menu-tab-badge">{formData.limitedOfferIds.length}</span>
-                  )}
-                </button>
-              </div>
-              {/* 施術メニューセクション - 予約モードのみ表示 */}
-              {formData.bookingType === 'booking' && (
+              {/* メニュータイプ選択タブ - 新規予約モードのみ */}
+              {!isEditMode && formData.bookingType === 'booking' && (
+                <div className="menu-type-tabs">
+                  <button
+                    className={`menu-type-tab ${formData.serviceType === 'normal' ? 'active' : ''}`}
+                    onClick={() => handleInputChange('serviceType', 'normal')}
+                  >
+                    通常メニュー
+                  </button>
+                  <button
+                    className={`menu-type-tab ${formData.serviceType === 'ticket' ? 'active' : ''}`}
+                    onClick={() => handleInputChange('serviceType', 'ticket')}
+                  >
+                    回数券
+                    {formData.ticketIds.length > 0 && (
+                      <span className="menu-tab-badge">{formData.ticketIds.length}</span>
+                    )}
+                  </button>
+                  <button
+                    className={`menu-type-tab ${formData.serviceType === 'coupon' ? 'active' : ''}`}
+                    onClick={() => handleInputChange('serviceType', 'coupon')}
+                  >
+                    クーポン
+                  </button>
+                  <button
+                    className={`menu-type-tab ${formData.serviceType === 'limited' ? 'active' : ''}`}
+                    onClick={() => handleInputChange('serviceType', 'limited')}
+                  >
+                    期間限定
+                    {formData.limitedOfferIds.length > 0 && (
+                      <span className="menu-tab-badge">{formData.limitedOfferIds.length}</span>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {/* 施術メニューセクション - 編集モード時は読み取り専用で表示 */}
+              {formData.bookingType === 'booking' && isEditMode && (
+                <div className="booking-section">
+                  <div className="section-header">
+                    <Package size={18} />
+                    施術メニュー情報(変更不可)
+                  </div>
+                  <div className="section-content">
+                    <div className="booking-info-display">
+                      {/* 通常サービス */}
+                      {formData.serviceId && (
+                        <div className="info-display-item">
+                          <div className="info-display-label">通常メニュー</div>
+                          <div className="info-display-value">
+                            {services.find(s => s.service_id === formData.serviceId)?.name || 'サービス名取得中...'}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* クーポン */}
+                      {formData.couponId && (
+                        <div className="info-display-item">
+                          <div className="info-display-label">
+                            <Tag size={14} />
+                            クーポン
+                          </div>
+                          <div className="info-display-value">
+                            {coupons.find(c => c.coupon_id === formData.couponId)?.name || 'クーポン名取得中...'}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 回数券(複数対応) */}
+                      {formData.ticketIds.length > 0 && (
+                        <div className="info-display-item">
+                          <div className="info-display-label">
+                            <Package size={14} />
+                            使用回数券({formData.ticketIds.length}件)
+                          </div>
+                          <div className="info-display-list">
+                            {formData.ticketIds.map((ticketId, index) => {
+                              const ticket = customerTickets.find(t => t.customer_ticket_id === ticketId);
+                              return (
+                                <div key={ticketId} className="info-display-list-item">
+                                  {index + 1}. {ticket?.plan_name || `回数券ID: ${ticketId}`}
+                                  {ticket && (
+                                    <span className="info-display-sub">
+                                      (残り{ticket.sessions_remaining}回)
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 期間限定オファー(複数対応) */}
+                      {formData.limitedOfferIds.length > 0 && (
+                        <div className="info-display-item">
+                          <div className="info-display-label">
+                            <Timer size={14} />
+                            期間限定オファー({formData.limitedOfferIds.length}件)
+                          </div>
+                          <div className="info-display-list">
+                            {formData.limitedOfferIds.map((offerId, index) => {
+                              const offer = limitedOffers.find(o => o.offer_id === offerId);
+                              return (
+                                <div key={offerId} className="info-display-list-item">
+                                  {index + 1}. {offer?.name || `オファーID: ${offerId}`}
+                                  {offer && (
+                                    <span className="info-display-sub">
+                                      ({offer.total_sessions}回券)
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* オプション */}
+                      {formData.optionIds.length > 0 && (
+                        <div className="info-display-item">
+                          <div className="info-display-label">
+                            <Settings2 size={14} />
+                            オプション({formData.optionIds.length}件)
+                          </div>
+                          <div className="info-display-list">
+                            {formData.optionIds.map((optionId, index) => {
+                              const option = options.find(o => o.option_id === optionId);
+                              return (
+                                <div key={optionId} className="info-display-list-item">
+                                  {index + 1}. {option?.name || `オプションID: ${optionId}`}
+                                  {option && (
+                                    <span className="info-display-sub">
+                                      (+{option.duration_minutes}分 / +¥{option.price.toLocaleString()})
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {!formData.serviceId && !formData.couponId &&
+                        formData.ticketIds.length === 0 && formData.limitedOfferIds.length === 0 && (
+                          <div className="info-display-item">
+                            <div className="info-display-value" style={{ color: '#6b7280' }}>
+                              施術メニュー情報なし
+                            </div>
+                          </div>
+                        )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 施術メニューセクション - 予約モードかつ新規作成時のみ表示 */}
+              {formData.bookingType === 'booking' && !isEditMode && (
                 <div className="booking-section">
                   <div className="section-header">
                     <Package size={18} />
@@ -823,12 +1137,12 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                 </div>
               )}
 
-              {/* オプションセクション - 予約モードのみ表示 */}
-              {formData.bookingType === 'booking' && (
+              {/* オプションセクション - 予約モードかつ新規作成時のみ表示 */}
+              {formData.bookingType === 'booking' && !isEditMode && (
                 <div className="booking-section">
                   <div className="section-header">
                     <Settings2 size={18} />
-                    オプション（複数選択可）
+                    オプション(複数選択可)
                   </div>
                   <div className="section-content">
                     {Object.entries(groupedOptions).map(([category, categoryOptions]) => (
@@ -860,7 +1174,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
 
             {/* 右側: 顧客情報とアクション */}
             <div className="booking-page-side">
-              {/* 予約モード：お客様情報セクション */}
+              {/* 予約モード:お客様情報セクション */}
               {formData.bookingType === 'booking' ? (
                 <>
                   <div className="booking-section">
@@ -869,51 +1183,53 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                       お客様情報
                     </div>
                     <div className="section-content">
-                      {/* 顧客検索 */}
-                      <div className="form-row">
-                        <label className="form-label">お客様検索（名前）</label>
-                        <div className="customer-search-box">
-                          <input
-                            type="text"
-                            placeholder="姓名を入力（例: 田中、田中花）"
-                            value={searchName}
-                            onChange={(e) => setSearchName(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && searchCustomers()}
-                            className="form-input"
-                          />
-                          <button onClick={searchCustomers} className="search-btn">
-                            <Search size={18} />
-                            検索
-                          </button>
-                        </div>
-
-                        {/* 検索結果 */}
-                        {searchResults.length > 0 && (
-                          <div className="search-results">
-                            {searchResults.map(customer => (
-                              <div
-                                key={customer.customer_id}
-                                className="search-result-item"
-                                onClick={() => selectCustomer(customer)}
-                              >
-                                <div className="result-name">
-                                  {customer.last_name} {customer.first_name}
-                                  （{customer.last_name_kana} {customer.first_name_kana}）
-                                </div>
-                                <div className="result-info">
-                                  <Phone size={14} />
-                                  {customer.phone_number}
-                                </div>
-                              </div>
-                            ))}
+                      {/* 顧客検索 - 新規作成時のみ */}
+                      {!isEditMode && (
+                        <div className="form-row">
+                          <label className="form-label">お客様検索(名前)</label>
+                          <div className="customer-search-box">
+                            <input
+                              type="text"
+                              placeholder="姓名を入力(例: 田中、田中花)"
+                              value={searchName}
+                              onChange={(e) => setSearchName(e.target.value)}
+                              onKeyPress={(e) => e.key === 'Enter' && searchCustomers()}
+                              className="form-input"
+                            />
+                            <button onClick={searchCustomers} className="search-btn">
+                              <Search size={18} />
+                              検索
+                            </button>
                           </div>
-                        )}
-                      </div>
+
+                          {/* 検索結果 */}
+                          {searchResults.length > 0 && (
+                            <div className="search-results">
+                              {searchResults.map(customer => (
+                                <div
+                                  key={customer.customer_id}
+                                  className="search-result-item"
+                                  onClick={() => selectCustomer(customer)}
+                                >
+                                  <div className="result-name">
+                                    {customer.last_name} {customer.first_name}
+                                    ({customer.last_name_kana} {customer.first_name_kana})
+                                  </div>
+                                  <div className="result-info">
+                                    <Phone size={14} />
+                                    {customer.phone_number}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* 顧客情報入力 */}
                       <div className="form-row">
                         <label className="form-label">
-                          氏名（カナ） <span className="required">●</span>
+                          氏名(カナ) <span className="required">●</span>
                         </label>
                         <div className="name-input-group">
                           <input
@@ -922,6 +1238,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                             value={formData.lastNameKana}
                             onChange={(e) => handleInputChange('lastNameKana', e.target.value)}
                             className="form-input"
+                            disabled={isEditMode}
                           />
                           <input
                             type="text"
@@ -929,13 +1246,14 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                             value={formData.firstNameKana}
                             onChange={(e) => handleInputChange('firstNameKana', e.target.value)}
                             className="form-input"
+                            disabled={isEditMode}
                           />
                         </div>
                       </div>
 
                       <div className="form-row">
                         <label className="form-label">
-                          氏名（漢字） <span className="required">●</span>
+                          氏名(漢字) <span className="required">●</span>
                         </label>
                         <div className="name-input-group">
                           <input
@@ -944,6 +1262,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                             value={formData.lastName}
                             onChange={(e) => handleInputChange('lastName', e.target.value)}
                             className="form-input"
+                            disabled={isEditMode}
                           />
                           <input
                             type="text"
@@ -951,6 +1270,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                             value={formData.firstName}
                             onChange={(e) => handleInputChange('firstName', e.target.value)}
                             className="form-input"
+                            disabled={isEditMode}
                           />
                         </div>
                       </div>
@@ -965,6 +1285,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                           value={formData.phoneNumber}
                           onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
                           className="form-input"
+                          disabled={isEditMode}
                         />
                       </div>
 
@@ -976,6 +1297,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                           value={formData.email}
                           onChange={(e) => handleInputChange('email', e.target.value)}
                           className="form-input"
+                          disabled={isEditMode}
                         />
                       </div>
 
@@ -983,7 +1305,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                         <label className="form-label">お客様番号</label>
                         <input
                           type="text"
-                          value={formData.customerId || '（新規顧客）'}
+                          value={formData.customerId || '(新規顧客)'}
                           disabled
                           className="form-input form-input--disabled"
                         />
@@ -1018,7 +1340,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                   </div>
                 </>
               ) : (
-                /* 予定モード：簡略情報セクション */
+                /* 予定モード:簡略情報セクション */
                 <div className="booking-section">
                   <div className="section-header">
                     <CalendarPlus size={18} />
@@ -1071,20 +1393,42 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
 
               {/* アクションボタン */}
               <div className="booking-actions-section">
-                <button
-                  onClick={onClose}
-                  className="action-btn action-btn--cancel"
-                  disabled={isLoading}
-                >
-                  キャンセル
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  className="action-btn action-btn--primary"
-                  disabled={isLoading}
-                >
-                  {isLoading ? '登録中...' : formData.bookingType === 'booking' ? '予約を登録' : '予定を登録'}
-                </button>
+                {isEditMode ? (
+                  <>
+                    <button
+                      onClick={() => setShowCancelModal(true)}
+                      className="action-btn action-btn--danger"
+                      disabled={isLoading}
+                    >
+                      <Ban size={18} />
+                      キャンセル
+                    </button>
+                    <button
+                      onClick={handleUpdate}
+                      className="action-btn action-btn--primary"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? '更新中...' : '予約を更新'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={onClose}
+                      className="action-btn action-btn--cancel"
+                      disabled={isLoading}
+                    >
+                      キャンセル
+                    </button>
+                    <button
+                      onClick={handleSubmit}
+                      className="action-btn action-btn--primary"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? '登録中...' : formData.bookingType === 'booking' ? '予約を登録' : '予定を登録'}
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>

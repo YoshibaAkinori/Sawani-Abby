@@ -1,0 +1,131 @@
+/* app/analytics/components/CancelAnalysis.css */
+
+/* メトリクスカードグリッド */
+.analytics-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.analytics-metric-card {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  border-left: 4px solid;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.analytics-metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.analytics-metric-card--total {
+  border-left-color: #6b7280;
+}
+
+.analytics-metric-card--contact {
+  border-left-color: #3b82f6;
+}
+
+.analytics-metric-card--noshow {
+  border-left-color: #ef4444;
+}
+
+.analytics-metric-card--rate {
+  border-left-color: #f59e0b;
+}
+
+.analytics-metric-card__icon {
+  flex-shrink: 0;
+  color: #6b7280;
+}
+
+.analytics-metric-card--contact .analytics-metric-card__icon {
+  color: #3b82f6;
+}
+
+.analytics-metric-card--noshow .analytics-metric-card__icon {
+  color: #ef4444;
+}
+
+.analytics-metric-card--rate .analytics-metric-card__icon {
+  color: #f59e0b;
+}
+
+.analytics-metric-card__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.analytics-metric-card__label {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+}
+
+.analytics-metric-card__value {
+  font-size: 1.875rem;
+  font-weight: 700;
+  color: #111827;
+  line-height: 1;
+}
+
+.analytics-metric-card__unit {
+  font-size: 1rem;
+  font-weight: 400;
+  margin-left: 0.25rem;
+}
+
+.analytics-metric-card__sub {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-top: 0.25rem;
+}
+
+/* インサイトカード */
+.insight-card {
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.insights {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.insight-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.insight-item svg {
+  flex-shrink: 0;
+}
+
+.insight-item--warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.insight-item--danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.insight-item--success {
+  background: #d1fae5;
+  color: #065f46;
+}
