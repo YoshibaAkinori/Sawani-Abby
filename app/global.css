@@ -1637,3 +1637,25 @@
     width: 100%;
   }
 }
+
+/* global.css の salon-board__row--is-holiday セクションの後に追加 */
+
+/* 退職済みスタッフの行スタイル */
+.salon-board__row--inactive {
+  background-color: #fafafa;
+  opacity: 0.7;
+}
+
+.salon-board__row--inactive .salon-board__staff-name {
+  color: #9ca3af;
+}
+
+.salon-board__row--inactive .salon-board__staff-color {
+  opacity: 0.5;
+}
+
+.salon-board__staff-status {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  margin-left: 0.5rem;
+}
