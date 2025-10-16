@@ -708,7 +708,6 @@ const CustomersPage = () => {
                 </div>
               )}
 
-              {/* 来店履歴タブ */}
               {activeTab === 'history' && (
                 <div>
                   <table className="customers-page__history-table">
@@ -723,12 +722,46 @@ const CustomersPage = () => {
                     </thead>
                     <tbody>
                       {visitHistory.map(visit => {
+                        // キャンセル予約の場合
+                        if (visit.record_type === 'cancelled_booking') {
+                          return (
+                            <tr key={visit.id} className="cancelled-row">
+                              <td className="customers-page__history-date">
+                                {visit.date}
+                                {visit.start_time && (
+                                  <div style={{ fontSize: '0.875rem', color: '#6b7280', marginTop: '0.25rem' }}>
+                                    予約時間: {visit.start_time}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="customers-page__history-service">
+                                <div>{visit.service}</div>
+                                {visit.cancel_notes && (
+                                  <div className="customers-page__cancel-reason">
+                                    理由: {visit.cancel_notes}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="customers-page__history-staff">
+                                {visit.staff}
+                              </td>
+                              <td className="customers-page__history-payment">
+                                <span style={{ color: '#9ca3af' }}>-</span>
+                              </td>
+                              <td className="customers-page__history-amount">
+                                <span style={{ color: '#9ca3af' }}>-</span>
+                              </td>
+                            </tr>
+                          );
+                        }
+
+                        // 通常の来店履歴
                         const isTicketPurchaseOnly = visit.ticket_purchases &&
                           visit.ticket_purchases.length > 0 &&
                           !visit.service;
 
                         return (
-                          <tr key={visit.payment_id}>
+                          <tr key={visit.id}>
                             <td className="customers-page__history-date">
                               {visit.date}
                             </td>
@@ -736,58 +769,49 @@ const CustomersPage = () => {
                               {/* 通常のサービス表示 */}
                               {!isTicketPurchaseOnly && visit.service && (
                                 <div style={{
-                                  color: visit.detail_info?.type === 'coupon' ? '#f97316' :
-                                    visit.detail_info?.type === 'limited_offer' ? '#9333ea' : 'inherit',
-                                  fontSize: '1.25rem'
+                                  color: visit.detail_info?.type === 'coupon' ?
+                                    '#10b981' : visit.detail_info?.type === 'limited_offer' ?
+                                      '#f59e0b' : '#374151',
+                                  fontWeight: visit.detail_info?.type ? '600' : 'normal'
                                 }}>
-                                  {/* 期間限定の場合は名前のみ */}
-                                  {visit.detail_info?.type === 'limited_offer' ? (
-                                    <>期間限定: {visit.service}</>
-                                  ) : (
-                                    <>
-                                      {visit.service}
-                                      {visit.price > 0 && (
-                                        <span style={{ marginLeft: '0.5rem', color: '#6b7280' }}>
-                                          (¥{visit.price.toLocaleString()})
+                                  {visit.service}
+                                  {visit.detail_info?.type === 'coupon' && (
+                                    <span style={{ marginLeft: '0.5rem', color: '#6b7280' }}>
+                                      (クーポン利用)
+                                    </span>
+                                  )}
+                                  {visit.detail_info?.type === 'limited_offer' && (
+                                    <span style={{ marginLeft: '0.5rem', color: '#6b7280' }}>
+                                      (期間限定オファー)
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* 回数券使用の場合 */}
+                              {visit.detail_info?.type === 'ticket_use' && (
+                                <div style={{ marginTop: isTicketPurchaseOnly ? 0 : '0.25rem' }}>
+                                  {visit.detail_info.ticket_uses.map((ticket, idx) => (
+                                    <div key={idx} style={{ color: '#3b82f6' }}>
+                                      {isTicketPurchaseOnly ? '' : '+ '}
+                                      回数券使用: {ticket.plan_name}
+                                      {ticket.remaining_payment > 0 && (
+                                        <span style={{ color: '#ef4444', marginLeft: '0.5rem' }}>
+                                          (残金 ¥{ticket.remaining_payment.toLocaleString()})
                                         </span>
                                       )}
-                                    </>
-                                  )}
+                                    </div>
+                                  ))}
                                 </div>
                               )}
 
-                              {/* 詳細情報の表示 */}
-                              {visit.detail_info && !isTicketPurchaseOnly && (
-                                <div style={{ fontSize: '1.25rem', color: '#6b7280', marginTop: '0.25rem' }}>
-                                  {visit.detail_info.type === 'ticket_use' && (
-                                    <>
-                                      {visit.detail_info.ticket_uses && visit.detail_info.ticket_uses.length > 0 && (
-                                        <div style={{ color: '#3b82f6' }}>
-                                          {visit.detail_info.ticket_uses.map((t, idx) => (
-                                            <div key={idx}>
-                                              回数券使用: {t.plan_name}
-                                              {t.remaining_payment > 0 && (
-                                                <span style={{ color: '#dc2626', marginLeft: '0.5rem' }}>
-                                                  (残金支払い: ¥{t.remaining_payment.toLocaleString()})
-                                                </span>
-                                              )}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* 回数券購入情報の表示 */}
+                              {/* 回数券購入の場合 */}
                               {visit.ticket_purchases && visit.ticket_purchases.length > 0 && (
-                                <div style={{ fontSize: '1.25rem', marginTop: isTicketPurchaseOnly ? 0 : '0.25rem' }}>
+                                <div style={{ marginTop: isTicketPurchaseOnly ? 0 : '0.25rem' }}>
                                   {visit.ticket_purchases.map((ticket, idx) => (
                                     <div key={idx} style={{ color: '#10b981' }}>
                                       {isTicketPurchaseOnly ? '' : '+ '}
-                                      回数券購入: {
-                                        ticket.plan_name}
+                                      回数券購入: {ticket.plan_name}
                                       <span style={{ color: '#6b7280', marginLeft: '0.5rem' }}>
                                         (¥{ticket.amount.toLocaleString()})
                                       </span>

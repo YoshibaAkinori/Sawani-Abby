@@ -5,11 +5,10 @@ import { getConnection } from '../../../../../lib/db';
 export async function GET(request, { params }) {
   try {
     const pool = await getConnection();
-    const { id } = await params;
-    const customerId = id;
+    const { id: customerId } = await params;
     const connection = await pool.getConnection();
 
-    // 1. 会計済み来店履歴を取得
+    // 通常の支払い履歴を取得
     const [payments] = await connection.query(`
       SELECT 
         p.payment_id,
@@ -26,52 +25,64 @@ export async function GET(request, { params }) {
         p.notes,
         p.related_payment_id,
         p.payment_amount,
+        p.is_cancelled,
         s.name as staff_name,
-        DATE(p.payment_date) as date
+        DATE(p.payment_date) as date,
+        'payment' as record_type
       FROM payments p
       LEFT JOIN staff s ON p.staff_id = s.staff_id
       WHERE p.customer_id = ? 
-        AND p.is_cancelled = FALSE
         AND p.related_payment_id IS NULL
       ORDER BY p.payment_date DESC
     `, [customerId]);
 
-    // 2. キャンセルされた予約を取得
+    // キャンセルされた予約を取得
     const [cancelledBookings] = await connection.query(`
       SELECT 
-        b.booking_id,
+        bh.history_id,
+        bh.booking_id,
+        bh.changed_at,
+        bh.change_type,
+        bh.details,
         b.date,
         b.start_time,
-        b.status,
-        b.notes,
+        sv.name as service_name,
         s.name as staff_name,
-        COALESCE(
-          cp.name,
-          lo.name,
-          tp.name,
-          sv.name,
-          b.notes
-        ) as service_name,
-        bh.changed_at as cancelled_at
-      FROM bookings b
-      LEFT JOIN staff s ON b.staff_id = s.staff_id
+        'cancelled_booking' as record_type
+      FROM booking_history bh
+      JOIN bookings b ON bh.booking_id = b.booking_id
       LEFT JOIN services sv ON b.service_id = sv.service_id
-      LEFT JOIN customer_tickets ct ON b.customer_ticket_id = ct.customer_ticket_id
-      LEFT JOIN ticket_plans tp ON ct.plan_id = tp.plan_id
-      LEFT JOIN coupons cp ON b.coupon_id = cp.coupon_id
-      LEFT JOIN limited_offers lo ON b.limited_offer_id = lo.offer_id
-      LEFT JOIN booking_history bh ON b.booking_id = bh.booking_id 
+      LEFT JOIN staff s ON b.staff_id = s.staff_id
+      WHERE b.customer_id = ? 
         AND bh.change_type IN ('cancel', 'no_show')
-      WHERE b.customer_id = ?
-        AND b.status IN ('cancelled', 'no_show')
-        AND b.type = 'booking'
-      ORDER BY b.date DESC
+      ORDER BY bh.changed_at DESC
     `, [customerId]);
 
     const visitHistory = [];
 
-    // 会計済み来店履歴を処理
+    // 支払い履歴の処理
     for (const payment of payments) {
+      // キャンセルされた支払いの場合
+      if (payment.is_cancelled) {
+        visitHistory.push({
+          id: `cancelled_payment_${payment.payment_id}`, // ユニークなID
+          payment_id: payment.payment_id,
+          date: payment.date,
+          service: payment.service_name,
+          price: payment.service_price,
+          staff: payment.staff_name || '不明',
+          payment_type: payment.payment_type,
+          payment_method: payment.payment_method,
+          amount: payment.total_amount,
+          record_type: 'cancelled_payment',
+          is_cancelled: true,
+          options: [],
+          detail_info: null,
+          ticket_purchases: []
+        });
+        continue;
+      }
+
       const [childPayments] = await connection.query(`
         SELECT 
           payment_id,
@@ -273,7 +284,7 @@ export async function GET(request, { params }) {
       }
 
       visitHistory.push({
-        type: 'completed',
+        id: `payment_${payment.payment_id}`, // ユニークなID
         payment_id: payment.payment_id,
         date: payment.date,
         service: isParentTicketPurchase ? '' : serviceDisplay,
@@ -282,29 +293,59 @@ export async function GET(request, { params }) {
         payment_type: payment.payment_type,
         payment_method: payment.payment_method,
         amount: totalAmount,
+        record_type: 'payment',
+        is_cancelled: false,
         options: options,
         detail_info: detailInfo,
         ticket_purchases: ticketPurchases
       });
     }
 
-    // キャンセル履歴を追加
-    for (const cancel of cancelledBookings) {
+    // キャンセルされた予約を追加
+    for (const booking of cancelledBookings) {
+      // change_typeから無断キャンセルかどうかを判定
+      const isNoShow = booking.change_type === 'no_show';
+      
+      // detailsからキャンセル理由を取得
+      let cancelReason = '';
+      
+      if (booking.details) {
+        try {
+          const details = typeof booking.details === 'string' 
+            ? JSON.parse(booking.details) 
+            : booking.details;
+          
+          // notesフィールドまたはその他の理由フィールドをチェック
+          cancelReason = details.notes || details.reason || details.cancel_reason || '';
+        } catch (e) {
+          // JSON解析失敗時は空文字列
+          console.error('JSON parse error:', e);
+        }
+      }
+      
+      const cancelType = isNoShow ? '無断キャンセル' : '連絡ありキャンセル';
+      const cancelInfo = cancelReason ? `${cancelType} (${cancelReason})` : cancelType;
+      
       visitHistory.push({
-        type: 'cancelled',
-        booking_id: cancel.booking_id,
-        date: cancel.date,
-        time: cancel.start_time,
-        service: cancel.service_name || 'サービス情報なし',
-        staff: cancel.staff_name || '不明',
-        cancel_type: cancel.status, // 'cancelled' or 'no_show'
-        cancelled_at: cancel.cancelled_at,
-        notes: cancel.notes
+        id: `booking_${booking.booking_id}_${booking.history_id}`, // ユニークなID
+        booking_id: booking.booking_id,
+        date: booking.date,
+        start_time: booking.start_time,
+        service: `${booking.service_name || '予約'} - ${cancelInfo}`,
+        staff: booking.staff_name || '不明',
+        record_type: 'cancelled_booking',
+        is_cancelled: true,
+        cancel_type: cancelType,
+        cancel_notes: cancelReason
       });
     }
 
-    // 日付でソート
-    visitHistory.sort((a, b) => new Date(b.date) - new Date(a.date));
+    // 日付順にソート（新しい順）
+    visitHistory.sort((a, b) => {
+      const dateA = new Date(a.date);
+      const dateB = new Date(b.date);
+      return dateB - dateA;
+    });
 
     connection.release();
 

@@ -1,3 +1,4 @@
+// app/analytics/page.js
 "use client";
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
@@ -16,6 +17,9 @@ import './analytics.css';
 const AnalyticsPage = () => {
   const [activeTab, setActiveTab] = useState('summary');
   const [period, setPeriod] = useState('monthly'); // 'monthly' or 'yearly'
+  const [datePreset, setDatePreset] = useState('thisYear'); // 期間プリセット
+  const [showCalendarModal, setShowCalendarModal] = useState(false); // カレンダーモーダル表示
+  const [tempDateRange, setTempDateRange] = useState({ startYear: '', startMonth: '', endYear: '', endMonth: '' }); // モーダル内の一時的な日付
   const [dateRange, setDateRange] = useState({
     startDate: '',
     endDate: ''
@@ -23,16 +27,83 @@ const AnalyticsPage = () => {
   const [data, setData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // 初期日付設定（今月）
-  useEffect(() => {
+  // プリセット期間の計算
+  const calculatePresetDates = (preset) => {
     const today = new Date();
-    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-    const lastDay = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    
+    let startDate, endDate;
+
+    switch (preset) {
+      case 'thisYear':
+        startDate = new Date(today.getFullYear(), 0, 1);
+        endDate = new Date(today.getFullYear(), 11, 31);
+        break;
+      case 'lastYear':
+        startDate = new Date(today.getFullYear() - 1, 0, 1);
+        endDate = new Date(today.getFullYear() - 1, 11, 31);
+        break;
+      case 'past3Years':
+        startDate = new Date(today.getFullYear() - 2, 0, 1);
+        endDate = new Date(today.getFullYear(), 11, 31);
+        break;
+      default:
+        return;
+    }
+
     setDateRange({
-      startDate: firstDay.toISOString().split('T')[0],
-      endDate: lastDay.toISOString().split('T')[0]
+      startDate: startDate.toISOString().split('T')[0],
+      endDate: endDate.toISOString().split('T')[0]
     });
+  };
+
+  // プリセット変更時の処理
+  const handlePresetChange = (preset) => {
+    setDatePreset(preset);
+    if (preset === 'custom') {
+      // カスタムの場合はモーダルを開く
+      // 現在の日付範囲から年月を抽出
+      const startDate = new Date(dateRange.startDate);
+      const endDate = new Date(dateRange.endDate);
+      setTempDateRange({
+        startYear: startDate.getFullYear().toString(),
+        startMonth: (startDate.getMonth() + 1).toString().padStart(2, '0'),
+        endYear: endDate.getFullYear().toString(),
+        endMonth: (endDate.getMonth() + 1).toString().padStart(2, '0')
+      });
+      setShowCalendarModal(true);
+    } else {
+      setShowCalendarModal(false);
+      calculatePresetDates(preset);
+    }
+  };
+
+  // カレンダーモーダルの適用
+  const handleApplyCustomDate = () => {
+    if (tempDateRange.startYear && tempDateRange.startMonth && tempDateRange.endYear && tempDateRange.endMonth) {
+      // 開始日: その月の1日
+      const startDate = new Date(parseInt(tempDateRange.startYear), parseInt(tempDateRange.startMonth) - 1, 1);
+      // 終了日: その月の最終日
+      const endDate = new Date(parseInt(tempDateRange.endYear), parseInt(tempDateRange.endMonth), 0);
+      
+      setDateRange({
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0]
+      });
+      setShowCalendarModal(false);
+    }
+  };
+
+  // カレンダーモーダルのキャンセル
+  const handleCancelCustomDate = () => {
+    setShowCalendarModal(false);
+    // プリセットを前の状態に戻す
+    if (datePreset === 'custom') {
+      setDatePreset('thisYear');
+    }
+  };
+
+  // 初期設定（今年）
+  useEffect(() => {
+    calculatePresetDates('thisYear');
   }, []);
 
   // データ取得
@@ -162,38 +233,38 @@ const AnalyticsPage = () => {
     let csv = 'サマリーレポート\n\n';
     csv += `期間,${dateRange.startDate} 〜 ${dateRange.endDate}\n\n`;
     csv += '項目,値\n';
-    csv += `総売上,${data.total_sales || 0}\n`;
-    csv += `取引数,${data.transaction_count || 0}\n`;
-    csv += `平均単価,${Math.round(data.average_sale || 0)}\n`;
-    csv += `現金売上,${data.total_cash || 0}\n`;
-    csv += `カード売上,${data.total_card || 0}\n`;
-    csv += `ユニーク顧客数,${data.unique_customers || 0}\n`;
+    csv += `総売上,${data.summary?.total_sales || 0}\n`;
+    csv += `取引数,${data.summary?.total_transactions || 0}\n`;
+    csv += `平均単価,${Math.round(data.summary?.average_sale || 0)}\n`;
+    csv += `現金売上,${data.summary?.total_cash || 0}\n`;
+    csv += `カード売上,${data.summary?.total_card || 0}\n`;
+    csv += `ユニーク顧客数,${data.summary?.unique_customers || 0}\n`;
     return csv;
   }
 
   function generateSalesCSV(data) {
     let csv = '売上推移\n';
-    csv += '期間,取引数,総売上,平均単価\n';
+    csv += '期間,取引数,総売上,現金,カード,平均単価,顧客数\n';
     data.forEach(row => {
-      csv += `${row.date || row.month},${row.transaction_count},${row.total_sales},${Math.round(row.average_sale)}\n`;
+      csv += `${row.period},${row.transaction_count},${row.total_sales},${row.cash_sales},${row.card_sales},${Math.round(row.average_sale)},${row.unique_customers}\n`;
     });
     return csv;
   }
 
   function generateServiceCSV(data) {
     let csv = 'サービス別売上\n';
-    csv += 'サービス名,カテゴリ,利用回数,総売上,平均単価\n';
+    csv += 'サービス名,カテゴリ,期間,利用回数,総売上,平均単価,総施術時間\n';
     data.forEach(row => {
-      csv += `${row.service_name},${row.category},${row.usage_count},${row.total_revenue},${Math.round(row.avg_price)}\n`;
+      csv += `${row.service_name},${row.category},${row.period},${row.count},${row.total_revenue},${Math.round(row.average_price)},${row.total_minutes}\n`;
     });
     return csv;
   }
 
   function generateOptionCSV(data) {
     let csv = 'オプション利用状況\n';
-    csv += 'オプション名,カテゴリ,利用回数,総売上,無料,有料\n';
+    csv += 'オプション名,カテゴリ,期間,使用回数,総数量,売上,無料,有料\n';
     data.forEach(row => {
-      csv += `${row.option_name},${row.category},${row.usage_count},${row.total_revenue},${row.free_count},${row.paid_count}\n`;
+      csv += `${row.option_name},${row.option_category},${row.period},${row.usage_count},${row.total_quantity},${row.total_revenue},${row.free_count},${row.paid_count}\n`;
     });
     return csv;
   }
@@ -213,23 +284,25 @@ const AnalyticsPage = () => {
     csv += `総顧客数,${data.repeatAnalysis?.total_customers || 0}\n`;
     csv += `リピート顧客数,${data.repeatAnalysis?.repeat_customers || 0}\n`;
     csv += `リピート率,${data.repeatAnalysis?.repeat_rate || 0}%\n`;
+    csv += `平均リピート日数,${Math.round(data.avgRepeatDays?.avg_repeat_days || 0)}\n`;
+    csv += `平均LTV,${Math.round(data.ltvAnalysis?.avg_ltv || 0)}\n`;
     return csv;
   }
 
   function generateCouponCSV(data) {
     let csv = 'クーポン使用状況\n';
-    csv += 'クーポン名,使用回数,総割引額\n';
+    csv += 'クーポン名,使用回数,総割引額,使用制限,有効\n';
     data.usageByCoupon?.forEach(row => {
-      csv += `${row.coupon_name},${row.usage_count},${row.total_discount}\n`;
+      csv += `${row.coupon_name},${row.usage_count},${row.total_discount},${row.usage_limit || '無制限'},${row.is_active ? '有効' : '無効'}\n`;
     });
     return csv;
   }
 
   function generateLimitedCSV(data) {
     let csv = '期間限定オファー販売状況\n';
-    csv += 'オファー名,購入数,総売上\n';
+    csv += 'オファー名,サービス名,特別価格,販売数,総売上,販売終了日,有効\n';
     data.salesByOffer?.forEach(row => {
-      csv += `${row.offer_name},${row.current_sales},${row.total_revenue}\n`;
+      csv += `${row.offer_name},${row.service_name},${row.special_price},${row.current_sales},${row.total_revenue},${row.sale_end_date || '無期限'},${row.is_active ? '有効' : '無効'}\n`;
     });
     return csv;
   }
@@ -237,11 +310,11 @@ const AnalyticsPage = () => {
   function generateCancelCSV(data) {
     let csv = 'キャンセル統計\n\n';
     csv += '項目,値\n';
-    csv += `総キャンセル数,${data.summary.total_cancels}\n`;
-    csv += `連絡ありキャンセル,${data.summary.with_contact_cancels}\n`;
-    csv += `無断キャンセル,${data.summary.no_show_cancels}\n`;
-    csv += `キャンセル率,${data.summary.cancel_rate}%\n`;
-    csv += `総予約数,${data.summary.total_bookings}\n\n`;
+    csv += `総キャンセル数,${data.summary?.total_cancels || 0}\n`;
+    csv += `連絡ありキャンセル,${data.summary?.with_contact_cancels || 0}\n`;
+    csv += `無断キャンセル,${data.summary?.no_show_cancels || 0}\n`;
+    csv += `キャンセル率,${data.summary?.cancel_rate || 0}%\n`;
+    csv += `総予約数,${data.summary?.total_bookings || 0}\n\n`;
     
     csv += 'スタッフ別キャンセル\n';
     csv += 'スタッフ名,総キャンセル数,連絡あり,無断\n';
@@ -274,23 +347,35 @@ const AnalyticsPage = () => {
       <main className="analytics__main">
         {/* コントロールパネル */}
         <div className="analytics__controls">
-          <div className="analytics__date-range">
-            <Calendar size={18} />
-            <input
-              type="date"
-              value={dateRange.startDate}
-              onChange={(e) => setDateRange(prev => ({ ...prev, startDate: e.target.value }))}
-              className="analytics__date-input"
-            />
-            <span>〜</span>
-            <input
-              type="date"
-              value={dateRange.endDate}
-              onChange={(e) => setDateRange(prev => ({ ...prev, endDate: e.target.value }))}
-              className="analytics__date-input"
-            />
+          {/* 期間選択ボタン */}
+          <div className="analytics__preset-buttons">
+            <button
+              className={`analytics__preset-btn ${datePreset === 'thisYear' ? 'analytics__preset-btn--active' : ''}`}
+              onClick={() => handlePresetChange('thisYear')}
+            >
+              今年
+            </button>
+            <button
+              className={`analytics__preset-btn ${datePreset === 'lastYear' ? 'analytics__preset-btn--active' : ''}`}
+              onClick={() => handlePresetChange('lastYear')}
+            >
+              去年
+            </button>
+            <button
+              className={`analytics__preset-btn ${datePreset === 'past3Years' ? 'analytics__preset-btn--active' : ''}`}
+              onClick={() => handlePresetChange('past3Years')}
+            >
+              過去3年
+            </button>
+            <button
+              className={`analytics__preset-btn ${datePreset === 'custom' ? 'analytics__preset-btn--active' : ''}`}
+              onClick={() => handlePresetChange('custom')}
+            >
+              カスタム期間
+            </button>
           </div>
 
+          {/* 月別/年別切り替え */}
           <div className="analytics__period-toggle">
             <button
               className={`analytics__period-btn ${period === 'monthly' ? 'analytics__period-btn--active' : ''}`}
@@ -387,7 +472,6 @@ const AnalyticsPage = () => {
         <div className="analytics__content">
           {isLoading ? (
             <div className="analytics__loading">
-              <div className="analytics__loading-spinner"></div>
               <p>データを読み込み中...</p>
             </div>
           ) : (
@@ -405,6 +489,101 @@ const AnalyticsPage = () => {
           )}
         </div>
       </main>
+
+      {/* カレンダーモーダル */}
+      {showCalendarModal && (
+        <div className="calendar-modal-overlay" onClick={handleCancelCustomDate}>
+          <div className="calendar-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="calendar-modal__header">
+              <h3>期間を選択</h3>
+              <button className="calendar-modal__close" onClick={handleCancelCustomDate}>
+                ✕
+              </button>
+            </div>
+            <div className="calendar-modal__content">
+              {/* 開始年月 */}
+              <div className="calendar-modal__section">
+                <label className="calendar-modal__label">開始年月</label>
+                <div className="calendar-modal__date-inputs">
+                  <select
+                    value={tempDateRange.startYear}
+                    onChange={(e) => setTempDateRange(prev => ({ ...prev, startYear: e.target.value }))}
+                    className="calendar-modal__select"
+                  >
+                    <option value="">年を選択</option>
+                    {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map(year => (
+                      <option key={year} value={year}>{year}年</option>
+                    ))}
+                  </select>
+                  <select
+                    value={tempDateRange.startMonth}
+                    onChange={(e) => setTempDateRange(prev => ({ ...prev, startMonth: e.target.value }))}
+                    className="calendar-modal__select"
+                  >
+                    <option value="">月を選択</option>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                      <option key={month} value={month.toString().padStart(2, '0')}>
+                        {month}月
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* 終了年月 */}
+              <div className="calendar-modal__section">
+                <label className="calendar-modal__label">終了年月</label>
+                <div className="calendar-modal__date-inputs">
+                  <select
+                    value={tempDateRange.endYear}
+                    onChange={(e) => setTempDateRange(prev => ({ ...prev, endYear: e.target.value }))}
+                    className="calendar-modal__select"
+                  >
+                    <option value="">年を選択</option>
+                    {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - i).map(year => (
+                      <option key={year} value={year}>{year}年</option>
+                    ))}
+                  </select>
+                  <select
+                    value={tempDateRange.endMonth}
+                    onChange={(e) => setTempDateRange(prev => ({ ...prev, endMonth: e.target.value }))}
+                    className="calendar-modal__select"
+                  >
+                    <option value="">月を選択</option>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                      <option key={month} value={month.toString().padStart(2, '0')}>
+                        {month}月
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* プレビュー */}
+              {tempDateRange.startYear && tempDateRange.startMonth && tempDateRange.endYear && tempDateRange.endMonth && (
+                <div className="calendar-modal__preview">
+                  <span className="calendar-modal__preview-label">選択期間:</span>
+                  <span className="calendar-modal__preview-text">
+                    {tempDateRange.startYear}年{parseInt(tempDateRange.startMonth)}月 〜 {tempDateRange.endYear}年{parseInt(tempDateRange.endMonth)}月
+                  </span>
+                </div>
+              )}
+            </div>
+            <div className="calendar-modal__footer">
+              <button className="calendar-modal__btn calendar-modal__btn--cancel" onClick={handleCancelCustomDate}>
+                キャンセル
+              </button>
+              <button 
+                className="calendar-modal__btn calendar-modal__btn--apply" 
+                onClick={handleApplyCustomDate}
+                disabled={!tempDateRange.startYear || !tempDateRange.startMonth || !tempDateRange.endYear || !tempDateRange.endMonth}
+              >
+                適用
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

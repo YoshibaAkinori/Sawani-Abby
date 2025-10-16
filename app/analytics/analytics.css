@@ -386,139 +386,223 @@
     padding: 0.5rem;
   }
 }
-/* テーブルスタイル */
-.analytics-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed; /* 重要: 列幅を固定 */
-}
-
-.analytics-table thead {
-  background: #f9fafb;
-  position: sticky;
+/* カレンダーモーダル */
+.calendar-modal-overlay {
+  position: fixed;
   top: 0;
-  z-index: 1;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s;
 }
 
-.analytics-table th {
-  padding: 0.875rem 1rem;
-  text-align: left;
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.calendar-modal {
+  background: white;
+  border-radius: 1rem;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  width: 90%;
+  max-width: 500px;
+  animation: slideUp 0.3s;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.calendar-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.calendar-modal__header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.calendar-modal__close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  transition: all 0.2s;
+}
+
+.calendar-modal__close:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.calendar-modal__content {
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.calendar-modal__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.calendar-modal__label {
   font-size: 0.875rem;
   font-weight: 600;
   color: #374151;
-  border-bottom: 2px solid #e5e7eb;
-  white-space: nowrap;
 }
 
-/* 列幅の指定 */
-.analytics-table th:first-child {
-  width: 40%; /* 名前/日付列 */
+.calendar-modal__date-inputs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
 }
 
-.analytics-table th:nth-child(2) {
-  width: 20%; /* 総キャンセル/取引数など */
-  text-align: right;
+.calendar-modal__select {
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.5rem;
+  font-size: 1rem;
+  color: #111827;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-.analytics-table th:nth-child(3) {
-  width: 20%; /* 連絡あり */
-  text-align: right;
+.calendar-modal__select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-.analytics-table th:nth-child(4) {
-  width: 20%; /* 無断 */
-  text-align: right;
+.calendar-modal__select:hover {
+  border-color: #9ca3af;
 }
 
-/* 数値列は右寄せ */
-.analytics-table th.analytics-table__number {
-  text-align: right;
-}
-
-.analytics-table tbody tr {
-  border-bottom: 1px solid #f3f4f6;
-  transition: background 0.15s;
-}
-
-.analytics-table tbody tr:hover {
-  background: #f9fafb;
-}
-
-.analytics-table td {
-  padding: 1rem;
-  font-size: 0.9375rem;
-  color: #1f2937;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* 数値セルは右寄せ */
-.analytics-table td.analytics-table__number {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-/* スタッフ名セル */
-.analytics-table__staff-cell {
+.calendar-modal__preview {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 0.5rem;
-  overflow: hidden;
+  padding: 1rem;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 0.5rem;
+  margin-top: 0.5rem;
 }
 
-.analytics-table__staff-color {
-  width: 16px;
-  height: 16px;
-  border-radius: 4px;
-  flex-shrink: 0;
+.calendar-modal__preview-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #0369a1;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.analytics-table__staff-cell span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* カラー別の数値 */
-.analytics-table__number--with-contact {
-  color: #3b82f6;
+.calendar-modal__preview-text {
+  font-size: 1rem;
   font-weight: 600;
+  color: #0c4a6e;
 }
 
-.analytics-table__number--no-show {
-  color: #ef4444;
-  font-weight: 600;
+.calendar-modal__footer {
+  display: flex;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  border-top: 1px solid #e5e7eb;
+  justify-content: flex-end;
 }
 
-/* レスポンシブ対応 */
-@media (max-width: 768px) {
-  .analytics-table {
-    font-size: 0.875rem;
-  }
-  
-  .analytics-table th,
-  .analytics-table td {
-    padding: 0.75rem 0.5rem;
-  }
-  
-  .analytics-table th:first-child,
-  .analytics-table td:first-child {
-    width: 35%;
-  }
+.calendar-modal__btn {
+  padding: 0.625rem 1.5rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
 }
 
-/* テーブルコンテナ */
-.analytics-table-container {
-  overflow-x: auto;
-  border-radius: 8px;
+.calendar-modal__btn--cancel {
+  background: white;
+  color: #6b7280;
   border: 1px solid #e5e7eb;
 }
 
-/* 空データメッセージ */
-.no-data-message {
-  text-align: center;
-  padding: 3rem;
-  color: #9ca3af;
-  font-size: 0.9375rem;
+.calendar-modal__btn--cancel:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.calendar-modal__btn--apply {
+  background: #3b82f6;
+  color: white;
+}
+
+.calendar-modal__btn--apply:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.calendar-modal__btn--apply:disabled {
+  background: #d1d5db;
+  cursor: not-allowed;
+}
+
+/* プリセットボタン */
+.analytics__preset-buttons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.analytics__preset-btn {
+  padding: 0.5rem 1rem;
+  border: 1px solid #e5e7eb;
+  background: white;
+  color: #6b7280;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.analytics__preset-btn:hover {
+  background: #f9fafb;
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.analytics__preset-btn--active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
 }
