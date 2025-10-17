@@ -1,4 +1,4 @@
-// app/api/payments/route.js
+// app/api/payments/route.js - 完全版お会計APIシステム（決済金額修正版）
 import { NextResponse } from 'next/server';
 import { getConnection } from '../../../lib/db';
 
@@ -120,8 +120,9 @@ export async function POST(request) {
 
     await connection.beginTransaction();
 
-    // ★★★ 残金支払い専用処理(notesに「残金支払い」が含まれる場合) ★★★
-    if (notes && notes.includes('残金支払い') && payment_amount > 0) {
+    // ★★★ 回数券の残金支払い専用処理 ★★★
+    // フロントからnotesに「回数券使用時の未払い分支払い」が含まれる場合
+    if (notes && (notes.includes('残金支払い') || notes.includes('未払い分支払い')) && payment_amount > 0 && ticket_id) {
       // 回数券情報を取得
       const [ticketRows] = await connection.execute(
         `SELECT 
@@ -136,7 +137,30 @@ export async function POST(request) {
 
       const ticketInfo = ticketRows.length > 0 ? ticketRows[0] : { plan_name: '回数券', service_name: '' };
 
-      // paymentsレコード作成(残金支払い専用)
+      // ★★★ 残金支払いの決済金額按分 ★★★
+      let finalCashAmount = 0;
+      let finalCardAmount = 0;
+
+      if (payment_method === 'cash') {
+        finalCashAmount = payment_amount;
+        finalCardAmount = 0;
+      } else if (payment_method === 'card') {
+        finalCashAmount = 0;
+        finalCardAmount = payment_amount;
+      } else if (payment_method === 'mixed') {
+        finalCashAmount = cash_amount || 0;
+        finalCardAmount = card_amount || 0;
+      }
+
+      // 1. ticket_paymentsに追加支払いを記録
+      await connection.execute(
+        `INSERT INTO ticket_payments (
+          customer_ticket_id, payment_date, amount_paid, payment_method, notes
+        ) VALUES (?, NOW(), ?, ?, ?)`,
+        [ticket_id, payment_amount, payment_method, notes]
+      );
+
+      // 2. paymentsテーブルにも記録(売上管理用)
       const [result] = await connection.execute(
         `INSERT INTO payments (
           payment_id,
@@ -172,8 +196,8 @@ export async function POST(request) {
           payment_amount,
           payment_amount,
           payment_method,
-          cash_amount,
-          card_amount,
+          finalCashAmount,
+          finalCardAmount,
           notes,
           related_payment_id
         ]
@@ -301,6 +325,22 @@ export async function POST(request) {
     const serviceSubtotal = serviceData.price;
     const totalAmount = serviceSubtotal + optionsTotal - discount_amount;
 
+    // ★★★ 決済方法に応じて cash_amount と card_amount を按分計算 ★★★
+    let finalCashAmount = 0;
+    let finalCardAmount = 0;
+
+    if (payment_method === 'cash') {
+      finalCashAmount = totalAmount;
+      finalCardAmount = 0;
+    } else if (payment_method === 'card') {
+      finalCashAmount = 0;
+      finalCardAmount = totalAmount;
+    } else if (payment_method === 'mixed') {
+      // 混合決済の場合は、リクエストから受け取った値を使用
+      finalCashAmount = cash_amount || 0;
+      finalCardAmount = card_amount || 0;
+    }
+
     // ★★★ payment_typeを正規化（ENUMに合わせる） ★★★
     let normalizedPaymentType = payment_type;
     if (payment_type === 'limited') {
@@ -341,7 +381,7 @@ export async function POST(request) {
         serviceData.name,
         serviceData.price,
         serviceData.duration,
-        normalizedPaymentType, // ★ 正規化した値を使用
+        normalizedPaymentType,
         ticket_id || null,
         coupon_id || null,
         limited_offer_id || null,
@@ -351,8 +391,8 @@ export async function POST(request) {
         payment_amount,
         totalAmount,
         payment_method,
-        cash_amount,
-        card_amount,
+        finalCashAmount,
+        finalCardAmount,
         notes,
         related_payment_id
       ]

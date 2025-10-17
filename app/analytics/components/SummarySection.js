@@ -1,7 +1,7 @@
 // app/analytics/components/SummarySection.js
 "use client";
 import React from 'react';
-import { TrendingUp, Users, CreditCard, Ticket, Tag } from 'lucide-react';
+import { TrendingUp, Users, CreditCard, Ticket, Tag, ShoppingCart } from 'lucide-react';
 
 const SummarySection = ({ data }) => {
   const { 
@@ -27,12 +27,12 @@ const SummarySection = ({ data }) => {
     );
   }
 
-  const cashRatio = summary.total_sales > 0 
-    ? (summary.total_cash / summary.total_sales * 100) 
+  const cashRatio = summary.actual_sales > 0 
+    ? (summary.total_cash / summary.actual_sales * 100) 
     : 0;
   
-  const cardRatio = summary.total_sales > 0 
-    ? (summary.total_card / summary.total_sales * 100) 
+  const cardRatio = summary.actual_sales > 0 
+    ? (summary.total_card / summary.actual_sales * 100) 
     : 0;
 
   return (
@@ -42,10 +42,35 @@ const SummarySection = ({ data }) => {
         <div className="analytics-metric">
           <span className="analytics-metric__label">
             <TrendingUp size={16} style={{ display: 'inline', marginRight: '0.25rem' }} />
-            総売上
+            理想売上
           </span>
           <span className="analytics-metric__value">
-            {formatCurrency(summary.total_sales || 0)}
+            {formatCurrency(summary.ideal_sales || 0)}
+          </span>
+          <span className="analytics-metric__sub" style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+            (最終的に得られる金額)
+          </span>
+        </div>
+
+        <div className="analytics-metric">
+          <span className="analytics-metric__label">現状売上</span>
+          <span className="analytics-metric__value">
+            {formatCurrency(summary.actual_sales || 0)}
+          </span>
+          <span className="analytics-metric__sub" style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+            (実際に支払われた金額)
+          </span>
+        </div>
+
+        <div className="analytics-metric">
+          <span className="analytics-metric__label">差額</span>
+          <span className="analytics-metric__value" style={{ 
+            color: (summary.ideal_sales - summary.actual_sales) > 0 ? '#f59e0b' : '#10b981' 
+          }}>
+            {formatCurrency((summary.ideal_sales || 0) - (summary.actual_sales || 0))}
+          </span>
+          <span className="analytics-metric__sub" style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.25rem' }}>
+            (未回収金額)
           </span>
         </div>
 
@@ -54,13 +79,6 @@ const SummarySection = ({ data }) => {
           <span className="analytics-metric__value">
             {(summary.total_transactions || 0).toLocaleString()}
             <span className="analytics-metric__unit">件</span>
-          </span>
-        </div>
-
-        <div className="analytics-metric">
-          <span className="analytics-metric__label">平均単価</span>
-          <span className="analytics-metric__value">
-            {formatCurrency(summary.average_sale || 0)}
           </span>
         </div>
 
@@ -117,6 +135,17 @@ const SummarySection = ({ data }) => {
       <div className="analytics-card">
         <h3 className="analytics-card__title">特典利用状況</h3>
         <div className="analytics-metrics">
+          <div className="analytics-metric">
+            <span className="analytics-metric__label">
+              <ShoppingCart size={16} style={{ display: 'inline', marginRight: '0.25rem' }} />
+              回数券購入
+            </span>
+            <span className="analytics-metric__value">
+              {(summary.ticket_purchase || 0).toLocaleString()}
+              <span className="analytics-metric__unit">件</span>
+            </span>
+          </div>
+
           <div className="analytics-metric">
             <span className="analytics-metric__label">
               <Ticket size={16} style={{ display: 'inline', marginRight: '0.25rem' }} />

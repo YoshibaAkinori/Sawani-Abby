@@ -17,10 +17,14 @@ export async function GET(request) {
         data = await getSummary(pool, startDate, endDate);
         break;
       case 'daily':
-        data = await getDailySales(pool, startDate, endDate);
+        const dailyData = await getDailySales(pool, startDate, endDate);
+        const dailyGender = await getGenderSales(pool, startDate, endDate, 'daily');
+        data = { salesData: dailyData, genderData: dailyGender };
         break;
       case 'monthly':
-        data = await getMonthlySales(pool, startDate, endDate);
+        const monthlyData = await getMonthlySales(pool, startDate, endDate);
+        const monthlyGender = await getGenderSales(pool, startDate, endDate, 'monthly');
+        data = { salesData: monthlyData, genderData: monthlyGender };
         break;
       default:
         return NextResponse.json(
@@ -47,16 +51,29 @@ async function getSummary(pool, startDate, endDate) {
   const [summary] = await pool.execute(
     `SELECT 
       COUNT(*) as total_transactions,
-      SUM(total_amount) as total_sales,
-      AVG(total_amount) as average_sale,
-      SUM(cash_amount) as total_cash,
-      SUM(card_amount) as total_card,
-      COUNT(DISTINCT customer_id) as unique_customers,
-      SUM(CASE WHEN payment_type = 'ticket' THEN 1 ELSE 0 END) as ticket_usage,
-      SUM(CASE WHEN payment_type = 'coupon' THEN 1 ELSE 0 END) as coupon_usage
-    FROM payments
-    WHERE is_cancelled = FALSE
-      AND DATE(payment_date) BETWEEN ? AND ?`,
+      SUM(p.total_amount) as actual_sales,
+      SUM(CASE
+        WHEN p.payment_type = 'ticket' AND p.service_name LIKE '%回数券購入%' THEN ct.purchase_price
+        WHEN p.payment_type = 'ticket' AND p.service_price = 0 THEN ROUND(ct.purchase_price / tp.total_sessions)
+        ELSE p.service_price
+      END) as ideal_sales,
+      SUM(p.cash_amount) as total_cash,
+      SUM(p.card_amount) as total_card,
+      COUNT(DISTINCT p.customer_id) as unique_customers,
+      SUM(CASE 
+        WHEN p.payment_type = 'ticket' AND (p.service_name NOT LIKE '%回数券購入%' OR p.service_name IS NULL)
+        THEN 1 ELSE 0 
+      END) as ticket_usage,
+      SUM(CASE 
+        WHEN p.payment_type = 'ticket' AND p.service_name LIKE '%回数券購入%' 
+        THEN 1 ELSE 0 
+      END) as ticket_purchase,
+      SUM(CASE WHEN p.payment_type = 'coupon' THEN 1 ELSE 0 END) as coupon_usage
+    FROM payments p
+    LEFT JOIN customer_tickets ct ON p.ticket_id = ct.customer_ticket_id
+    LEFT JOIN ticket_plans tp ON ct.plan_id = tp.plan_id
+    WHERE p.is_cancelled = FALSE
+      AND DATE(p.payment_date) BETWEEN ? AND ?`,
     [startDate, endDate]
   );
 
@@ -74,7 +91,11 @@ async function getSummary(pool, startDate, endDate) {
           WHEN p.payment_type = 'limited_offer' THEN CONCAT(lo.name, ' (期間限定)')
           ELSE p.service_name
         END as service_name,
-        p.service_price
+        CASE
+          WHEN p.payment_type = 'ticket' AND p.service_price = 0 THEN 
+            ROUND(tp.price / tp.total_sessions)
+          ELSE p.service_price
+        END as service_price
       FROM payments p
       LEFT JOIN services s ON p.service_id = s.service_id
       LEFT JOIN customer_tickets ct ON p.ticket_id = ct.customer_ticket_id
@@ -83,6 +104,7 @@ async function getSummary(pool, startDate, endDate) {
       LEFT JOIN limited_offers lo ON p.limited_offer_id = lo.offer_id
       WHERE p.is_cancelled = FALSE
         AND DATE(p.payment_date) BETWEEN ? AND ?
+        AND (p.service_name NOT LIKE '%回数券購入%' OR p.service_name IS NULL)
     ) as service_data
     GROUP BY service_name
     ORDER BY count DESC
@@ -117,17 +139,24 @@ async function getSummary(pool, startDate, endDate) {
 async function getDailySales(pool, startDate, endDate) {
   const [rows] = await pool.execute(
     `SELECT 
-      DATE(payment_date) as date,
+      DATE(p.payment_date) as period,
       COUNT(*) as transaction_count,
-      SUM(total_amount) as total_sales,
-      SUM(cash_amount) as cash_sales,
-      SUM(card_amount) as card_sales,
-      AVG(total_amount) as average_sale
-    FROM payments
-    WHERE is_cancelled = FALSE
-      AND DATE(payment_date) BETWEEN ? AND ?
-    GROUP BY DATE(payment_date)
-    ORDER BY date DESC`,
+      SUM(p.total_amount) as actual_sales,
+      SUM(CASE
+        WHEN p.payment_type = 'ticket' AND p.service_name LIKE '%回数券購入%' THEN ct.purchase_price
+        WHEN p.payment_type = 'ticket' AND p.service_price = 0 THEN ROUND(ct.purchase_price / tp.total_sessions)
+        ELSE p.service_price
+      END) as ideal_sales,
+      SUM(p.cash_amount) as cash_sales,
+      SUM(p.card_amount) as card_sales,
+      COUNT(DISTINCT p.customer_id) as unique_customers
+    FROM payments p
+    LEFT JOIN customer_tickets ct ON p.ticket_id = ct.customer_ticket_id
+    LEFT JOIN ticket_plans tp ON ct.plan_id = tp.plan_id
+    WHERE p.is_cancelled = FALSE
+      AND DATE(p.payment_date) BETWEEN ? AND ?
+    GROUP BY DATE(p.payment_date)
+    ORDER BY period ASC`,
     [startDate, endDate]
   );
   return rows;
@@ -137,17 +166,50 @@ async function getDailySales(pool, startDate, endDate) {
 async function getMonthlySales(pool, startDate, endDate) {
   const [rows] = await pool.execute(
     `SELECT 
-      DATE_FORMAT(payment_date, '%Y-%m') as month,
+      DATE_FORMAT(p.payment_date, '%Y-%m') as period,
       COUNT(*) as transaction_count,
-      SUM(total_amount) as total_sales,
-      SUM(cash_amount) as cash_sales,
-      SUM(card_amount) as card_sales,
-      AVG(total_amount) as average_sale
-    FROM payments
-    WHERE is_cancelled = FALSE
-      AND DATE(payment_date) BETWEEN ? AND ?
-    GROUP BY DATE_FORMAT(payment_date, '%Y-%m')
-    ORDER BY month DESC`,
+      SUM(p.total_amount) as actual_sales,
+      SUM(CASE
+        WHEN p.payment_type = 'ticket' AND p.service_name LIKE '%回数券購入%' THEN ct.purchase_price
+        WHEN p.payment_type = 'ticket' AND p.service_price = 0 THEN ROUND(ct.purchase_price / tp.total_sessions)
+        ELSE p.service_price
+      END) as ideal_sales,
+      SUM(p.cash_amount) as cash_sales,
+      SUM(p.card_amount) as card_sales,
+      COUNT(DISTINCT p.customer_id) as unique_customers
+    FROM payments p
+    LEFT JOIN customer_tickets ct ON p.ticket_id = ct.customer_ticket_id
+    LEFT JOIN ticket_plans tp ON ct.plan_id = tp.plan_id
+    WHERE p.is_cancelled = FALSE
+      AND DATE(p.payment_date) BETWEEN ? AND ?
+    GROUP BY DATE_FORMAT(p.payment_date, '%Y-%m')
+    ORDER BY period ASC`,
+    [startDate, endDate]
+  );
+  return rows;
+}
+
+// 性別ごとの売上集計
+async function getGenderSales(pool, startDate, endDate, type) {
+  const groupBy = type === 'daily' 
+    ? 'DATE(p.payment_date)' 
+    : "DATE_FORMAT(p.payment_date, '%Y-%m')";
+
+  const [rows] = await pool.execute(
+    `SELECT 
+      ${groupBy} as period,
+      c.gender,
+      COUNT(*) as transaction_count,
+      SUM(p.total_amount) as total_sales,
+      COUNT(DISTINCT p.customer_id) as unique_customers
+    FROM payments p
+    JOIN customers c ON p.customer_id = c.customer_id
+    WHERE p.is_cancelled = FALSE
+      AND DATE(p.payment_date) BETWEEN ? AND ?
+      AND c.gender IS NOT NULL
+      AND c.gender IN ('female', 'male')
+    GROUP BY ${groupBy}, c.gender
+    ORDER BY period ASC, c.gender`,
     [startDate, endDate]
   );
   return rows;

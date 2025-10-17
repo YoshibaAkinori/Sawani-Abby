@@ -472,7 +472,8 @@ const RegisterPage = () => {
       const response = await fetch(`/api/customers/${customerId}/tickets`);
       const data = await response.json();
       if (data.success) {
-        const activeTickets = (data.data || []).filter(t => t.status === 'active').map(ticket => {
+        // statusフィルタを削除
+        const activeTickets = (data.data || []).map(ticket => {
           const service = services.find(s => s.name === ticket.service_name);
           return {
             ...ticket,
@@ -962,9 +963,29 @@ const RegisterPage = () => {
         });
       }
 
-      // 4. 回数券の未払い分支払い処理（ticket_paymentsのみ）
       for (const ticket of additionalPayments) {
         if (ticket.payment_amount > 0) {
+          // 按分計算
+          let cashAmt = 0;
+          let cardAmt = 0;
+
+          if (paymentMethod === 'cash') {
+            cashAmt = ticket.payment_amount;
+            cardAmt = 0;
+          } else if (paymentMethod === 'card') {
+            cashAmt = 0;
+            cardAmt = ticket.payment_amount;
+          } else if (paymentMethod === 'mixed') {
+            // 全体の未払い分合計に対する比率で按分
+            const totalAdditionalPayment = additionalPayments.reduce((sum, t) => sum + (t.payment_amount || 0), 0);
+            if (totalAdditionalPayment > 0) {
+              const ratio = ticket.payment_amount / totalAdditionalPayment;
+              cashAmt = Math.round(parseInt(cashAmount) * ratio);
+              cardAmt = Math.round(parseInt(cardAmount) * ratio);
+            }
+          }
+
+          // 1. ticket_paymentsテーブルへの記録
           await fetch('/api/ticket-purchases', {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -973,6 +994,26 @@ const RegisterPage = () => {
               payment_amount: ticket.payment_amount,
               payment_method: paymentMethod,
               notes: '回数券使用時の未払い分支払い'
+            })
+          });
+
+          // 2. paymentsテーブルへの記録（売上管理用）
+          await fetch('/api/payments', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              customer_id: selectedCustomer.customer_id,
+              staff_id: selectedStaff.staff_id,
+              payment_type: 'ticket',
+              ticket_id: ticket.customer_ticket_id,
+              options: [],
+              discount_amount: 0,
+              payment_method: paymentMethod,
+              cash_amount: cashAmt,
+              card_amount: cardAmt,
+              payment_amount: ticket.payment_amount,
+              notes: '回数券使用時の未払い分支払い',
+              related_payment_id: mainPaymentId
             })
           });
         }

@@ -1,4 +1,4 @@
-// app/api/ticket-purchases/route.js
+// app/api/ticket-purchases/route.js - 回数券購入API（決済金額修正版）
 import { NextResponse } from 'next/server';
 import { getConnection } from '../../../lib/db';
 
@@ -91,14 +91,31 @@ export async function POST(request) {
       `, [customerTicketId, payment_amount, payment_method, notes]);
     }
 
+    // ★★★ 決済方法に応じて cash_amount と card_amount を按分計算 ★★★
+    let finalCashAmount = 0;
+    let finalCardAmount = 0;
+
+    if (payment_method === 'cash') {
+      finalCashAmount = payment_amount;
+      finalCardAmount = 0;
+    } else if (payment_method === 'card') {
+      finalCashAmount = 0;
+      finalCardAmount = payment_amount;
+    } else if (payment_method === 'mixed') {
+      // 混合決済の場合は、リクエストから受け取った按分済みの値を使用
+      finalCashAmount = cash_amount || 0;
+      finalCardAmount = card_amount || 0;
+    }
+
     // 6. payments テーブルにも記録（売上管理用）
     const [purchasePaymentResult] = await connection.query(`
       INSERT INTO payments (
         payment_id,
         customer_id, staff_id, service_id, service_name, service_price, service_duration,
-        payment_type, ticket_id, service_subtotal, options_total, discount_amount, total_amount,
+        payment_type, ticket_id, service_subtotal, options_total, discount_amount, 
+        payment_amount, total_amount,
         payment_method, cash_amount, card_amount, notes, related_payment_id
-      ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       customer_id,
       staff_id,
@@ -112,9 +129,10 @@ export async function POST(request) {
       0,
       0,
       payment_amount,
+      payment_amount,
       payment_method,
-      payment_method === 'mixed' ? cash_amount : (payment_method === 'cash' ? payment_amount : 0),
-      payment_method === 'mixed' ? card_amount : (payment_method === 'card' ? payment_amount : 0),
+      finalCashAmount,
+      finalCardAmount,
       use_immediately 
         ? `回数券購入: ${plan.name}(${plan.total_sessions}回) - 購入時に1回使用済み`
         : `回数券購入: ${plan.name}(${plan.total_sessions}回)`,
@@ -133,9 +151,10 @@ export async function POST(request) {
       await connection.query(`
         INSERT INTO payments (
           customer_id, staff_id, service_id, service_name, service_price, service_duration,
-          payment_type, ticket_id, service_subtotal, options_total, discount_amount, total_amount,
+          payment_type, ticket_id, service_subtotal, options_total, discount_amount, 
+          payment_amount, total_amount,
           payment_method, cash_amount, card_amount, notes, related_payment_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `, [
         customer_id,
         staff_id,
@@ -145,6 +164,7 @@ export async function POST(request) {
         0,
         'ticket',
         customerTicketId,
+        0,
         0,
         0,
         0,
@@ -204,6 +224,8 @@ export async function PATCH(request) {
       customer_ticket_id,
       payment_amount,
       payment_method,
+      cash_amount = 0,
+      card_amount = 0,
       notes = null
     } = body;
 
