@@ -27,6 +27,7 @@ export async function GET(request) {
         c.phone_number,
         c.email,
         c.birth_date,
+        c.gender,
         c.base_visit_count,
         c.created_at,
         COUNT(CASE 

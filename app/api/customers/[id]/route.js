@@ -8,7 +8,7 @@ export async function GET(request, { params }) {
     const { id } = await params;
     const customerId = id;
 
-    // 顧客基本情報を取得
+    // 顧客基本情報を取得（genderを追加）
     const [customerRows] = await pool.execute(
       `SELECT 
         customer_id,
@@ -20,7 +20,9 @@ export async function GET(request, { params }) {
         phone_number,
         email,
         birth_date,
+        gender,
         notes,
+        base_visit_count,
         created_at,
         updated_at
       FROM customers 
@@ -37,14 +39,16 @@ export async function GET(request, { params }) {
 
     const customer = customerRows[0];
 
-    // 来店回数を計算
+    // 来店回数を計算（base_visit_count + 実際の来店回数）
     const [visitCountRows] = await pool.execute(
-      `SELECT COUNT(*) as visit_count 
+      `SELECT COUNT(*) as actual_visit_count 
        FROM bookings 
        WHERE customer_id = ? AND status = 'completed'`,
       [customerId]
     );
-    customer.visit_count = visitCountRows[0].visit_count || 0;
+    const actualVisitCount = visitCountRows[0].actual_visit_count || 0;
+    const baseVisitCount = customer.base_visit_count || 0;
+    customer.visit_count = baseVisitCount + actualVisitCount;
 
     // 最終来店日を取得
     const [lastVisitRows] = await pool.execute(
@@ -90,28 +94,45 @@ export async function PUT(request, { params }) {
     const customerId = id;
     
     const body = await request.json();
-    const {
-      last_name,
-      first_name,
-      last_name_kana,
-      first_name_kana,
-      phone_number,
-      email,
+    const { 
+      last_name, 
+      first_name, 
+      last_name_kana, 
+      first_name_kana, 
+      phone_number, 
+      email, 
       birth_date,
-      notes
+      gender,
+      notes,
+      base_visit_count,
+      line_user_id
     } = body;
 
+    console.log('受信データ:', { gender, ...body }); // デバッグ用
+
+    // バリデーション
+    if (!last_name || !first_name || !phone_number) {
+      return NextResponse.json(
+        { success: false, error: '必須項目を入力してください' },
+        { status: 400 }
+      );
+    }
+
+    // UPDATE文を実行
     await pool.execute(
-      `UPDATE customers 
-       SET last_name = ?,
-           first_name = ?,
-           last_name_kana = ?,
-           first_name_kana = ?,
-           phone_number = ?,
-           email = ?,
-           birth_date = ?,
-           notes = ?
-       WHERE customer_id = ?`,
+      `UPDATE customers SET
+        last_name = ?,
+        first_name = ?,
+        last_name_kana = ?,
+        first_name_kana = ?,
+        phone_number = ?,
+        email = ?,
+        birth_date = ?,
+        gender = ?,
+        notes = ?,
+        base_visit_count = ?,
+        line_user_id = ?
+      WHERE customer_id = ?`,
       [
         last_name,
         first_name,
@@ -120,10 +141,15 @@ export async function PUT(request, { params }) {
         phone_number,
         email || '',
         birth_date || null,
+        gender || 'not_specified',
         notes || '',
+        base_visit_count || 0,
+        line_user_id || null,
         customerId
       ]
     );
+
+    console.log('更新成功 - customer_id:', customerId, 'gender:', gender); // デバッグ用
 
     return NextResponse.json({
       success: true,
@@ -132,7 +158,7 @@ export async function PUT(request, { params }) {
   } catch (error) {
     console.error('顧客更新エラー:', error);
     return NextResponse.json(
-      { success: false, error: 'データベースエラー' },
+      { success: false, error: 'データベースエラー: ' + error.message },
       { status: 500 }
     );
   }

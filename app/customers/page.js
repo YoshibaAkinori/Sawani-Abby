@@ -22,6 +22,7 @@ const CustomersPage = () => {
     phone_number: '',
     email: '',
     birth_date: '',
+    gender: 'not_specified',
     notes: '',
     base_visit_count: '',
     line_user_id: ''
@@ -123,6 +124,17 @@ const CustomersPage = () => {
     handleSelectCustomer(customerId);
   };
 
+  // 性別ラベル取得
+  const getGenderLabel = (gender) => {
+    const labels = {
+      'male': '男性',
+      'female': '女性',
+      'other': 'その他',
+      'not_specified': '未設定'
+    };
+    return labels[gender] || '未設定';
+  };
+
   // 編集モード開始
   const handleStartEdit = () => {
     setEditFormData({
@@ -133,6 +145,7 @@ const CustomersPage = () => {
       phone_number: selectedCustomer.phone_number || '',
       email: selectedCustomer.email || '',
       birth_date: selectedCustomer.birth_date || '',
+      gender: selectedCustomer.gender || 'not_specified',
       notes: selectedCustomer.notes || '',
       base_visit_count: selectedCustomer.base_visit_count || '',
       line_user_id: selectedCustomer.line_user_id || ''
@@ -153,6 +166,7 @@ const CustomersPage = () => {
       phone_number: '',
       email: '',
       birth_date: '',
+      gender: 'not_specified',
       notes: '',
       base_visit_count: '',
       line_user_id: ''
@@ -446,7 +460,6 @@ const CustomersPage = () => {
                           <input
                             type="number"
                             className="customers-page__info-input"
-                            // ★★★ この行を追加 ★★★
                             placeholder={selectedCustomer.base_visit_count || 0}
                             value={editFormData.base_visit_count}
                             onChange={(e) => setEditFormData({
@@ -524,6 +537,44 @@ const CustomersPage = () => {
                     )}
                   </div>
 
+                  {/* 性別 */}
+                  <div className="customers-page__info-item">
+                    <div className="customers-page__info-label">性別</div>
+                    {isEditMode ? (
+                      <select
+                        className="customers-page__info-input"
+                        value={editFormData.gender}
+                        onChange={(e) => setEditFormData({ ...editFormData, gender: e.target.value })}
+                      >
+                        <option value="not_specified">未設定</option>
+                        <option value="male">男性</option>
+                        <option value="female">女性</option>
+                        <option value="other">その他</option>
+                      </select>
+                    ) : (
+                      <div className="customers-page__info-value">
+                        {getGenderLabel(selectedCustomer.gender)}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 生年月日 */}
+                  <div className="customers-page__info-item">
+                    <div className="customers-page__info-label">生年月日</div>
+                    {isEditMode ? (
+                      <input
+                        type="date"
+                        className="customers-page__info-input"
+                        value={editFormData.birth_date}
+                        onChange={(e) => setEditFormData({ ...editFormData, birth_date: e.target.value })}
+                      />
+                    ) : (
+                      <div className="customers-page__info-value">
+                        {selectedCustomer.birth_date || <span className="customers-page__info-value--empty">未登録</span>}
+                      </div>
+                    )}
+                  </div>
+
                   {/* 電話番号 */}
                   <div className="customers-page__info-item">
                     <div className="customers-page__info-label">
@@ -570,30 +621,6 @@ const CustomersPage = () => {
                     )}
                   </div>
 
-                  {/* 生年月日 */}
-                  <div className="customers-page__info-item">
-                    <div className="customers-page__info-label">生年月日</div>
-                    {isEditMode ? (
-                      <input
-                        type="date"
-                        className="customers-page__info-input"
-                        value={editFormData.birth_date}
-                        onChange={(e) => setEditFormData({ ...editFormData, birth_date: e.target.value })}
-                      />
-                    ) : (
-                      <div className="customers-page__info-value">
-                        {selectedCustomer.birth_date || <span className="customers-page__info-value--empty">未登録</span>}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* 初回登録日 - 編集不可 */}
-                  <div className="customers-page__info-item">
-                    <div className="customers-page__info-label">初回登録日</div>
-                    <div className="customers-page__info-value">
-                      {new Date(selectedCustomer.created_at).toLocaleDateString('ja-JP')}
-                    </div>
-                  </div>
 
                   {/* LINE ユーザーID */}
                   <div className="customers-page__info-item">
@@ -611,6 +638,14 @@ const CustomersPage = () => {
                         {selectedCustomer.line_user_id || <span className="customers-page__info-value--empty">未登録</span>}
                       </div>
                     )}
+                  </div>
+
+                  {/* 初回登録日 - 編集不可 */}
+                  <div className="customers-page__info-item">
+                    <div className="customers-page__info-label">初回登録日</div>
+                    <div className="customers-page__info-value">
+                      {new Date(selectedCustomer.created_at).toLocaleDateString('ja-JP')}
+                    </div>
                   </div>
 
                   {/* 備考 */}

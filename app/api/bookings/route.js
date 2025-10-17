@@ -2,7 +2,6 @@
 import { NextResponse } from 'next/server';
 import { getConnection } from '../../../lib/db';
 
-
 // 予約一覧取得
 export async function GET(request) {
   try {
@@ -14,61 +13,55 @@ export async function GET(request) {
     const bookingId = searchParams.get('id');
 
     let query = `
-  SELECT 
-    b.booking_id,
-    b.customer_id,
-    b.staff_id,
-    b.service_id,
-    b.customer_ticket_id,
-    b.coupon_id,
-    b.limited_offer_id,
-    b.date,
-    b.start_time,
-    b.end_time,
-    b.bed_id,
-    b.type,
-    b.status,
-    b.notes,
-    b.created_at,
-    c.last_name,
-    c.first_name,
-    s.name as staff_name,
-    s.color as staff_color,
-    -- 直接のサービス情報(通常予約)
-    sv_direct.name as direct_service_name,
-    sv_direct.category as direct_service_category,
-    -- 回数券情報(後方互換性用・最初の1つのみ)
-    tp.name as ticket_plan_name,
-    sv_ticket.category as ticket_service_category,
-    -- クーポン情報
-    cp.name as coupon_name,
-    cp.description as coupon_description,
-    cp.total_price as coupon_price,
-    -- 期間限定オファー情報(後方互換性用・最初の1つのみ)
-    lo.name as limited_offer_name,
-    lo.description as limited_offer_description,
-    lo.special_price as limited_offer_price,
-    lo.total_sessions as limited_offer_sessions,
-    -- 表示用の名前(優先順位: クーポン > 期間限定 > 回数券 > 通常サービス)
-    COALESCE(cp.name, lo.name, tp.name, sv_direct.name) as service_name,
-    -- カテゴリ(優先順位: クーポン > 期間限定 > 回数券 > 通常サービス)
-    CASE
-      WHEN cp.coupon_id IS NOT NULL THEN 'クーポン'
-      WHEN lo.offer_id IS NOT NULL THEN '期間限定'
-      ELSE COALESCE(sv_direct.category, sv_ticket.category)
-    END as service_category
-  FROM bookings b
-  LEFT JOIN customers c ON b.customer_id = c.customer_id
-  LEFT JOIN staff s ON b.staff_id = s.staff_id
-  LEFT JOIN services sv_direct ON b.service_id = sv_direct.service_id
-  LEFT JOIN customer_tickets ct ON b.customer_ticket_id = ct.customer_ticket_id
-  LEFT JOIN ticket_plans tp ON ct.plan_id = tp.plan_id
-  LEFT JOIN services sv_ticket ON tp.service_id = sv_ticket.service_id
-  LEFT JOIN coupons cp ON b.coupon_id = cp.coupon_id
-  LEFT JOIN limited_offers lo ON b.limited_offer_id = lo.offer_id
-  WHERE 1=1
-  AND b.status NOT IN ('cancelled', 'no_show')
-`;
+      SELECT 
+        b.booking_id,
+        b.customer_id,
+        b.staff_id,
+        b.service_id,
+        b.customer_ticket_id,
+        b.coupon_id,
+        b.limited_offer_id,
+        b.date,
+        b.start_time,
+        b.end_time,
+        b.bed_id,
+        b.type,
+        b.status,
+        b.notes,
+        b.created_at,
+        c.last_name,
+        c.first_name,
+        s.name as staff_name,
+        s.color as staff_color,
+        sv_direct.name as direct_service_name,
+        sv_direct.category as direct_service_category,
+        tp.name as ticket_plan_name,
+        sv_ticket.category as ticket_service_category,
+        cp.name as coupon_name,
+        cp.description as coupon_description,
+        cp.total_price as coupon_price,
+        lo.name as limited_offer_name,
+        lo.description as limited_offer_description,
+        lo.special_price as limited_offer_price,
+        lo.total_sessions as limited_offer_sessions,
+        COALESCE(cp.name, lo.name, tp.name, sv_direct.name) as service_name,
+        CASE
+          WHEN cp.coupon_id IS NOT NULL THEN 'クーポン'
+          WHEN lo.offer_id IS NOT NULL THEN '期間限定'
+          ELSE COALESCE(sv_direct.category, sv_ticket.category)
+        END as service_category
+      FROM bookings b
+      LEFT JOIN customers c ON b.customer_id = c.customer_id
+      LEFT JOIN staff s ON b.staff_id = s.staff_id
+      LEFT JOIN services sv_direct ON b.service_id = sv_direct.service_id
+      LEFT JOIN customer_tickets ct ON b.customer_ticket_id = ct.customer_ticket_id
+      LEFT JOIN ticket_plans tp ON ct.plan_id = tp.plan_id
+      LEFT JOIN services sv_ticket ON tp.service_id = sv_ticket.service_id
+      LEFT JOIN coupons cp ON b.coupon_id = cp.coupon_id
+      LEFT JOIN limited_offers lo ON b.limited_offer_id = lo.offer_id
+      WHERE 1=1
+      AND b.status NOT IN ('cancelled', 'no_show')
+    `;
 
     const params = [];
 
@@ -96,9 +89,7 @@ export async function GET(request) {
 
     const [rows] = await pool.execute(query, params);
 
-    // 各予約の追加情報を取得
     for (let booking of rows) {
-      // オプション情報を取得
       const [options] = await pool.execute(
         `SELECT 
           bo.booking_option_id,
@@ -114,7 +105,6 @@ export async function GET(request) {
       );
       booking.options = options;
 
-      // 複数の回数券情報を取得
       const [tickets] = await pool.execute(
         `SELECT 
           bt.booking_ticket_id,
@@ -137,7 +127,6 @@ export async function GET(request) {
       );
       booking.tickets = tickets;
 
-      // 複数の期間限定オファー情報を取得
       const [limitedOffers] = await pool.execute(
         `SELECT 
           blo.booking_limited_offer_id,
@@ -156,7 +145,6 @@ export async function GET(request) {
       );
       booking.limited_offers = limitedOffers;
 
-      // service_nameを複数の回数券・期間限定がある場合は更新
       if (tickets.length > 0) {
         const ticketNames = tickets.map(t => t.plan_name).join(' + ');
         booking.service_name = ticketNames;
@@ -193,9 +181,9 @@ export async function POST(request) {
       customer_id,
       staff_id,
       service_id,
-      customer_ticket_ids, // ← 配列に変更
+      customer_ticket_ids,
       coupon_id,
-      limited_offer_ids, // ← 配列に変更
+      limited_offer_ids,
       date,
       start_time,
       end_time,
@@ -206,9 +194,7 @@ export async function POST(request) {
       option_ids = []
     } = body;
 
-    // バリデーション
     if (type === 'schedule') {
-      // 予定の場合: スタッフと日時のみ必須
       if (!staff_id || !date || !start_time || !end_time) {
         return NextResponse.json(
           { success: false, error: 'スタッフと日時を入力してください' },
@@ -216,7 +202,6 @@ export async function POST(request) {
         );
       }
     } else {
-      // 予約の場合: 従来通りの厳格なバリデーション
       if (!staff_id || !date || !start_time || !end_time) {
         return NextResponse.json(
           { success: false, error: '必須項目を入力してください' },
@@ -224,7 +209,6 @@ export async function POST(request) {
         );
       }
 
-      // 予約の場合は顧客情報も必要(ただしcustomer_idは後で生成する場合もある)
       if (!customer_id && !body.last_name && !body.first_name) {
         return NextResponse.json(
           { success: false, error: '顧客情報を入力してください' },
@@ -232,7 +216,6 @@ export async function POST(request) {
         );
       }
 
-      // サービスまたはチケット/クーポン/期間限定のいずれかが必要
       const hasTickets = customer_ticket_ids && customer_ticket_ids.length > 0;
       const hasLimitedOffers = limited_offer_ids && limited_offer_ids.length > 0;
 
@@ -248,9 +231,8 @@ export async function POST(request) {
 
     let finalCustomerId = customer_id;
 
-    // 予約の場合で新規顧客の場合は顧客を先に登録
     if (type === 'booking' && !customer_id && body.last_name && body.first_name) {
-      const [customerResult] = await connection.execute(
+      await connection.execute(
         `INSERT INTO customers (
           customer_id,
           last_name,
@@ -258,19 +240,22 @@ export async function POST(request) {
           last_name_kana,
           first_name_kana,
           phone_number,
-          email
-        ) VALUES (UUID(), ?, ?, ?, ?, ?, ?)`,
+          email,
+          birth_date,
+          gender
+        ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           body.last_name,
           body.first_name,
           body.last_name_kana || '',
           body.first_name_kana || '',
           body.phone_number || '',
-          body.email || ''
+          body.email || '',
+          body.birth_date || null,
+          body.gender || 'not_specified'
         ]
       );
 
-      // 挿入されたcustomer_idを取得
       const [customerRow] = await connection.execute(
         'SELECT customer_id FROM customers WHERE phone_number = ? ORDER BY created_at DESC LIMIT 1',
         [body.phone_number]
@@ -278,8 +263,7 @@ export async function POST(request) {
       finalCustomerId = customerRow[0].customer_id;
     }
 
-    // 予約/予定登録（既存カラムは互換性のため保持、最初の要素のみ設定）
-    const [result] = await connection.execute(
+    await connection.execute(
       `INSERT INTO bookings (
         booking_id,
         customer_id,
@@ -300,9 +284,9 @@ export async function POST(request) {
         finalCustomerId,
         staff_id,
         service_id ?? null,
-        customer_ticket_ids && customer_ticket_ids.length > 0 ? customer_ticket_ids[0] : null, // 互換性のため最初の1つ
+        customer_ticket_ids && customer_ticket_ids.length > 0 ? customer_ticket_ids[0] : null,
         coupon_id ?? null,
-        limited_offer_ids && limited_offer_ids.length > 0 ? limited_offer_ids[0] : null, // 互換性のため最初の1つ
+        limited_offer_ids && limited_offer_ids.length > 0 ? limited_offer_ids[0] : null,
         date,
         start_time,
         end_time,
@@ -313,7 +297,6 @@ export async function POST(request) {
       ]
     );
 
-    // 挿入されたbooking_idを取得
     const [bookingRow] = await connection.execute(
       `SELECT booking_id FROM bookings 
        WHERE staff_id = ? AND date = ? AND start_time = ? 
@@ -322,19 +305,16 @@ export async function POST(request) {
     );
     const bookingId = bookingRow[0].booking_id;
 
-    // 複数の回数券を中間テーブルに登録
     if (customer_ticket_ids && customer_ticket_ids.length > 0) {
       for (const ticketId of customer_ticket_ids) {
-        // booking_tickets テーブルに記録するだけ（残回数は減らさない）
-        await pool.execute(
+        await connection.execute(
           `INSERT INTO booking_tickets (booking_id, customer_ticket_id)
-       VALUES (?, ?)`,
+           VALUES (?, ?)`,
           [bookingId, ticketId]
         );
       }
     }
 
-    // 複数の期間限定オファーを中間テーブルに登録
     if (limited_offer_ids && limited_offer_ids.length > 0) {
       for (const offerId of limited_offer_ids) {
         await connection.execute(
@@ -348,7 +328,6 @@ export async function POST(request) {
       }
     }
 
-    // 予約の場合のみオプション登録
     if (type === 'booking' && option_ids && option_ids.length > 0) {
       for (const optionId of option_ids) {
         await connection.execute(
@@ -414,7 +393,6 @@ export async function PUT(request) {
 
     await connection.beginTransaction();
 
-    // 変更前のデータを取得
     const [beforeData] = await connection.execute(
       'SELECT * FROM bookings WHERE booking_id = ?',
       [booking_id]
@@ -429,7 +407,6 @@ export async function PUT(request) {
 
     const before = beforeData[0];
 
-    // 予約を更新
     await connection.execute(
       `UPDATE bookings 
        SET date = ?,
@@ -443,7 +420,6 @@ export async function PUT(request) {
       [date, start_time, end_time, staff_id, bed_id, status, notes, booking_id]
     );
 
-    // 変更内容を記録
     const changes = {
       before: {
         date: before.date,
@@ -465,7 +441,6 @@ export async function PUT(request) {
       }
     };
 
-    // 履歴を記録
     await connection.execute(
       `INSERT INTO booking_history (
         history_id,
@@ -495,6 +470,7 @@ export async function PUT(request) {
     }
   }
 }
+
 // 予約削除/キャンセル
 export async function DELETE(request) {
   const pool = await getConnection();
@@ -503,7 +479,7 @@ export async function DELETE(request) {
   try {
     const { searchParams } = new URL(request.url);
     const bookingId = searchParams.get('id');
-    const cancelType = searchParams.get('cancelType'); // 'with_contact' or 'no_contact'
+    const cancelType = searchParams.get('cancelType');
 
     if (!bookingId) {
       return NextResponse.json(
@@ -514,7 +490,6 @@ export async function DELETE(request) {
 
     await connection.beginTransaction();
 
-    // 予約情報を取得
     const [booking] = await connection.execute(
       'SELECT * FROM bookings WHERE booking_id = ?',
       [bookingId]
@@ -529,17 +504,9 @@ export async function DELETE(request) {
 
     const bookingData = booking[0];
 
-    // ★★★ 重要: 予約キャンセル時は回数券の回数を戻さない ★★★
-    // 理由: 予約時に回数を減らしていないため、キャンセル時も何もしない
-    // 回数券は会計（支払い）時に初めて減らされる
-
-    // 参考: もし既に会計済み（completed）の予約をキャンセルする場合は
-    // 会計データも取り消す必要があるが、それは別の処理として実装すべき
-
-    // キャンセル理由を含めた履歴を記録
     const cancelDetails = {
       ...bookingData,
-      cancel_type: cancelType || 'unknown', // 'with_contact', 'no_contact', 'unknown'
+      cancel_type: cancelType || 'unknown',
       cancelled_at: new Date().toISOString()
     };
 
@@ -557,7 +524,6 @@ export async function DELETE(request) {
       ]
     );
 
-    // 予約をキャンセルに（statusも区別する場合）
     const cancelStatus = cancelType === 'no_contact' ? 'no_show' : 'cancelled';
 
     await connection.execute(
@@ -568,7 +534,7 @@ export async function DELETE(request) {
     await connection.commit();
 
     const message = cancelType === 'no_contact'
-      ? '予約をキャンセルしました（無断キャンセル）'
+      ? '予約をキャンセルしました(無断キャンセル)'
       : '予約をキャンセルしました';
 
     return NextResponse.json({
