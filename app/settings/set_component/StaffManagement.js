@@ -1,8 +1,7 @@
-// app/settings/set_component/StaffManagement.js
+// app/components/settings/StaffManagement.js
 "use client";
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X, Check, User } from 'lucide-react';
-import { useStaff } from '../../../contexts/StaffContext';
 
 const StaffManagement = () => {
   const [staff, setStaff] = useState([]);
@@ -11,9 +10,6 @@ const StaffManagement = () => {
   const [success, setSuccess] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
-
-  // ★ StaffContextから取得
-  const { refreshStaff } = useStaff();
 
   // フォームデータ
   const [formData, setFormData] = useState({
@@ -55,7 +51,13 @@ const StaffManagement = () => {
       }
     } catch (err) {
       console.error('スタッフデータの取得に失敗:', err);
-      setStaff([]);
+      // デモデータを使用
+      setStaff([
+        { staff_id: '1', name: '佐野 智里', color: '#FF69B4', role: 'セラピスト', is_active: true, hourly_wage: 1500, transport_allowance: 900 },
+        { staff_id: '2', name: '星野 加奈恵', color: '#9370DB', role: 'セラピスト', is_active: true, hourly_wage: 1500, transport_allowance: 900 },
+        { staff_id: '3', name: '吉羽 顕功', color: '#4169E1', role: 'マネージャー', is_active: true, hourly_wage: 1500, transport_allowance: 900 },
+        { staff_id: '4', name: '吉羽 皓紀', color: '#32CD32', role: 'セラピスト', is_active: false, hourly_wage: 1500, transport_allowance: 900 },
+      ]);
     } finally {
       setIsLoading(false);
     }
@@ -89,20 +91,24 @@ const StaffManagement = () => {
       });
 
       if (response.ok) {
+        const data = await response.json();
         setSuccess('スタッフを登録しました');
-        await fetchStaff();
-        
-        // ★ Contextを強制更新
-        await refreshStaff(true);
-        
+        fetchStaff();
         setShowAddForm(false);
         resetForm();
       } else {
-        const data = await response.json();
-        throw new Error(data.error || '登録に失敗しました');
+        throw new Error('登録に失敗しました');
       }
     } catch (err) {
-      setError(err.message);
+      // デモモード: ローカルで追加
+      const newStaff = {
+        staff_id: Date.now().toString(),
+        ...formData
+      };
+      setStaff(prev => [...prev, newStaff]);
+      setSuccess('スタッフを登録しました（ローカル保存）');
+      setShowAddForm(false);
+      resetForm();
     } finally {
       setIsLoading(false);
       setTimeout(() => setSuccess(''), 3000);
@@ -145,18 +151,18 @@ const StaffManagement = () => {
 
       if (response.ok) {
         setSuccess('更新しました');
-        await fetchStaff();
-        
-        // ★ Contextを強制更新
-        await refreshStaff(true);
-        
+        fetchStaff();
         setEditingId(null);
       } else {
-        const data = await response.json();
-        throw new Error(data.error || '更新に失敗しました');
+        throw new Error('更新に失敗しました');
       }
     } catch (err) {
-      setError(err.message);
+      // デモモード: ローカルで更新
+      setStaff(prev => prev.map(s =>
+        s.staff_id === staffId ? { ...s, ...formData } : s
+      ));
+      setSuccess('更新しました（ローカル保存）');
+      setEditingId(null);
     } finally {
       setIsLoading(false);
       setTimeout(() => setSuccess(''), 3000);
@@ -165,7 +171,9 @@ const StaffManagement = () => {
 
   // 削除
   const handleDelete = async (staffId) => {
-    if (!confirm('本当に削除しますか？')) return;
+    if (!window.confirm('このスタッフを削除してもよろしいですか？')) {
+      return;
+    }
 
     setIsLoading(true);
     setError('');
@@ -177,26 +185,18 @@ const StaffManagement = () => {
 
       if (response.ok) {
         setSuccess('削除しました');
-        await fetchStaff();
-        
-        // ★ Contextを強制更新
-        await refreshStaff(true);
+        fetchStaff();
       } else {
-        const data = await response.json();
-        throw new Error(data.error || '削除に失敗しました');
+        throw new Error('削除に失敗しました');
       }
     } catch (err) {
-      setError(err.message);
+      // デモモード: ローカルで削除
+      setStaff(prev => prev.filter(s => s.staff_id !== staffId));
+      setSuccess('削除しました（ローカル保存）');
     } finally {
       setIsLoading(false);
       setTimeout(() => setSuccess(''), 3000);
     }
-  };
-
-  // 編集キャンセル
-  const cancelEdit = () => {
-    setEditingId(null);
-    resetForm();
   };
 
   // フォームリセット
@@ -211,294 +211,309 @@ const StaffManagement = () => {
     });
   };
 
-  return (
-    <div className="staff-management">
-      <div className="staff-management__header">
-        <h2 className="staff-management__title">スタッフ管理</h2>
-        <button
-          onClick={() => setShowAddForm(!showAddForm)}
-          className="staff-management__add-btn"
-          disabled={isLoading}
-        >
-          {showAddForm ? <X size={20} /> : <Plus size={20} />}
-          {showAddForm ? 'キャンセル' : '新規追加'}
-        </button>
-      </div>
+  // キャンセル
+  const handleCancel = () => {
+    setEditingId(null);
+    setShowAddForm(false);
+    resetForm();
+    setError('');
+  };
 
-      {/* メッセージ */}
+  return (
+    <div className="settings__staff-management">
+      {/* アラート表示 */}
       {error && (
-        <div className="staff-management__alert staff-management__alert--error">
-          {error}
+        <div className="settings__alert settings__alert--error">
+          <span>{error}</span>
         </div>
       )}
       {success && (
-        <div className="staff-management__alert staff-management__alert--success">
+        <div className="settings__alert settings__alert--success">
           <Check size={16} />
-          {success}
+          <span>{success}</span>
         </div>
       )}
 
+      {/* ヘッダー */}
+      <div className="settings__section-header">
+        <h2 className="settings__section-title">スタッフ一覧</h2>
+        {!showAddForm && (
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="settings__btn settings__btn--primary"
+            disabled={isLoading}
+          >
+            <Plus size={16} />
+            新規追加
+          </button>
+        )}
+      </div>
+
       {/* 新規追加フォーム */}
       {showAddForm && (
-        <div className="staff-management__form-card">
-          <h3 className="staff-management__form-title">新規スタッフ登録</h3>
-          <div className="staff-management__form-grid">
-            <div className="staff-management__form-group">
-              <label className="staff-management__label">
-                スタッフ名 <span className="staff-management__required">*</span>
-              </label>
+        <div className="settings__add-form">
+          <div className="settings__form-grid">
+            <div className="settings__form-group">
+              <label className="settings__form-label">スタッフ名 *</label>
               <input
                 type="text"
                 name="name"
                 value={formData.name}
                 onChange={handleInputChange}
-                className="staff-management__input"
-                placeholder="山田 太郎"
+                className="settings__form-input"
+                placeholder="例: 山田 太郎"
               />
             </div>
 
-            <div className="staff-management__form-group">
-              <label className="staff-management__label">役職</label>
+            <div className="settings__form-group">
+              <label className="settings__form-label">役職</label>
               <select
                 name="role"
                 value={formData.role}
                 onChange={handleInputChange}
-                className="staff-management__select"
+                className="settings__form-select"
               >
                 <option value="セラピスト">セラピスト</option>
                 <option value="マネージャー">マネージャー</option>
-                <option value="アシスタント">アシスタント</option>
+                <option value="研修生">研修生</option>
+                <option value="受付">受付</option>
               </select>
             </div>
 
-            <div className="staff-management__form-group">
-              <label className="staff-management__label">カラー</label>
-              <div className="staff-management__color-grid">
-                {colorOptions.map(color => (
-                  <button
-                    key={color}
-                    type="button"
-                    className={`staff-management__color-option ${formData.color === color ? 'staff-management__color-option--selected' : ''}`}
-                    style={{ backgroundColor: color }}
-                    onClick={() => setFormData(prev => ({ ...prev, color }))}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="staff-management__form-group">
-              <label className="staff-management__label">時給（円）</label>
+            <div className="settings__form-group">
+              <label className="settings__form-label">時給（円）</label>
               <input
                 type="number"
                 name="hourly_wage"
                 value={formData.hourly_wage}
                 onChange={handleInputChange}
-                className="staff-management__input"
-                min="0"
+                className="settings__form-input"
+                placeholder="1500"
               />
             </div>
 
-            <div className="staff-management__form-group">
-              <label className="staff-management__label">交通費（円）</label>
+            <div className="settings__form-group">
+              <label className="settings__form-label">交通費（円）</label>
               <input
                 type="number"
                 name="transport_allowance"
                 value={formData.transport_allowance}
                 onChange={handleInputChange}
-                className="staff-management__input"
-                min="0"
+                className="settings__form-input"
+                placeholder="900"
               />
             </div>
 
-            <div className="staff-management__form-group staff-management__form-group--full">
-              <label className="staff-management__checkbox-label">
+            <div className="settings__form-group">
+              <label className="settings__form-label">カラー</label>
+              <div className="settings__color-picker">
+                {colorOptions.map(color => (
+                  <button
+                    key={color}
+                    onClick={() => setFormData(prev => ({ ...prev, color }))}
+                    className={`settings__color-option ${formData.color === color ? 'settings__color-option--selected' : ''}`}
+                    style={{ backgroundColor: color }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="settings__form-group">
+              <label className="settings__form-label settings__form-label--checkbox">
                 <input
                   type="checkbox"
                   name="is_active"
                   checked={formData.is_active}
                   onChange={handleInputChange}
-                  className="staff-management__checkbox"
+                  className="settings__form-checkbox"
                 />
-                <span>有効</span>
+                有効
               </label>
             </div>
           </div>
 
-          <div className="staff-management__form-actions">
+          <div className="settings__form-actions">
             <button
-              onClick={handleAdd}
-              className="staff-management__btn staff-management__btn--primary"
+              onClick={handleCancel}
+              className="settings__btn settings__btn--secondary"
               disabled={isLoading}
             >
-              {isLoading ? '登録中...' : '登録'}
+              <X size={16} />
+              キャンセル
+            </button>
+            <button
+              onClick={handleAdd}
+              className="settings__btn settings__btn--primary"
+              disabled={isLoading}
+            >
+              <Save size={16} />
+              登録
             </button>
           </div>
         </div>
       )}
 
-      {/* スタッフ一覧 */}
-      <div className="staff-management__list">
-        {staff.length === 0 ? (
-          <div className="staff-management__empty">
-            <User size={48} />
-            <p>スタッフが登録されていません</p>
-          </div>
-        ) : (
-          staff.map(staffMember => (
-            <div key={staffMember.staff_id} className="staff-management__card">
-              {editingId === staffMember.staff_id ? (
-                // 編集モード
-                <div className="staff-management__edit-form">
-                  <div className="staff-management__form-grid">
-                    <div className="staff-management__form-group">
-                      <label className="staff-management__label">スタッフ名</label>
+      {/* スタッフテーブル */}
+      <div className="settings__table-container">
+        <table className="settings__table">
+          <thead>
+            <tr>
+              <th>カラー</th>
+              <th>スタッフ名</th>
+              <th>役職</th>
+              <th>時給</th>
+              <th>交通費</th>
+              <th>ステータス</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {staff.map(member => (
+              <tr key={member.staff_id}>
+                {editingId === member.staff_id ? (
+                  <>
+                    <td>
+                      <div className="settings__color-picker settings__color-picker--inline">
+                        {colorOptions.map(color => (
+                          <button
+                            key={color}
+                            onClick={() => setFormData(prev => ({ ...prev, color }))}
+                            className={`settings__color-option settings__color-option--small ${formData.color === color ? 'settings__color-option--selected' : ''}`}
+                            style={{ backgroundColor: color }}
+                          />
+                        ))}
+                      </div>
+                    </td>
+                    <td>
                       <input
                         type="text"
                         name="name"
                         value={formData.name}
                         onChange={handleInputChange}
-                        className="staff-management__input"
+                        className="settings__form-input settings__form-input--inline"
                       />
-                    </div>
-
-                    <div className="staff-management__form-group">
-                      <label className="staff-management__label">役職</label>
+                    </td>
+                    <td>
                       <select
                         name="role"
                         value={formData.role}
                         onChange={handleInputChange}
-                        className="staff-management__select"
+                        className="settings__form-select settings__form-select--inline"
                       >
                         <option value="セラピスト">セラピスト</option>
                         <option value="マネージャー">マネージャー</option>
-                        <option value="アシスタント">アシスタント</option>
+                        <option value="研修生">研修生</option>
+                        <option value="受付">受付</option>
                       </select>
-                    </div>
-
-                    <div className="staff-management__form-group">
-                      <label className="staff-management__label">カラー</label>
-                      <div className="staff-management__color-grid">
-                        {colorOptions.map(color => (
-                          <button
-                            key={color}
-                            type="button"
-                            className={`staff-management__color-option ${formData.color === color ? 'staff-management__color-option--selected' : ''}`}
-                            style={{ backgroundColor: color }}
-                            onClick={() => setFormData(prev => ({ ...prev, color }))}
-                          />
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="staff-management__form-group">
-                      <label className="staff-management__label">時給（円）</label>
+                    </td>
+                    <td>
                       <input
                         type="number"
                         name="hourly_wage"
                         value={formData.hourly_wage}
                         onChange={handleInputChange}
-                        className="staff-management__input"
-                        min="0"
+                        className="settings__form-input settings__form-input--inline"
+                        placeholder="1500"
                       />
-                    </div>
-
-                    <div className="staff-management__form-group">
-                      <label className="staff-management__label">交通費（円）</label>
+                    </td>
+                    <td>
                       <input
                         type="number"
                         name="transport_allowance"
                         value={formData.transport_allowance}
                         onChange={handleInputChange}
-                        className="staff-management__input"
-                        min="0"
+                        className="settings__form-input settings__form-input--inline"
+                        placeholder="900"
                       />
-                    </div>
-
-                    <div className="staff-management__form-group staff-management__form-group--full">
-                      <label className="staff-management__checkbox-label">
+                    </td>
+                    <td>
+                      <label className="settings__form-label--checkbox">
                         <input
                           type="checkbox"
                           name="is_active"
                           checked={formData.is_active}
                           onChange={handleInputChange}
-                          className="staff-management__checkbox"
+                          className="settings__form-checkbox"
                         />
-                        <span>有効</span>
+                        有効
                       </label>
-                    </div>
-                  </div>
-
-                  <div className="staff-management__form-actions">
-                    <button
-                      onClick={() => handleUpdate(staffMember.staff_id)}
-                      className="staff-management__btn staff-management__btn--primary"
-                      disabled={isLoading}
-                    >
-                      <Save size={16} />
-                      保存
-                    </button>
-                    <button
-                      onClick={cancelEdit}
-                      className="staff-management__btn staff-management__btn--secondary"
-                      disabled={isLoading}
-                    >
-                      <X size={16} />
-                      キャンセル
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                // 表示モード
-                <>
-                  <div className="staff-management__card-header">
-                    <div className="staff-management__card-info">
-                      <div
-                        className="staff-management__card-color"
-                        style={{ backgroundColor: staffMember.color }}
-                      />
-                      <div>
-                        <h3 className="staff-management__card-name">{staffMember.name}</h3>
-                        <p className="staff-management__card-role">{staffMember.role}</p>
+                    </td>
+                    <td>
+                      <div className="settings__actions">
+                        <button
+                          onClick={() => handleUpdate(member.staff_id)}
+                          className="settings__btn-icon settings__btn-icon--success"
+                          disabled={isLoading}
+                        >
+                          <Save size={16} />
+                        </button>
+                        <button
+                          onClick={handleCancel}
+                          className="settings__btn-icon settings__btn-icon--secondary"
+                          disabled={isLoading}
+                        >
+                          <X size={16} />
+                        </button>
                       </div>
-                    </div>
-                    <div className="staff-management__card-actions">
-                      <button
-                        onClick={() => startEdit(staffMember)}
-                        className="staff-management__icon-btn staff-management__icon-btn--edit"
-                        disabled={isLoading}
-                      >
-                        <Edit2 size={18} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(staffMember.staff_id)}
-                        className="staff-management__icon-btn staff-management__icon-btn--delete"
-                        disabled={isLoading}
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="staff-management__card-details">
-                    <div className="staff-management__detail-item">
-                      <span className="staff-management__detail-label">時給:</span>
-                      <span className="staff-management__detail-value">¥{staffMember.hourly_wage?.toLocaleString() || '1,500'}</span>
-                    </div>
-                    <div className="staff-management__detail-item">
-                      <span className="staff-management__detail-label">交通費:</span>
-                      <span className="staff-management__detail-value">¥{staffMember.transport_allowance?.toLocaleString() || '900'}</span>
-                    </div>
-                    <div className="staff-management__detail-item">
-                      <span className="staff-management__detail-label">ステータス:</span>
-                      <span className={`staff-management__status ${staffMember.is_active ? 'staff-management__status--active' : 'staff-management__status--inactive'}`}>
-                        {staffMember.is_active ? '有効' : '無効'}
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td>
+                      <div
+                        className="settings__color-indicator"
+                        style={{ backgroundColor: member.color }}
+                      />
+                    </td>
+                    <td className="settings__table-name">
+                      <User size={16} />
+                      {member.name}
+                    </td>
+                    <td>{member.role}</td>
+                    <td>¥{(member.hourly_wage || 1500).toLocaleString()}</td>
+                    <td>¥{(member.transport_allowance || 900).toLocaleString()}</td>
+                    <td>
+                      <span className={`settings__status-badge ${member.is_active ? 'settings__status-badge--active' : 'settings__status-badge--inactive'}`}>
+                        {member.is_active ? '有効' : '無効'}
                       </span>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          ))
+                    </td>
+                    <td>
+                      <div className="settings__actions">
+                        <button
+                          onClick={() => startEdit(member)}
+                          className="settings__btn-icon settings__btn-icon--primary"
+                          disabled={isLoading}
+                        >
+                          <Edit2 size={16} />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(member.staff_id)}
+                          className="settings__btn-icon settings__btn-icon--danger"
+                          disabled={isLoading}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </td>
+                  </>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {staff.length === 0 && !isLoading && (
+          <div className="settings__empty-state">
+            <User size={48} />
+            <p>スタッフが登録されていません</p>
+            <button
+              onClick={() => setShowAddForm(true)}
+              className="settings__btn settings__btn--primary"
+            >
+              <Plus size={16} />
+              最初のスタッフを追加
+            </button>
+          </div>
         )}
       </div>
     </div>

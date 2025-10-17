@@ -34,14 +34,12 @@ export function StaffProvider({ children }: { children: React.ReactNode }) {
   const fetchStaff = useCallback(async (force: boolean = false) => {
     const now = Date.now();
 
-    // 強制更新でない場合、キャッシュ期限をチェック
     if (!force && lastFetched && (now - lastFetched) < CACHE_DURATION) {
       console.log('StaffContext: キャッシュを使用');
       return;
     }
 
     console.log('StaffContext: APIからスタッフデータを取得');
-    setLoading(true);
     setError(null);
 
     try {
@@ -54,10 +52,19 @@ export function StaffProvider({ children }: { children: React.ReactNode }) {
       const data = await response.json();
       
       if (data.success) {
-        // 有効なスタッフのみをフィルタ
         const active = data.data.filter((s: Staff) => s.is_active);
         setActiveStaff(active);
         setLastFetched(now);
+        
+        // ★ localStorageに保存
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.setItem('cached_staff', JSON.stringify(active));
+            console.log('StaffContext: localStorageに保存', active);
+          } catch (err) {
+            console.error('localStorage保存エラー:', err);
+          }
+        }
       } else {
         throw new Error(data.error || 'データ取得エラー');
       }
@@ -66,14 +73,29 @@ export function StaffProvider({ children }: { children: React.ReactNode }) {
       setError(errorMessage);
       console.error('StaffContext エラー:', err);
     } finally {
-      setLoading(false);
+      setLoading(false); // ★ API取得完了でローディング解除
     }
   }, [lastFetched]);
 
-  // 初回マウント時に取得
+  // ★ クライアント側でマウント時にlocalStorageから復元してからAPI取得
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('cached_staff');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          console.log('StaffContext: localStorageから復元', parsed);
+          setActiveStaff(parsed);
+          setLoading(false); // ★ 復元できたらすぐにローディング解除
+        }
+      } catch (err) {
+        console.error('localStorage読み込みエラー:', err);
+      }
+    }
+    
+    // APIから最新データを取得
     fetchStaff();
-  }, []);
+  }, [fetchStaff]);
 
   const refreshStaff = useCallback(async (force: boolean = false) => {
     await fetchStaff(force);
@@ -94,7 +116,6 @@ export function StaffProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// カスタムフック
 export function useStaff() {
   const context = useContext(StaffContext);
   if (context === undefined) {

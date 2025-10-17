@@ -2,87 +2,101 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Calendar, ChevronLeft, ChevronRight, Settings, User, Clock, Users, BarChart3, CreditCard } from 'lucide-react';
+import { useStaff } from '../contexts/StaffContext';
 import BookingModal from './components/BookingModal';
 import CalendarModal from './components/CalendarModal';
 import './global.css';
 
 const SalonBoard = () => {
   const router = useRouter();
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]); // 本日の日付を初期値に
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [activeModal, setActiveModal] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
 
-  // データとローディング状態
-  const [staffShifts, setStaffShifts] = useState([]);
-  const [bookings, setBookings] = useState([]); // ★★★ APIから取得した予約データを保持するState
-  const [isLoading, setIsLoading] = useState(true);
+  // ★ Contextから取得
+  const { activeStaff, loading: staffLoading } = useStaff();
 
-  // ★★★ 日付が変更されたらシフトと予約の両方を取得する ★★★
+  console.log('activeStaff:', activeStaff);
+  console.log('staffLoading:', staffLoading);
+
+  // ★ 初期値としてスタッフの骨組みを即座に作成
+  const [staffShifts, setStaffShifts] = useState([]);
+  const [bookings, setBookings] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // ★ activeStaffが変更されたら、即座にスタッフの骨組みを作成
   useEffect(() => {
-    fetchDataForDate();
-  }, [selectedDate]);
+    if (activeStaff.length > 0) {
+      const initialStaffShifts = activeStaff.map(staff => ({
+        ...staff,
+        shift: null,
+        hasShift: false
+      }));
+      setStaffShifts(initialStaffShifts);
+    }
+  }, [activeStaff]);
+
+  // ★ 日付が変更されたら、シフトと予約データを取得
+  useEffect(() => {
+    if (activeStaff.length > 0) {
+      fetchDataForDate();
+    }
+  }, [selectedDate, activeStaff]);
 
   const fetchDataForDate = async () => {
     setIsLoading(true);
     try {
-      // 2つのAPI呼び出しを並列で実行
-      const [shiftsPromise, bookingsPromise] = [
-        fetchShifts(selectedDate),
-        fetchBookings(selectedDate)
-      ];
+      const [year, month] = selectedDate.split('-');
 
-      // 両方の完了を待つ
-      await Promise.all([shiftsPromise, bookingsPromise]);
+      // ★ マネージャー以外のスタッフのみシフト取得
+      const nonManagerStaff = activeStaff.filter(s => s.role !== 'マネージャー');
 
+      // シフトと予約を並列取得
+      const [shiftsData, bookingsData] = await Promise.all([
+        // シフトデータ取得（マネージャーは除外）
+        Promise.all(nonManagerStaff.map(async (staff) => {
+          const shiftResponse = await fetch(`/api/shifts?staffId=${staff.staff_id}&year=${year}&month=${month}`);
+          const shiftData = await shiftResponse.json();
+          const dayShift = shiftData.data?.shifts?.find(s => s.date.startsWith(selectedDate));
+          return { ...staff, shift: dayShift || null, hasShift: !!dayShift };
+        })),
+        // 予約データ取得
+        fetch(`/api/bookings?date=${selectedDate}`).then(res => res.json())
+      ]);
+
+      // ★ マネージャーは常にシフトありとして追加
+      const managerStaff = activeStaff
+        .filter(s => s.role === 'マネージャー')
+        .map(staff => ({ ...staff, shift: null, hasShift: true }));
+
+      // ★ シフトデータで更新（マネージャー + その他スタッフ）
+      setStaffShifts([...managerStaff, ...shiftsData]);
+
+      // ★ 予約データをフォーマット
+      if (bookingsData.success) {
+        const formattedBookings = bookingsData.data.map(b => ({
+          id: b.booking_id,
+          staffId: b.staff_id,
+          staffName: b.staff_name,
+          bed: b.bed_id ? `ベッド${b.bed_id}` : '',
+          date: b.date.split('T')[0],
+          startTime: b.start_time,
+          endTime: b.end_time,
+          service: b.service_name || b.notes || '予定',
+          client: `${b.last_name || ''} ${b.first_name || ''}`,
+          serviceType: b.service_category || '予定',
+          status: b.status,
+          type: b.type
+        }));
+        setBookings(formattedBookings);
+      } else {
+        setBookings([]);
+      }
     } catch (err) {
       console.error('データ取得エラー:', err);
-      setStaffShifts([]);
       setBookings([]);
     } finally {
       setIsLoading(false);
-    }
-  };
-
-  // シフトデータを取得する関数
-  const fetchShifts = async (date) => {
-    const [year, month] = date.split('-');
-    const staffResponse = await fetch('/api/staff');
-    const staffData = await staffResponse.json();
-    const allStaff = staffData.data?.filter(s => s.is_active) || [];
-
-    const shiftsPromises = allStaff.map(async (staff) => {
-      const shiftResponse = await fetch(`/api/shifts?staffId=${staff.staff_id}&year=${year}&month=${month}`);
-      const shiftData = await shiftResponse.json();
-      const dayShift = shiftData.data?.shifts?.find(s => s.date.startsWith(date));
-      return { ...staff, shift: dayShift || null, hasShift: !!dayShift };
-    });
-
-    const staffWithShifts = await Promise.all(shiftsPromises);
-    setStaffShifts(staffWithShifts);
-  };
-
-  // ★★★ 予約データを取得する新しい関数 ★★★
-  const fetchBookings = async (date) => {
-    const response = await fetch(`/api/bookings?date=${date}`);
-    const data = await response.json();
-    if (data.success) {
-      // APIのキー(snake_case)をコンポーネントで使う(camelCase)に変換
-      const formattedBookings = data.data.map(b => ({
-        id: b.booking_id,
-        staffId: b.staff_id,
-        bed: b.bed_id ? `ベッド${b.bed_id}` : '',
-        date: b.date.split('T')[0],
-        startTime: b.start_time,
-        endTime: b.end_time,
-        service: b.service_name || b.notes || '予定', // サービス名がなければメモを表示
-        client: `${b.last_name || ''} ${b.first_name || ''}`,
-        serviceType: b.service_category || '予定', // カテゴリがなければ「予定」
-        status: b.status,
-        type: b.type // 'booking' or 'schedule'
-      }));
-      setBookings(formattedBookings);
-    } else {
-      setBookings([]);
     }
   };
 
@@ -90,14 +104,11 @@ const SalonBoard = () => {
   const beds = Array.from({ length: bedCount }, (_, i) => `ベッド${i + 1}`);
 
   const timeSlots = [];
-  // 10:00から23:30まで30分刻みで生成（計14時間、28スロット）
   for (let hour = 9; hour < 24; hour++) {
     timeSlots.push(`${hour.toString().padStart(2, '0')}:00`);
     timeSlots.push(`${hour.toString().padStart(2, '0')}:30`);
   }
 
-
-  // 時間ヘッダー用の無記名スタッフデータ
   const headerRowData = {
     id: 'HEADER_ROW',
     staff_id: 'HEADER_ROW',
@@ -105,7 +116,12 @@ const SalonBoard = () => {
     color: 'transparent'
   };
 
-  const displayStaff = [headerRowData, ...staffShifts.filter(s => s.is_active)];
+  // ★ ベッドと同じように、activeStaffから直接表示用配列を作成
+  const displayStaff = activeStaff.length > 0 
+    ? [headerRowData, ...activeStaff]
+    : [];
+
+  console.log('displayStaff:', displayStaff);
 
   const timeToMinutes = (time) => {
     const [hours, minutes] = time.split(':').map(Number);
@@ -113,20 +129,13 @@ const SalonBoard = () => {
   };
 
   const calculateBookingPosition = (startTime, endTime) => {
-    // タイムライン全体の時間（分）を定義
-    const timelineStartMinutes = 9 * 60; // 10:00
-    // 10:00から24:00までの14時間 = 840分
+    const timelineStartMinutes = 9 * 60;
     const totalTimelineMinutes = (24 - 9) * 60;
-
     const startMinutes = timeToMinutes(startTime);
     const endMinutes = timeToMinutes(endTime);
     const duration = endMinutes - startMinutes;
-
-    // 位置と幅をパーセンテージで計算
     const leftPercent = ((startMinutes - timelineStartMinutes) / totalTimelineMinutes) * 100;
     const widthPercent = (duration / totalTimelineMinutes) * 100;
-
-    // CSSで使えるように文字列で返す
     return { left: `${leftPercent}%`, width: `${widthPercent}%` };
   };
 
@@ -146,21 +155,19 @@ const SalonBoard = () => {
     setSelectedDate(currentDate.toISOString().split('T')[0]);
   };
 
-  // スロットがシフト時間内かチェック（マネージャーは常にtrue）
   const isSlotInShiftTime = (staff, timeSlot) => {
-    // マネージャーは常に予約可能
     if (staff.role === 'マネージャー') return true;
-
-    if (!staff.shift || !staff.shift.start_time || !staff.shift.end_time) return false;
-
+    
+    // ★ staffShiftsから該当スタッフのシフト情報を取得
+    const staffShift = staffShifts.find(s => s.staff_id === staff.staff_id);
+    if (!staffShift || !staffShift.shift || !staffShift.shift.start_time || !staffShift.shift.end_time) return false;
+    
     const slotMinutes = timeToMinutes(timeSlot);
-    const startMinutes = timeToMinutes(staff.shift.start_time);
-    const endMinutes = timeToMinutes(staff.shift.end_time);
-
+    const startMinutes = timeToMinutes(staffShift.shift.start_time);
+    const endMinutes = timeToMinutes(staffShift.shift.end_time);
     return slotMinutes >= startMinutes && slotMinutes < endMinutes;
   };
 
-  // 空きスロットの判定
   const isSlotAvailable = (staffId, timeSlot) => {
     const slotMinutes = timeToMinutes(timeSlot);
     return !bookings.some(booking => {
@@ -171,11 +178,9 @@ const SalonBoard = () => {
     });
   };
 
-  // 空きスロットクリック処理
   const handleSlotClick = (staffId, timeSlot, slotIndex) => {
-    const staff = staffShifts.find(s => s.staff_id === staffId);
+    const staff = activeStaff.find(s => s.staff_id === staffId);
     if (!staff) return;
-
     setSelectedSlot({
       staffId,
       staffName: staff.name,
@@ -185,24 +190,20 @@ const SalonBoard = () => {
     });
     setActiveModal('booking');
   };
-  // 予約カードクリック処理を追加
+
   const handleBookingClick = async (bookingId) => {
     try {
-      // 予約詳細を取得
       const response = await fetch(`/api/bookings?id=${bookingId}`);
       const data = await response.json();
-
       if (data.success && data.data.length > 0) {
         const booking = data.data[0];
-
         setSelectedSlot({
           bookingId: booking.booking_id,
-          isEdit: true, // 編集モードフラグ
+          isEdit: true,
           staffId: booking.staff_id,
           staffName: booking.staff_name,
           date: booking.date.split('T')[0],
           timeSlot: booking.start_time,
-          // 予約の全データを渡す
           bookingData: booking
         });
         setActiveModal('booking');
@@ -213,33 +214,45 @@ const SalonBoard = () => {
     }
   };
 
-  // モーダルを閉じる
   const closeModal = () => {
     setActiveModal(null);
     setSelectedSlot(null);
+    fetchDataForDate();
   };
 
-  // 設定サイドバーの開閉
   const toggleSettings = () => {
     router.push('/settings');
   };
 
-  // カレンダーモーダルを開く
   const openCalendarModal = () => {
     setActiveModal('calendar');
   };
 
-  // カレンダーから日付を選択
   const handleDateSelect = (date) => {
     setSelectedDate(date);
     setActiveModal(null);
   };
 
-  // ページ遷移ハンドラー
   const handlePageChange = (page) => {
     router.push(`/${page}`);
     setActiveModal(null);
   };
+
+  // ★ activeStaffが空の場合のみローディング表示
+  if (activeStaff.length === 0) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        fontSize: '1.125rem',
+        color: '#6b7280'
+      }}>
+        読み込み中...
+      </div>
+    );
+  }
 
   return (
     <div className="salon-board">
@@ -284,7 +297,7 @@ const SalonBoard = () => {
           <div className="salon-board__db-info-content">
             <div className="salon-board__db-info-item">
               <User />
-              <span>スタッフ: {staffShifts.length}名</span>
+              <span>スタッフ: {activeStaff.length}名</span>
             </div>
             <div className="salon-board__db-info-item">
               <Clock />
@@ -293,18 +306,18 @@ const SalonBoard = () => {
           </div>
         </div>
 
-        {/* --- 共通の横スクロールコンテナ --- */}
         <div className="shared-horizontal-scroller">
-          {/* --- スクロールする中身全体（幅1800px） --- */}
           <div className="wide-content-wrapper">
-
-            {/* スタッフ別スケジュール */}
             <div className="salon-board__section">
               <h3 className="salon-board__section-title"><User />スタッフ別スケジュール</h3>
               <div className="salon-board__rows">
                 {displayStaff.map(staff => {
                   const isHeader = staff.id === 'HEADER_ROW';
-                  const isHoliday = !isHeader && staff.role !== 'マネージャー' && !staff.hasShift;
+                  
+                  // ★ staffShiftsから該当スタッフのシフト情報を取得
+                  const staffShift = staffShifts.find(s => s.staff_id === staff.staff_id);
+                  const isHoliday = !isHeader && staff.role !== 'マネージャー' && (!staffShift || !staffShift.hasShift);
+                  
                   const rowClassName = `salon-board__row ${isHeader ? 'salon-board__row--is-header' : ''} ${isHoliday ? 'salon-board__row--holiday' : ''}`;
 
                   return (
@@ -361,12 +374,11 @@ const SalonBoard = () => {
                                 const { left, width } = calculateBookingPosition(booking.startTime, booking.endTime);
                                 const serviceColorClass = getServiceColorClass(booking.serviceType);
                                 return (
-                                  // スタッフ別スケジュールの予約カード
                                   <div
                                     key={booking.id}
                                     className={`salon-board__booking ${serviceColorClass}`}
-                                    onClick={() => handleBookingClick(booking.id)} // 追加
-                                    style={{ left, width, cursor: 'pointer' }} // cursor追加
+                                    onClick={() => handleBookingClick(booking.id)}
+                                    style={{ left, width, cursor: 'pointer' }}
                                   >
                                     <div className="salon-board__booking-content">
                                       {booking.type === 'schedule' ? (
@@ -390,7 +402,6 @@ const SalonBoard = () => {
               </div>
             </div>
 
-            {/* モーダル非表示時のみベッドスケジュールを表示 */}
             {!activeModal && (
               <div className="salon-board__section">
                 <h3 className="salon-board__section-title">ベッド別スケジュール</h3>
@@ -422,7 +433,7 @@ const SalonBoard = () => {
                             .map(booking => {
                               const { left, width } = calculateBookingPosition(booking.startTime, booking.endTime);
                               const serviceColorClass = getServiceColorClass(booking.serviceType);
-                              const staff = staffShifts.find(s => s.staff_id === booking.staffId);
+                              const staff = activeStaff.find(s => s.staff_id === booking.staffId);
                               return (
                                 <div key={booking.id} className={`salon-board__booking ${serviceColorClass}`} style={{ left, width }}>
                                   <div className="salon-board__booking-content">
@@ -453,7 +464,6 @@ const SalonBoard = () => {
           </div>
         </div>
 
-        {/* --- スクロールしない下半分のエリア --- */}
         <div className="salon-board__lower-area">
           {activeModal === 'booking' ? (
             <BookingModal

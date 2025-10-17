@@ -241,12 +241,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
       const coupon = coupons.find(c => c.coupon_id === updatedFormData.couponId);
       if (coupon?.total_duration_minutes) {
         duration = coupon.total_duration_minutes;
-      } else if (coupon?.service_duration) {
-        duration = coupon.service_duration;
-      } else if (coupon?.base_service_id) {
-        const service = services.find(s => s.service_id === coupon.base_service_id);
-        duration = service?.duration_minutes || 60;
-      } else {
+      }else {
         duration = 60;
       }
     } else {
