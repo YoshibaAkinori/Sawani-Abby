@@ -127,11 +127,29 @@ async function getSummary(pool, startDate, endDate) {
      LIMIT 5`,
     [startDate, endDate]
   );
+  // トップパフォーマー情報を取得
+  const [topStaff] = await pool.execute(
+    `SELECT 
+    s.name as staff_name,
+    s.color as staff_color,
+    COUNT(*) as transaction_count,
+    CAST(SUM(p.total_amount) AS DECIMAL(15,2)) as total_sales,
+    COUNT(DISTINCT p.customer_id) as unique_customers
+  FROM payments p
+  JOIN staff s ON p.staff_id = s.staff_id
+  WHERE p.is_cancelled = FALSE
+    AND DATE(p.payment_date) BETWEEN ? AND ?
+  GROUP BY s.staff_id, s.name, s.color
+  ORDER BY total_sales DESC
+  LIMIT 1`,
+    [startDate, endDate]
+  );
 
   return {
     summary: summary[0],
     topServices,
-    topOptions
+    topOptions,
+    topStaff: topStaff[0] || null
   };
 }
 
@@ -191,8 +209,8 @@ async function getMonthlySales(pool, startDate, endDate) {
 
 // 性別ごとの売上集計
 async function getGenderSales(pool, startDate, endDate, type) {
-  const groupBy = type === 'daily' 
-    ? 'DATE(p.payment_date)' 
+  const groupBy = type === 'daily'
+    ? 'DATE(p.payment_date)'
     : "DATE_FORMAT(p.payment_date, '%Y-%m')";
 
   const [rows] = await pool.execute(

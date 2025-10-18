@@ -227,6 +227,67 @@ const SummarySection = ({ data }) => {
           </p>
         )}
       </div>
+      
+      {/* トップパフォーマー */}
+      {data.topStaff && (
+        <div className="analytics-card">
+          <h3 className="analytics-card__title">
+            <Users size={20} style={{ display: 'inline', marginRight: '0.5rem' }} />
+            全期間トップパフォーマー
+          </h3>
+          <div className="top-performer-card" style={{ 
+            background: `linear-gradient(135deg, ${data.topStaff.staff_color}dd, ${data.topStaff.staff_color}88)`,
+            borderRadius: '0.75rem',
+            padding: '1.5rem',
+            color: 'white',
+            marginTop: '1rem'
+          }}>
+            <div className="top-performer-name" style={{ 
+              fontSize: '1.75rem', 
+              fontWeight: 700, 
+              marginBottom: '1rem' 
+            }}>
+              {data.topStaff.staff_name}
+            </div>
+            <div className="top-performer-stats" style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(3, 1fr)', 
+              gap: '1rem' 
+            }}>
+              <div className="stat-item" style={{ 
+                background: 'rgba(255, 255, 255, 0.15)', 
+                padding: '0.75rem', 
+                borderRadius: '0.5rem' 
+              }}>
+                <div className="stat-label" style={{ fontSize: '0.875rem', opacity: 0.9 }}>総売上</div>
+                <div className="stat-value" style={{ fontSize: '1.25rem', fontWeight: 700, marginTop: '0.25rem' }}>
+                  {formatCurrency(data.topStaff.total_sales)}
+                </div>
+              </div>
+              <div className="stat-item" style={{ 
+                background: 'rgba(255, 255, 255, 0.15)', 
+                padding: '0.75rem', 
+                borderRadius: '0.5rem' 
+              }}>
+                <div className="stat-label" style={{ fontSize: '0.875rem', opacity: 0.9 }}>取引数</div>
+                <div className="stat-value" style={{ fontSize: '1.25rem', fontWeight: 700, marginTop: '0.25rem' }}>
+                  {data.topStaff.transaction_count}件
+                </div>
+              </div>
+              <div className="stat-item" style={{ 
+                background: 'rgba(255, 255, 255, 0.15)', 
+                padding: '0.75rem', 
+                borderRadius: '0.5rem' 
+              }}>
+                <div className="stat-label" style={{ fontSize: '0.875rem', opacity: 0.9 }}>顧客数</div>
+                <div className="stat-value" style={{ fontSize: '1.25rem', fontWeight: 700, marginTop: '0.25rem' }}>
+                  {data.topStaff.unique_customers}人
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
         .summary-section {

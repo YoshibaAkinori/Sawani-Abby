@@ -1,14 +1,15 @@
 // app/analytics/components/StaffAnalysis.js
 "use client";
 import React from 'react';
-import { Users, TrendingUp, Award } from 'lucide-react';
+import { Users, TrendingUp } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const StaffAnalysis = ({ data, period }) => {
   function formatCurrency(amount) {
-    return `¥${Math.round(amount || 0).toLocaleString()}`;
+    return `¥${Math.round(Number(amount) || 0).toLocaleString()}`;
   }
 
-  if (!data || !Array.isArray(data)) {
+  if (!data || !Array.isArray(data) || data.length === 0) {
     return (
       <div className="staff-analysis">
         <p className="no-data-message">データがありません</p>
@@ -16,172 +17,194 @@ const StaffAnalysis = ({ data, period }) => {
     );
   }
 
-  // 期間ごとにグループ化
-  const groupedByPeriod = data.reduce((acc, row) => {
-    if (!acc[row.period]) {
-      acc[row.period] = [];
+  // グラフ用データ整形（常に月別グラフ）
+  // 横軸: 2023年1月、2023年2月...2025年12月のように時系列で伸ばす
+  let chartData = [];
+  const staffColors = {};
+  const monthlyData = {};
+  
+  // データから年月を抽出してソート
+  const yearMonths = new Set();
+  
+  data.forEach(row => {
+    if (!row.period || typeof row.period !== 'string') return;
+    
+    const parts = row.period.split('-');
+    if (parts.length < 2) return;
+    
+    const yearMonth = `${parts[0]}-${parts[1]}`;
+    yearMonths.add(yearMonth);
+    
+    if (!monthlyData[yearMonth]) {
+      monthlyData[yearMonth] = {};
     }
-    acc[row.period].push(row);
-    return acc;
-  }, {});
+    
+    monthlyData[yearMonth][row.staff_name] = Number(row.total_sales) || 0;
+    staffColors[row.staff_name] = row.staff_color;
+  });
+  
+  // 年月を時系列順にソート
+  const sortedYearMonths = Array.from(yearMonths).sort();
+  
+  // グラフ用データを作成
+  sortedYearMonths.forEach(yearMonth => {
+    const [year, month] = yearMonth.split('-');
+    chartData.push({
+      period: `${year}年${parseInt(month)}月`,
+      yearMonth: yearMonth,
+      ...monthlyData[yearMonth]
+    });
+  });
 
-  // 各期間内でランキング
-  const rankedPeriods = Object.entries(groupedByPeriod).map(([period, rows]) => {
-    const sortedRows = rows.sort((a, b) => b.total_sales - a.total_sales);
-    return { period, rankings: sortedRows };
-  }).sort((a, b) => b.period.localeCompare(a.period)); // 期間を降順に並べ替え
-
-  // 全期間通してのトップパフォーマー
-  const allStaffStats = data.reduce((acc, row) => {
-    const existing = acc.find(s => s.staff_name === row.staff_name);
-    if (existing) {
-      existing.transaction_count += row.transaction_count;
-      existing.total_sales += row.total_sales;
-      existing.unique_customers += row.unique_customers;
-    } else {
-      acc.push({
-        staff_name: row.staff_name,
-        staff_color: row.staff_color,
-        transaction_count: row.transaction_count,
-        total_sales: row.total_sales,
-        unique_customers: row.unique_customers
-      });
+  // カスタムツールチップ
+  const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div style={{
+          background: 'white',
+          padding: '12px',
+          border: '1px solid #e5e7eb',
+          borderRadius: '8px',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
+        }}>
+          <p style={{ margin: '0 0 8px 0', fontWeight: 600, color: '#111827' }}>
+            {label}
+          </p>
+          {payload.map((entry, index) => (
+            <p key={index} style={{ margin: '4px 0', color: entry.color, fontSize: '14px' }}>
+              {entry.name}: {formatCurrency(entry.value)}
+            </p>
+          ))}
+        </div>
+      );
     }
-    return acc;
-  }, []).sort((a, b) => b.total_sales - a.total_sales);
-
-  const topPerformer = allStaffStats[0];
+    return null;
+  };
 
   return (
     <div className="staff-analysis">
-      {/* トップパフォーマー */}
-      {topPerformer && (
-        <div className="top-performer-card" style={{ background: `linear-gradient(135deg, ${topPerformer.staff_color}dd, ${topPerformer.staff_color}88)` }}>
-          <div className="top-performer-header">
-            <Award size={32} color="white" />
-            <h3>全期間トップパフォーマー</h3>
-          </div>
-          <div className="top-performer-name">{topPerformer.staff_name}</div>
-          <div className="top-performer-stats">
-            <div className="stat-item">
-              <div className="stat-label">総売上</div>
-              <div className="stat-value">{formatCurrency(topPerformer.total_sales)}</div>
-            </div>
-            <div className="stat-item">
-              <div className="stat-label">取引数</div>
-              <div className="stat-value">{topPerformer.transaction_count}件</div>
-            </div>
-            <div className="stat-item">
-              <div className="stat-label">顧客数</div>
-              <div className="stat-value">{topPerformer.unique_customers}人</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 期間別ランキング */}
+      {/* 折れ線グラフ */}
       <div className="analytics-card">
         <h3 className="analytics-card__title">
           <TrendingUp size={20} style={{ display: 'inline', marginRight: '0.5rem' }} />
-          {period === 'yearly' ? '年別' : '月別'}スタッフランキング
+          スタッフ別売上推移（月別）
+        </h3>
+
+        <div style={{ width: '100%', height: '450px', marginTop: '1rem' }}>
+          <ResponsiveContainer>
+            <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+              <XAxis 
+                dataKey="period"
+                tick={{ fontSize: 11, fill: '#6b7280' }}
+                stroke="#e5e7eb"
+                angle={-45}
+                textAnchor="end"
+                height={80}
+              />
+              <YAxis 
+                tick={{ fontSize: 12, fill: '#6b7280' }}
+                stroke="#e5e7eb"
+                tickFormatter={(value) => `¥${(value / 10000).toFixed(0)}万`}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend 
+                wrapperStyle={{ fontSize: '14px', paddingTop: '20px' }}
+                iconType="line"
+              />
+              {/* スタッフごとに線を生成 */}
+              {Object.keys(staffColors).map((staffName, index) => {
+                const color = staffColors[staffName];
+                return (
+                  <Line 
+                    key={staffName}
+                    type="monotone" 
+                    dataKey={staffName}
+                    name={staffName}
+                    stroke={color}
+                    strokeWidth={2}
+                    dot={{ fill: color, r: 4 }}
+                    activeDot={{ r: 6 }}
+                    connectNulls
+                  />
+                );
+              })}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* 月別ランキングテーブル */}
+      <div className="analytics-card">
+        <h3 className="analytics-card__title">
+          <Users size={20} style={{ display: 'inline', marginRight: '0.5rem' }} />
+          月別スタッフランキング
         </h3>
         
-        {rankedPeriods.map(({ period: periodName, rankings }) => (
-          <div key={periodName} className="period-section">
-            <h4 className="period-title">{periodName}</h4>
-            <div className="staff-table">
-              {/* ヘッダー */}
-              <div className="staff-row staff-row--header">
-                <div className="staff-cell staff-cell--rank">順位</div>
-                <div className="staff-cell staff-cell--name">スタッフ名</div>
-                <div className="staff-cell staff-cell--number">取引数</div>
-                <div className="staff-cell staff-cell--number">総売上</div>
-                <div className="staff-cell staff-cell--number">平均単価</div>
-                <div className="staff-cell staff-cell--number">顧客数</div>
-              </div>
-              
-              {/* データ行 */}
-              {rankings.map((staff, index) => (
-                <div key={index} className="staff-row">
-                  <div className="staff-cell staff-cell--rank">
-                    <div className={`rank-indicator rank-${index + 1}`} style={{ 
-                      background: index === 0 ? '#fbbf24' : index === 1 ? '#94a3b8' : index === 2 ? '#cd7f32' : staff.staff_color 
-                    }}>
-                      {index + 1}
-                    </div>
-                  </div>
-                  <div className="staff-cell staff-cell--name">
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <div className="staff-color-dot" style={{ background: staff.staff_color }} />
-                      <strong>{staff.staff_name}</strong>
-                    </div>
-                  </div>
-                  <div className="staff-cell staff-cell--number">{staff.transaction_count}件</div>
-                  <div className="staff-cell staff-cell--number">{formatCurrency(staff.total_sales)}</div>
-                  <div className="staff-cell staff-cell--number">
-                    {formatCurrency(staff.total_sales / staff.transaction_count)}
-                  </div>
-                  <div className="staff-cell staff-cell--number">{staff.unique_customers}人</div>
+        {sortedYearMonths.slice().reverse().map((yearMonth) => {
+          const [year, month] = yearMonth.split('-');
+          const periodLabel = `${year}年${parseInt(month)}月`;
+          
+          // その月のスタッフデータを取得してソート
+          const monthStaff = data
+            .filter(row => row.period && row.period.startsWith(yearMonth))
+            .sort((a, b) => (Number(b.total_sales) || 0) - (Number(a.total_sales) || 0));
+          
+          if (monthStaff.length === 0) return null;
+          
+          return (
+            <div key={yearMonth} className="period-section">
+              <h4 className="period-title">{periodLabel}</h4>
+              <div className="staff-table">
+                {/* ヘッダー */}
+                <div className="staff-row staff-row--header">
+                  <div className="staff-cell staff-cell--rank">順位</div>
+                  <div className="staff-cell staff-cell--name">スタッフ名</div>
+                  <div className="staff-cell staff-cell--number">取引数</div>
+                  <div className="staff-cell staff-cell--number">総売上</div>
+                  <div className="staff-cell staff-cell--number">平均単価</div>
+                  <div className="staff-cell staff-cell--number">顧客数</div>
                 </div>
-              ))}
+                
+                {/* データ行 */}
+                {monthStaff.map((staff, index) => {
+                  const totalSales = Number(staff.total_sales) || 0;
+                  const transactionCount = Number(staff.transaction_count) || 0;
+                  const averageSale = transactionCount > 0 ? totalSales / transactionCount : 0;
+                  
+                  return (
+                    <div key={index} className="staff-row">
+                      <div className="staff-cell staff-cell--rank">
+                        <div className={`rank-indicator rank-${index + 1}`} style={{ 
+                          background: index === 0 ? '#fbbf24' : index === 1 ? '#94a3b8' : index === 2 ? '#cd7f32' : staff.staff_color 
+                        }}>
+                          {index + 1}
+                        </div>
+                      </div>
+                      <div className="staff-cell staff-cell--name">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <div className="staff-color-dot" style={{ background: staff.staff_color }} />
+                          <strong>{staff.staff_name}</strong>
+                        </div>
+                      </div>
+                      <div className="staff-cell staff-cell--number">{transactionCount}件</div>
+                      <div className="staff-cell staff-cell--number">{formatCurrency(totalSales)}</div>
+                      <div className="staff-cell staff-cell--number">
+                        {formatCurrency(averageSale)}
+                      </div>
+                      <div className="staff-cell staff-cell--number">{Number(staff.unique_customers) || 0}人</div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <style jsx>{`
         .staff-analysis {
           padding: 0;
-        }
-
-        /* トップパフォーマーカード */
-        .top-performer-card {
-          border-radius: 1rem;
-          padding: 2rem;
-          margin-bottom: 2rem;
-          color: white;
-        }
-
-        .top-performer-header {
-          display: flex;
-          align-items: center;
-          gap: 0.75rem;
-          margin-bottom: 1rem;
-        }
-
-        .top-performer-header h3 {
-          margin: 0;
-          font-size: 1.25rem;
-          font-weight: 600;
-        }
-
-        .top-performer-name {
-          font-size: 2rem;
-          font-weight: 700;
-          margin-bottom: 1.5rem;
-        }
-
-        .top-performer-stats {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 1rem;
-        }
-
-        .stat-item {
-          background: rgba(255, 255, 255, 0.15);
-          padding: 1rem;
-          border-radius: 0.5rem;
-          backdrop-filter: blur(10px);
-        }
-
-        .stat-label {
-          font-size: 0.875rem;
-          opacity: 0.9;
-        }
-
-        .stat-value {
-          font-size: 1.5rem;
-          font-weight: 700;
         }
 
         /* 期間セクション */
@@ -266,7 +289,6 @@ const StaffAnalysis = ({ data, period }) => {
           font-variant-numeric: tabular-nums;
         }
 
-        /* 共通スタイル */
         .rank-indicator {
           display: inline-flex;
           align-items: center;
@@ -293,16 +315,6 @@ const StaffAnalysis = ({ data, period }) => {
           background: linear-gradient(135deg, #cd7f32, #b8692f) !important;
         }
 
-        .trophy {
-          font-size: 1.25rem;
-          animation: bounce 1s infinite;
-        }
-
-        @keyframes bounce {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-5px); }
-        }
-
         .staff-color-dot {
           width: 12px;
           height: 12px;
@@ -326,10 +338,6 @@ const StaffAnalysis = ({ data, period }) => {
           .staff-cell {
             padding: 0.75rem 0.5rem;
             font-size: 0.875rem;
-          }
-
-          .top-performer-stats {
-            grid-template-columns: 1fr;
           }
         }
 

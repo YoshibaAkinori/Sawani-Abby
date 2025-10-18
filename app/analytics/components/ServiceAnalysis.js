@@ -3,13 +3,17 @@
 import React from 'react';
 import { Briefcase, Award, Users } from 'lucide-react';
 
-const ServiceAnalysis = ({ data }) => {
+const ServiceAnalysis = ({ data, period }) => {
+  // 月別タブ用のstate
+  const [selectedPeriod, setSelectedPeriod] = React.useState(null);
+
   function formatCurrency(amount) {
     return `¥${Math.round(amount || 0).toLocaleString()}`;
   }
 
   const serviceData = data?.serviceData || data || [];
   const genderData = data?.genderData || [];
+  const serviceByPeriod = data?.serviceByPeriod || []; // 期間別サービスデータ
 
   if (!serviceData || !Array.isArray(serviceData) || serviceData.length === 0) {
     return (
@@ -22,7 +26,32 @@ const ServiceAnalysis = ({ data }) => {
   // 全期間通してのトップサービス
   const topService = serviceData[0];
 
-  // 性別別データを整形（利用回数の表用）
+  // 期間のリストを取得してソート
+  const allPeriods = React.useMemo(() => {
+    const periods = new Set();
+    serviceByPeriod.forEach(row => {
+      if (row.period) periods.add(row.period);
+    });
+    const sorted = Array.from(periods).sort().reverse();
+    
+    // 初期値を最新の期間に設定
+    if (!selectedPeriod && sorted.length > 0) {
+      setSelectedPeriod(sorted[0]);
+    }
+    
+    return sorted;
+  }, [serviceByPeriod, selectedPeriod]);
+
+  // 選択された期間のデータのみをフィルタリング
+  const periodServiceData = React.useMemo(() => {
+    if (!selectedPeriod) return [];
+    
+    return serviceByPeriod
+      .filter(row => row.period === selectedPeriod)
+      .sort((a, b) => (Number(b.total_revenue) || 0) - (Number(a.total_revenue) || 0));
+  }, [serviceByPeriod, selectedPeriod]);
+
+  // 性別別データを整形(利用回数の表用)
   const genderTableData = [];
   if (genderData.length > 0) {
     const serviceMap = {};
@@ -38,9 +67,9 @@ const ServiceAnalysis = ({ data }) => {
         };
       }
       if (row.gender === 'female') {
-        serviceMap[row.service_name].female_count = row.usage_count || 0;
+        serviceMap[row.service_name].female_count = Number(row.usage_count) || 0;
       } else if (row.gender === 'male') {
-        serviceMap[row.service_name].male_count = row.usage_count || 0;
+        serviceMap[row.service_name].male_count = Number(row.usage_count) || 0;
       }
     });
 
@@ -53,14 +82,14 @@ const ServiceAnalysis = ({ data }) => {
     genderTableData.sort((a, b) => b.total_count - a.total_count);
   }
 
-  // 性別合計
+  // 性別合計(サマリーの actual_sales と同じ計算方法)
   const genderTotals = genderData.reduce((acc, item) => {
     if (item.gender === 'female') {
-      acc.female += item.total_revenue || 0;
-      acc.femaleCount += item.usage_count || 0;
+      acc.female += Number(item.total_revenue) || 0;
+      acc.femaleCount += Number(item.usage_count) || 0;
     } else if (item.gender === 'male') {
-      acc.male += item.total_revenue || 0;
-      acc.maleCount += item.usage_count || 0;
+      acc.male += Number(item.total_revenue) || 0;
+      acc.maleCount += Number(item.usage_count) || 0;
     }
     return acc;
   }, { female: 0, male: 0, femaleCount: 0, maleCount: 0 });
@@ -95,11 +124,11 @@ const ServiceAnalysis = ({ data }) => {
         </div>
       )}
 
-      {/* サービスランキング（全体） */}
+      {/* サービス別売上ランキング(全体) */}
       <div className="analytics-card">
         <h3 className="analytics-card__title">
           <Briefcase size={20} style={{ display: 'inline', marginRight: '0.5rem' }} />
-          サービス別売上ランキング
+          サービス別売上ランキング(全期間)
         </h3>
         
         <div className="service-table">
@@ -138,6 +167,75 @@ const ServiceAnalysis = ({ data }) => {
         </div>
       </div>
 
+      {/* 期間別サービスランキング */}
+      {allPeriods.length > 0 && (
+        <div className="analytics-card">
+          <h3 className="analytics-card__title">
+            <Briefcase size={20} style={{ display: 'inline', marginRight: '0.5rem' }} />
+            {period === 'yearly' ? '年別' : '月別'}サービス売上ランキング
+          </h3>
+          
+          {/* 期間タブ */}
+          <div className="period-tabs">
+            {allPeriods.map(p => {
+              const isSelected = p === selectedPeriod;
+              const displayText = period === 'yearly' 
+                ? `${p}年` 
+                : (() => {
+                    const [year, month] = p.split('-');
+                    return `${year}年${parseInt(month)}月`;
+                  })();
+              
+              return (
+                <button
+                  key={p}
+                  className={`period-tab ${isSelected ? 'period-tab--active' : ''}`}
+                  onClick={() => setSelectedPeriod(p)}
+                >
+                  {displayText}
+                </button>
+              );
+            })}
+          </div>
+          
+          {/* 選択された期間のランキング表 */}
+          <div className="service-table" style={{ marginTop: '1rem' }}>
+            {/* ヘッダー */}
+            <div className="service-row service-row--header">
+              <div className="service-cell service-cell--rank">順位</div>
+              <div className="service-cell service-cell--name">サービス名</div>
+              <div className="service-cell service-cell--category">カテゴリ</div>
+              <div className="service-cell service-cell--number">回数</div>
+              <div className="service-cell service-cell--number">売上</div>
+              <div className="service-cell service-cell--number">平均単価</div>
+            </div>
+            
+            {/* データ行 */}
+            {periodServiceData.map((service, index) => (
+              <div key={index} className="service-row">
+                <div className="service-cell service-cell--rank">
+                  <div className={`rank-badge rank-${index + 1}`}>
+                    {index + 1}
+                  </div>
+                </div>
+                <div className="service-cell service-cell--name">
+                  <strong>{service.service_name}</strong>
+                  {index === 0 && <span className="medal">🥇</span>}
+                  {index === 1 && <span className="medal">🥈</span>}
+                  {index === 2 && <span className="medal">🥉</span>}
+                </div>
+                <div className="service-cell service-cell--category">{service.category}</div>
+                <div className="service-cell service-cell--number">{service.usage_count}回</div>
+                <div className="service-cell service-cell--number">{formatCurrency(service.total_revenue)}</div>
+                <div className="service-cell service-cell--number">
+                  {formatCurrency(service.avg_price)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 性別別サービス利用回数表 */}
       {genderTableData.length > 0 && (
         <div className="analytics-card">
@@ -174,104 +272,56 @@ const ServiceAnalysis = ({ data }) => {
             </div>
           )}
 
-          {/* 女性の表 */}
-          <div style={{ marginBottom: '2rem' }}>
-            <h4 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#ec4899', marginBottom: '0.75rem' }}>
-              👩 女性の利用状況
-            </h4>
-            <div className="service-table service-table--gender">
-              {/* ヘッダー */}
-              <div className="service-row service-row--header service-row--gender">
-                <div className="service-cell service-cell--rank">順位</div>
-                <div className="service-cell service-cell--name">サービス名</div>
-                <div className="service-cell service-cell--category">カテゴリ</div>
-                <div className="service-cell service-cell--number">利用回数</div>
-                <div className="service-cell service-cell--number">売上</div>
-              </div>
-              
-              {/* データ行 */}
-              {genderTableData
-                .filter(s => s.female_count > 0)
-                .sort((a, b) => b.female_count - a.female_count)
-                .map((service, index) => {
-                  const femaleRevenue = genderData.find(
-                    d => d.service_name === service.service_name && d.gender === 'female'
-                  )?.total_revenue || 0;
-                  
-                  return (
-                    <div key={index} className="service-row service-row--gender">
-                      <div className="service-cell service-cell--rank">
-                        <div className={`rank-badge rank-${index + 1}`}>
-                          {index + 1}
-                        </div>
-                      </div>
-                      <div className="service-cell service-cell--name">
-                        <strong>{service.service_name}</strong>
-                        {index === 0 && <span className="medal">🥇</span>}
-                        {index === 1 && <span className="medal">🥈</span>}
-                        {index === 2 && <span className="medal">🥉</span>}
-                      </div>
-                      <div className="service-cell service-cell--category">{service.category}</div>
-                      <div className="service-cell service-cell--number">
-                        <strong style={{ color: '#ec4899' }}>{service.female_count}回</strong>
-                      </div>
-                      <div className="service-cell service-cell--number">
-                        {formatCurrency(femaleRevenue)}
-                      </div>
-                    </div>
-                  );
-                })}
+          {/* 性別別利用回数表 */}
+          <div className="service-table">
+            {/* ヘッダー */}
+            <div className="service-row service-row--header">
+              <div className="service-cell service-cell--rank">順位</div>
+              <div className="service-cell service-cell--name">サービス名</div>
+              <div className="service-cell service-cell--category">カテゴリ</div>
+              <div className="service-cell service-cell--number">女性</div>
+              <div className="service-cell service-cell--number">男性</div>
+              <div className="service-cell service-cell--number">合計</div>
             </div>
-          </div>
-
-          {/* 男性の表 */}
-          <div>
-            <h4 style={{ fontSize: '1.125rem', fontWeight: 600, color: '#3b82f6', marginBottom: '0.75rem' }}>
-              👨 男性の利用状況
-            </h4>
-            <div className="service-table service-table--gender">
-              {/* ヘッダー */}
-              <div className="service-row service-row--header service-row--gender">
-                <div className="service-cell service-cell--rank">順位</div>
-                <div className="service-cell service-cell--name">サービス名</div>
-                <div className="service-cell service-cell--category">カテゴリ</div>
-                <div className="service-cell service-cell--number">利用回数</div>
-                <div className="service-cell service-cell--number">売上</div>
-              </div>
+            
+            {/* データ行 */}
+            {genderTableData.map((service, index) => {
+              const femalePercent = service.total_count > 0 
+                ? ((service.female_count / service.total_count) * 100).toFixed(1) 
+                : 0;
+              const malePercent = service.total_count > 0 
+                ? ((service.male_count / service.total_count) * 100).toFixed(1) 
+                : 0;
               
-              {/* データ行 */}
-              {genderTableData
-                .filter(s => s.male_count > 0)
-                .sort((a, b) => b.male_count - a.male_count)
-                .map((service, index) => {
-                  const maleRevenue = genderData.find(
-                    d => d.service_name === service.service_name && d.gender === 'male'
-                  )?.total_revenue || 0;
-                  
-                  return (
-                    <div key={index} className="service-row service-row--gender">
-                      <div className="service-cell service-cell--rank">
-                        <div className={`rank-badge rank-${index + 1}`}>
-                          {index + 1}
-                        </div>
-                      </div>
-                      <div className="service-cell service-cell--name">
-                        <strong>{service.service_name}</strong>
-                        {index === 0 && <span className="medal">🥇</span>}
-                        {index === 1 && <span className="medal">🥈</span>}
-                        {index === 2 && <span className="medal">🥉</span>}
-                      </div>
-                      <div className="service-cell service-cell--category">{service.category}</div>
-                      <div className="service-cell service-cell--number">
-                        <strong style={{ color: '#3b82f6' }}>{service.male_count}回</strong>
-                      </div>
-                      <div className="service-cell service-cell--number">
-                        {formatCurrency(maleRevenue)}
-                      </div>
+              return (
+                <div key={index} className="service-row">
+                  <div className="service-cell service-cell--rank">
+                    <div className={`rank-badge rank-${index + 1}`}>
+                      {index + 1}
                     </div>
-                  );
-                })}
-            </div>
+                  </div>
+                  <div className="service-cell service-cell--name">
+                    <strong>{service.service_name}</strong>
+                  </div>
+                  <div className="service-cell service-cell--category">{service.category}</div>
+                  <div className="service-cell service-cell--number">
+                    {service.female_count}回
+                    <span className="percent-badge" style={{ color: '#ec4899' }}>
+                      ({femalePercent}%)
+                    </span>
+                  </div>
+                  <div className="service-cell service-cell--number">
+                    {service.male_count}回
+                    <span className="percent-badge" style={{ color: '#3b82f6' }}>
+                      ({malePercent}%)
+                    </span>
+                  </div>
+                  <div className="service-cell service-cell--number">
+                    <strong>{service.total_count}回</strong>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -338,6 +388,45 @@ const ServiceAnalysis = ({ data }) => {
           margin-top: 0.25rem;
         }
 
+        /* 期間タブ */
+        .period-tabs {
+          display: flex;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+          margin-bottom: 1rem;
+          padding: 0.5rem;
+          background: #f9fafb;
+          border-radius: 0.5rem;
+        }
+
+        .period-tab {
+          padding: 0.5rem 1rem;
+          border: 1px solid #e5e7eb;
+          border-radius: 0.375rem;
+          background: white;
+          color: #6b7280;
+          font-size: 0.875rem;
+          font-weight: 500;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .period-tab:hover {
+          background: #f3f4f6;
+          border-color: #d1d5db;
+        }
+
+        .period-tab--active {
+          background: #3b82f6;
+          color: white;
+          border-color: #3b82f6;
+        }
+
+        .period-tab--active:hover {
+          background: #2563eb;
+          border-color: #2563eb;
+        }
+
         .gender-summary {
           background: #f9fafb;
           padding: 1rem;
@@ -375,12 +464,6 @@ const ServiceAnalysis = ({ data }) => {
           font-weight: 700;
         }
         
-        .gender-percent {
-          font-size: 1rem;
-          color: #6b7280;
-          margin-left: 0.5rem;
-        }
-        
         .gender-count {
           font-size: 0.875rem;
           color: #9ca3af;
@@ -396,13 +479,9 @@ const ServiceAnalysis = ({ data }) => {
 
         .service-row {
           display: grid;
-          grid-template-columns: 60px 2fr 1fr 1fr 1.2fr 1fr;
+          grid-template-columns: 60px 2fr 1fr 1fr 1fr 1fr;
           border-bottom: 1px solid #f3f4f6;
           transition: background 0.15s;
-        }
-        
-        .service-row--gender {
-          grid-template-columns: 60px 2fr 1fr 1fr 1.2fr;
         }
 
         .service-row:last-child {
