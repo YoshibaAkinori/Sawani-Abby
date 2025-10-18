@@ -1,0 +1,586 @@
+/* app/settings/set_component/RegisterClosing.css */
+
+.register-closing {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* ========== ヘッダー ========== */
+.register-closing__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.register-closing__title {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #111827;
+}
+
+.register-closing__date-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.register-closing__date-input {
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  min-width: 180px;
+}
+
+.register-closing__saved-badge {
+  padding: 4px 12px;
+  background: #d1fae5;
+  color: #059669;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 4px;
+}
+
+.register-closing__save-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.register-closing__save-btn:hover {
+  background: #2563eb;
+}
+
+.register-closing__save-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ========== セクション ========== */
+.register-closing__section {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.register-closing__section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+  color: #3b82f6;
+}
+
+.register-closing__section-header--sales {
+  color: #10b981;
+}
+
+.register-closing__section-header--payment {
+  justify-content: space-between;
+}
+
+.register-closing__section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #f59e0b;
+}
+
+.register-closing__section-header h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+}
+
+/* ========== レジ金額テーブル ========== */
+.register-closing__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.register-closing__table thead tr {
+  background: #f9fafb;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.register-closing__table th {
+  padding: 14px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.register-closing__table th:nth-child(1) {
+  text-align: left;
+  width: 100px;
+}
+
+.register-closing__table th:nth-child(2) {
+  text-align: center;
+  width: 110px;
+}
+
+.register-closing__table th:nth-child(3) {
+  text-align: center;
+  width: 90px;
+}
+
+.register-closing__table th:nth-child(4) {
+  text-align: center;
+  width: 90px;
+}
+
+.register-closing__table th:nth-child(5) {
+  text-align: center;
+  width: 110px;
+}
+
+.register-closing__table th:nth-child(6) {
+  text-align: right;
+  width: 110px;
+}
+
+.register-closing__table tbody tr {
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.15s;
+}
+
+.register-closing__table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.register-closing__table td {
+  padding: 14px 16px;
+  font-size: 14px;
+  color: #1f2937;
+}
+
+.register-closing__count-cell {
+  text-align: center;
+}
+
+.register-closing__default-count {
+  text-align: center;
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.register-closing__difference-count {
+  text-align: center;
+  font-weight: 600;
+  color: #3b82f6;
+}
+
+.register-closing__after-count {
+  text-align: center;
+  color: #059669;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.register-closing__count-input {
+  width: 90px;
+  padding: 8px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  text-align: center;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.register-closing__count-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.register-closing__count-input::placeholder {
+  color: #d1d5db;
+  opacity: 1;
+}
+
+.register-closing__count-input::-moz-placeholder {
+  color: #d1d5db;
+  opacity: 1;
+}
+
+.register-closing__count-input--after {
+  border-color: #10b981;
+  background: #f0fdf4;
+}
+
+.register-closing__count-input--after:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.register-closing__amount {
+  text-align: right;
+  font-weight: 500;
+  color: #374151;
+}
+
+.register-closing__total-row {
+  background: #f9fafb;
+  font-weight: 600;
+  border-top: 1px solid #e5e7eb;
+}
+
+.register-closing__total-row--highlight {
+  background: #fef3c7;
+  border-top: 2px solid #fbbf24;
+}
+
+.register-closing__actual-total {
+  text-align: right;
+  font-size: 16px;
+  color: #3b82f6;
+  font-weight: 700;
+}
+
+.register-closing__expected-total {
+  text-align: right;
+  font-size: 16px;
+  color: #6b7280;
+  font-weight: 700;
+}
+
+.register-closing__payment-total {
+  text-align: right;
+  font-size: 16px;
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.register-closing__record-total {
+  text-align: right;
+  font-size: 18px;
+  color: #d97706;
+  font-weight: 700;
+}
+
+/* ========== 売上グリッド ========== */
+.register-closing__sales-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.register-closing__sales-card {
+  padding: 16px;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px solid #f3f4f6;
+}
+
+.register-closing__sales-card--expected {
+  background: #e0f2fe;
+  border-color: #bae6fd;
+}
+
+.register-closing__sales-card--record {
+  background: #fef3c7;
+  border-color: #fde68a;
+}
+
+.register-closing__sales-label {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 8px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.register-closing__sales-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.register-closing__sales-value--total {
+  color: #10b981;
+}
+
+.register-closing__sales-value--payment {
+  color: #ef4444;
+}
+
+.register-closing__sales-value--expected {
+  color: #0369a1;
+}
+
+.register-closing__sales-value--record {
+  color: #d97706;
+  font-size: 24px;
+}
+
+.register-closing__sales-formula {
+  font-size: 11px;
+  color: #64748b;
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+/* ========== 過不足 ========== */
+.register-closing__discrepancy {
+  margin-top: 20px;
+  padding: 20px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.register-closing__discrepancy--zero {
+  background: #d1fae5;
+  border: 2px solid #86efac;
+}
+
+.register-closing__discrepancy--plus {
+  background: #fef3c7;
+  border: 2px solid #fde68a;
+}
+
+.register-closing__discrepancy--minus {
+  background: #fee2e2;
+  border: 2px solid #fecaca;
+}
+
+.register-closing__discrepancy-amount {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.register-closing__discrepancy--zero .register-closing__discrepancy-amount {
+  color: #059669;
+}
+
+.register-closing__discrepancy--plus .register-closing__discrepancy-amount {
+  color: #d97706;
+}
+
+.register-closing__discrepancy--minus .register-closing__discrepancy-amount {
+  color: #dc2626;
+}
+
+/* ========== 支払いボタン ========== */
+.register-closing__add-payment-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.register-closing__add-payment-btn:hover {
+  background: #059669;
+}
+
+.register-closing__add-payment-btn--close {
+  background: #ef4444;
+}
+
+.register-closing__add-payment-btn--close:hover {
+  background: #dc2626;
+}
+
+/* ========== 支払いフォーム ========== */
+.register-closing__payment-form {
+  padding: 20px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  box-sizing: border-box;
+}
+
+.register-closing__form-group {
+  margin-bottom: 16px;
+}
+
+.register-closing__form-group:last-of-type {
+  margin-bottom: 20px;
+}
+
+.register-closing__form-group label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 6px;
+}
+
+.register-closing__form-group input,
+.register-closing__form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 14px;
+  background: white;
+  transition: all 0.2s;
+  box-sizing: border-box;
+}
+
+.register-closing__form-group input:focus,
+.register-closing__form-group select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.register-closing__form-submit {
+  width: 100%;
+  padding: 12px;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.register-closing__form-submit:hover {
+  background: #2563eb;
+}
+
+/* ========== 支払いテーブル ========== */
+.register-closing__table--payments {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.register-closing__table--payments th,
+.register-closing__table--payments td {
+  padding: 12px 16px;
+}
+
+.register-closing__table--payments th:nth-child(1),
+.register-closing__table--payments td:nth-child(1) {
+  width: 130px;
+  text-align: left;
+}
+
+.register-closing__table--payments th:nth-child(2),
+.register-closing__table--payments td:nth-child(2) {
+  width: 120px;
+  text-align: left;
+}
+
+.register-closing__table--payments th:nth-child(3),
+.register-closing__table--payments td:nth-child(3) {
+  width: 130px;
+  text-align: right;
+}
+
+.register-closing__table--payments th:nth-child(4),
+.register-closing__table--payments td:nth-child(4) {
+  width: auto;
+  text-align: left;
+  color: #6b7280;
+}
+
+.register-closing__table--payments th:nth-child(5),
+.register-closing__table--payments td:nth-child(5) {
+  width: 100px;
+  text-align: center;
+}
+
+.register-closing__delete-btn {
+  padding: 6px 14px;
+  background: #ffffff;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.register-closing__delete-btn:hover {
+  background: #fee2e2;
+  border-color: #dc2626;
+}
+
+/* ========== 空状態 ========== */
+.register-closing__empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #9ca3af;
+  font-size: 14px;
+}
+
+/* ========== レスポンシブ ========== */
+@media (max-width: 768px) {
+  .register-closing {
+    padding: 16px;
+  }
+
+  .register-closing__header {
+    flex-direction: column;
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  .register-closing__save-btn {
+    justify-content: center;
+  }
+
+  .register-closing__section {
+    padding: 16px;
+  }
+
+  .register-closing__sales-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .register-closing__table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .register-closing__section-header--payment {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .register-closing__add-payment-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .register-closing__discrepancy {
+    flex-direction: column;
+    gap: 12px;
+    text-align: center;
+  }
+}

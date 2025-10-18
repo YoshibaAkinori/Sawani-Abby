@@ -6,6 +6,7 @@ import StaffManagement from './set_component/StaffManagement';
 import ShiftManagement from './set_component/ShiftManagement';
 import ServicesManagement from './set_component/ServicesManagement';
 import OptionsManagement from './set_component/OptionsManagement';
+import RegisterClosing from './set_component/RegisterClosing';
 import './settings.css';
 
 const SettingsPage = () => {
@@ -70,7 +71,7 @@ const SettingsPage = () => {
             <h2 className="settings__content-title">レジ締め管理</h2>
             <div className="settings__content-card">
               <p className="settings__content-description">日次の売上集計、レジ締め作業を管理します。現金・カード決済の実績確認、売上レポートの出力、差異チェック機能を提供します。</p>
-              <div className="settings__content-status">※ 機能実装中</div>
+                <RegisterClosing />
             </div>
           </div>
         );
