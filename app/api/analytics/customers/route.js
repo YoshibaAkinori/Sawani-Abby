@@ -26,22 +26,24 @@ export async function GET(request) {
     );
 
     const [avgRepeatDays] = await pool.execute(
-      `SELECT 
-        AVG(days_between) as avg_repeat_days
-      FROM (
-        SELECT 
-          customer_id,
-          DATEDIFF(
-            payment_date,
-            LAG(payment_date) OVER (PARTITION BY customer_id ORDER BY payment_date)
-          ) as days_between
-        FROM payments
-        WHERE is_cancelled = FALSE
-          AND DATE(payment_date) BETWEEN ? AND ?
-      ) as repeat_intervals
-      WHERE days_between IS NOT NULL`,
-      [startDate, endDate]
-    );
+  `SELECT 
+    AVG(days_between) as avg_repeat_days,
+    MIN(days_between) as min_repeat_days,
+    MAX(days_between) as max_repeat_days
+  FROM (
+    SELECT 
+      customer_id,
+      DATEDIFF(
+        payment_date,
+        LAG(payment_date) OVER (PARTITION BY customer_id ORDER BY payment_date)
+      ) as days_between
+    FROM payments
+    WHERE is_cancelled = FALSE
+      AND DATE(payment_date) BETWEEN ? AND ?
+  ) as repeat_intervals
+  WHERE days_between IS NOT NULL`,
+  [startDate, endDate]
+);
 
     const [visitDistribution] = await pool.execute(
       `SELECT 
@@ -75,40 +77,43 @@ export async function GET(request) {
     );
 
     const [ticketPurchaseTiming] = await pool.execute(
-      `SELECT 
-        CASE 
-          WHEN visit_number = 1 THEN '初回'
-          WHEN visit_number = 2 THEN '2回目'
-          WHEN visit_number = 3 THEN '3回目'
-          WHEN visit_number BETWEEN 4 AND 5 THEN '4-5回目'
-          ELSE '6回目以降'
-        END as visit_timing,
-        COUNT(*) as purchase_count
-      FROM (
-        SELECT 
-          ct.customer_ticket_id,
-          ct.purchase_date,
-          (
-            SELECT COUNT(*)
-            FROM payments p
-            WHERE p.customer_id = ct.customer_id
-              AND p.is_cancelled = FALSE
-              AND DATE(p.payment_date) < ct.purchase_date
-          ) + 1 as visit_number
-        FROM customer_tickets ct
-        WHERE DATE(ct.purchase_date) BETWEEN ? AND ?
-      ) as ticket_visits
-      GROUP BY visit_timing
-      ORDER BY 
-        CASE visit_timing
-          WHEN '初回' THEN 1
-          WHEN '2回目' THEN 2
-          WHEN '3回目' THEN 3
-          WHEN '4-5回目' THEN 4
-          ELSE 5
-        END`,
-      [startDate, endDate]
-    );
+  `SELECT 
+    CASE 
+      WHEN visit_number = 1 THEN '初回'
+      WHEN visit_number = 2 THEN '2回目'
+      WHEN visit_number = 3 THEN '3回目'
+      WHEN visit_number BETWEEN 4 AND 5 THEN '4-5回目'
+      ELSE '6回目以降'
+    END as visit_timing,
+    COUNT(*) as purchase_count
+  FROM (
+    SELECT 
+      ct.customer_id,
+      ct.customer_ticket_id,
+      ct.purchase_date,
+      (
+        SELECT COUNT(*)
+        FROM payments p
+        WHERE p.customer_id = ct.customer_id
+          AND p.is_cancelled = FALSE
+          AND DATE(p.payment_date) < ct.purchase_date
+      ) + 1 as visit_number,
+      ROW_NUMBER() OVER (PARTITION BY ct.customer_id ORDER BY ct.purchase_date) as ticket_rank
+    FROM customer_tickets ct
+    WHERE DATE(ct.purchase_date) BETWEEN ? AND ?
+  ) as ticket_visits
+  WHERE ticket_rank = 1
+  GROUP BY visit_timing
+  ORDER BY 
+    CASE visit_timing
+      WHEN '初回' THEN 1
+      WHEN '2回目' THEN 2
+      WHEN '3回目' THEN 3
+      WHEN '4-5回目' THEN 4
+      ELSE 5
+    END`,
+  [startDate, endDate]
+);
 
     const [ltvAnalysis] = await pool.execute(
       `SELECT 

@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { getConnection } from '../../../../../lib/db';
 
-// 顧客の回数券一覧取得（残額計算含む）
+// 顧客の回数券一覧取得(残額計算含む)
 export async function GET(request, { params }) {
   try {
     const pool = await getConnection();
@@ -40,11 +40,25 @@ export async function GET(request, { params }) {
       [customerId]
     );
 
-    // 残額を計算して各回数券に追加
-    const ticketsWithRemaining = rows.map(ticket => ({
-      ...ticket,
-      remaining_payment: Math.max(0, ticket.purchase_price - ticket.total_paid)
-    }));
+    // 残額を計算して各回数券にステータスを追加
+    const today = new Date().toISOString().split('T')[0];
+    const ticketsWithRemaining = rows.map(ticket => {
+      const remaining_payment = Math.max(0, ticket.purchase_price - ticket.total_paid);
+      
+      // ステータスを判定
+      let status = 'active';
+      if (ticket.sessions_remaining === 0) {
+        status = 'used_up';
+      } else if (ticket.expiry_date < today) {
+        status = 'expired';
+      }
+      
+      return {
+        ...ticket,
+        remaining_payment,
+        status
+      };
+    });
 
     return NextResponse.json({
       success: true,

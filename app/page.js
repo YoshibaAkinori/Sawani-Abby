@@ -301,7 +301,7 @@ const SalonBoard = () => {
             </div>
             <div className="salon-board__db-info-item">
               <Clock />
-              <span>本日の予約: {bookings.length}件</span>
+              <span>本日の予約: {bookings.filter(b => b.type === 'booking').length}件</span>
             </div>
           </div>
         </div>

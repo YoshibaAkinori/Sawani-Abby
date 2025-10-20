@@ -62,27 +62,6 @@ export async function GET(request, { params }) {
 
     // 支払い履歴の処理
     for (const payment of payments) {
-      // キャンセルされた支払いの場合
-      if (payment.is_cancelled) {
-        visitHistory.push({
-          id: `cancelled_payment_${payment.payment_id}`, // ユニークなID
-          payment_id: payment.payment_id,
-          date: payment.date,
-          service: payment.service_name,
-          price: payment.service_price,
-          staff: payment.staff_name || '不明',
-          payment_type: payment.payment_type,
-          payment_method: payment.payment_method,
-          amount: payment.total_amount,
-          record_type: 'cancelled_payment',
-          is_cancelled: true,
-          options: [],
-          detail_info: null,
-          ticket_purchases: []
-        });
-        continue;
-      }
-
       const [childPayments] = await connection.query(`
         SELECT 
           payment_id,
@@ -129,11 +108,8 @@ export async function GET(request, { params }) {
       let detailInfo = null;
       let ticketPurchases = [];
       let ticketUses = [];
+      // 合計金額の計算
       let totalAmount = payment.total_amount;
-
-      if (payment.payment_amount > 0) {
-        totalAmount += payment.payment_amount;
-      }
 
       const immediateUseMap = new Map();
 
@@ -146,6 +122,31 @@ export async function GET(request, { params }) {
       const isParentTicketPurchase = payment.payment_type === 'ticket' &&
         payment.service_name &&
         payment.service_name.includes('回数券購入');
+
+      const isParentTicketUse = payment.payment_type === 'ticket' && 
+        payment.ticket_id && 
+        !isParentTicketPurchase;
+
+      // キャンセルされた支払いの場合
+      if (payment.is_cancelled) {
+        visitHistory.push({
+          id: `cancelled_payment_${payment.payment_id}`,
+          payment_id: payment.payment_id,
+          date: payment.date,
+          service: payment.service_name,
+          price: payment.service_price,
+          staff: payment.staff_name || '不明',
+          payment_type: payment.payment_type,
+          payment_method: payment.payment_method,
+          amount: payment.total_amount,
+          record_type: 'cancelled_payment',
+          is_cancelled: true,
+          options: [],
+          detail_info: null,
+          ticket_purchases: []
+        });
+        continue;
+      }
 
       if (isParentTicketPurchase && payment.ticket_id) {
         const [ticketInfo] = await connection.query(`
@@ -171,14 +172,11 @@ export async function GET(request, { params }) {
         }
       }
 
-      const isParentTicketUse = payment.payment_type === 'ticket' && 
-        payment.ticket_id && 
-        !isParentTicketPurchase;
-
       for (const child of allChildPayments) {
         if (child.notes && child.notes.includes('回数券購入時の初回使用')) {
           continue;
         } else if (child.service_name && child.service_name.includes('回数券購入')) {
+          // 回数券購入の金額を加算
           totalAmount += child.total_amount;
 
           const [ticketInfo] = await connection.query(`
@@ -203,8 +201,14 @@ export async function GET(request, { params }) {
             });
           }
         } else if (child.payment_type === 'ticket' && child.ticket_id) {
+          // 回数券使用の残金支払いを加算(ただし、子レコードの残金支払いはticketUsesに追加しない)
           if (child.payment_amount > 0) {
             totalAmount += child.payment_amount;
+          }
+          
+          // 残金支払いレコード(service_nameに「残金支払い」が含まれる)はticketUsesに追加しない
+          if (child.service_name && child.service_name.includes('残金支払い')) {
+            continue;
           }
 
           const [ticketInfo] = await connection.query(`
@@ -284,10 +288,10 @@ export async function GET(request, { params }) {
       }
 
       visitHistory.push({
-        id: `payment_${payment.payment_id}`, // ユニークなID
+        id: `payment_${payment.payment_id}`,
         payment_id: payment.payment_id,
         date: payment.date,
-        service: isParentTicketPurchase ? '' : serviceDisplay,
+        service: isParentTicketPurchase || isParentTicketUse ? '' : serviceDisplay,
         price: payment.service_price,
         staff: payment.staff_name || '不明',
         payment_type: payment.payment_type,
@@ -327,7 +331,7 @@ export async function GET(request, { params }) {
       const cancelInfo = cancelReason ? `${cancelType} (${cancelReason})` : cancelType;
       
       visitHistory.push({
-        id: `booking_${booking.booking_id}_${booking.history_id}`, // ユニークなID
+        id: `booking_${booking.booking_id}_${booking.history_id}`,
         booking_id: booking.booking_id,
         date: booking.date,
         start_time: booking.start_time,
@@ -340,7 +344,7 @@ export async function GET(request, { params }) {
       });
     }
 
-    // 日付順にソート（新しい順）
+    // 日付順にソート(新しい順)
     visitHistory.sort((a, b) => {
       const dateA = new Date(a.date);
       const dateB = new Date(b.date);

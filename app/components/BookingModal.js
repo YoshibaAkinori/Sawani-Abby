@@ -946,37 +946,44 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                   <div className="section-content">
                     {formData.serviceType === 'normal' && (
                       <div className="menu-select-list">
-                        {Object.entries(groupedServices).map(([category, categoryServices]) => (
-                          <div key={category} className="menu-category-group">
-                            <div className="menu-category-header">{category}</div>
-                            {categoryServices.map(service => (
-                              <div
-                                key={service.service_id}
-                                className={`menu-select-item ${formData.serviceId === service.service_id ? 'selected' : ''}`}
-                                onClick={() => handleInputChange('serviceId', service.service_id)}
-                              >
-                                <input
-                                  type="radio"
-                                  name="service"
-                                  checked={formData.serviceId === service.service_id}
-                                  onChange={() => {}}
-                                  className="menu-radio"
-                                />
-                                <div className="menu-info">
-                                  <div className="menu-name">{service.name}</div>
-                                  <div className="menu-details">
-                                    <Clock size={14} />
-                                    {service.duration_minutes}分
-                                    {service.description && ` - ${service.description}`}
+                        {Object.entries(groupedServices)
+                          .sort(([categoryA], [categoryB]) => {
+                            // 「その他」カテゴリーを最後に
+                            if (categoryA === 'その他') return 1;
+                            if (categoryB === 'その他') return -1;
+                            return categoryA.localeCompare(categoryB, 'ja');
+                          })
+                          .map(([category, categoryServices]) => (
+                            <div key={category} className="menu-category-group">
+                              <div className="menu-category-header">{category}</div>
+                              {categoryServices.map(service => (
+                                <div
+                                  key={service.service_id}
+                                  className={`menu-select-item ${formData.serviceId === service.service_id ? 'selected' : ''}`}
+                                  onClick={() => handleInputChange('serviceId', service.service_id)}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="service"
+                                    checked={formData.serviceId === service.service_id}
+                                    onChange={() => { }}
+                                    className="menu-radio"
+                                  />
+                                  <div className="menu-info">
+                                    <div className="menu-name">{service.name}</div>
+                                    <div className="menu-details">
+                                      <Clock size={14} />
+                                      {service.duration_minutes}分
+                                      {service.description && ` - ${service.description}`}
+                                    </div>
+                                  </div>
+                                  <div className="menu-price">
+                                    ¥{service.price.toLocaleString()}
                                   </div>
                                 </div>
-                                <div className="menu-price">
-                                  ¥{service.price.toLocaleString()}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        ))}
+                              ))}
+                            </div>
+                          ))}
                       </div>
                     )}
 
@@ -992,7 +999,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                               <input
                                 type="checkbox"
                                 checked={formData.ticketIds.includes(ticket.customer_ticket_id)}
-                                onChange={() => {}}
+                                onChange={() => { }}
                                 className="menu-radio"
                               />
                               <div className="menu-info">
@@ -1023,7 +1030,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                               type="radio"
                               name="coupon"
                               checked={formData.couponId === coupon.coupon_id}
-                              onChange={() => {}}
+                              onChange={() => { }}
                               className="menu-radio"
                             />
                             <div className="menu-info">
@@ -1057,7 +1064,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                                 type={isTicketType ? "checkbox" : "radio"}
                                 name={isTicketType ? undefined : "limited"}
                                 checked={isSelected}
-                                onChange={() => {}}
+                                onChange={() => { }}
                                 className="menu-radio"
                               />
                               <div className="menu-info">
@@ -1181,33 +1188,33 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                               )}
                             </span>
                           </div>
-                          
+
                           <div className="info-row">
                             <span className="info-label">フリガナ:</span>
                             <span className="info-value">
                               {formData.lastNameKana} {formData.firstNameKana}
                             </span>
                           </div>
-                          
+
                           {formData.birthDate && (
                             <div className="info-row">
                               <span className="info-label">生年月日:</span>
                               <span className="info-value">{formData.birthDate}</span>
                             </div>
                           )}
-                          
+
                           {formData.gender && formData.gender !== 'not_specified' && (
                             <div className="info-row">
                               <span className="info-label">性別:</span>
                               <span className="info-value">{getGenderLabel(formData.gender)}</span>
                             </div>
                           )}
-                          
+
                           <div className="info-row">
                             <span className="info-label">電話番号:</span>
                             <span className="info-value">{formData.phoneNumber}</span>
                           </div>
-                          
+
                           {formData.email && (
                             <div className="info-row">
                               <span className="info-label">メール:</span>
@@ -1320,7 +1327,7 @@ const BookingModal = ({ activeModal, selectedSlot, onClose, onModalChange }) => 
                               className="form-input form-input--disabled"
                             />
                           </div>
-                          
+
                           <div className="form-row">
                             <label className="form-label">来店回数</label>
                             <input

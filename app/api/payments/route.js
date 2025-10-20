@@ -152,13 +152,7 @@ export async function POST(request) {
         finalCardAmount = card_amount || 0;
       }
 
-      // 1. ticket_paymentsに追加支払いを記録
-      await connection.execute(
-        `INSERT INTO ticket_payments (
-          customer_ticket_id, payment_date, amount_paid, payment_method, notes
-        ) VALUES (?, NOW(), ?, ?, ?)`,
-        [ticket_id, payment_amount, payment_method, notes]
-      );
+
 
       // 2. paymentsテーブルにも記録(売上管理用)
       const [result] = await connection.execute(

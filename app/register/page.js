@@ -447,6 +447,23 @@ const RegisterPage = () => {
   const handleSelectCustomer = async (customer) => {
     setSelectedCustomer(customer);
     setSelectedBookingId(null);
+    // 選択された顧客のみを検索結果に設定
+    setSearchResults([customer]);
+
+    // 顧客の詳細情報（性別含む）を取得
+    try {
+      const customerDetailRes = await fetch(`/api/customers/${customer.customer_id}`);
+      const customerDetailData = await customerDetailRes.json();
+      if (customerDetailData.success) {
+        setSelectedCustomer({
+          ...customer,
+          gender: customerDetailData.data.gender
+        });
+      }
+    } catch (err) {
+      console.error('顧客詳細取得エラー:', err);
+    }
+
     await fetchCustomerTickets(customer.customer_id);
     await fetchAvailableCoupons(customer.customer_id);
   };
@@ -1363,13 +1380,37 @@ const RegisterPage = () => {
                     ) : (
                       (() => {
                         const groupedPlans = {};
-                        availableTicketPlans.forEach(plan => {
+                        // 性別フィルタリングを追加
+                        const filteredPlans = availableTicketPlans.filter(plan => {
+                          // 性別が未設定の顧客は全てのプランを表示
+                          if (!selectedCustomer.gender || selectedCustomer.gender === 'not_specified') {
+                            return true;
+                          }
+                          // プラン名に性別表記がない場合は表示
+                          if (!plan.name.includes('男性') && !plan.name.includes('女性')) {
+                            return true;
+                          }
+                          // 顧客の性別とプラン名が一致する場合のみ表示
+                          if (selectedCustomer.gender === 'male' && plan.name.includes('男性')) {
+                            return true;
+                          }
+                          if (selectedCustomer.gender === 'female' && plan.name.includes('女性')) {
+                            return true;
+                          }
+                          return false;
+                        });
+
+                        filteredPlans.forEach(plan => {
                           const category = plan.service_category || 'その他';
                           if (!groupedPlans[category]) {
                             groupedPlans[category] = [];
                           }
                           groupedPlans[category].push(plan);
                         });
+
+                        if (filteredPlans.length === 0) {
+                          return <div className="empty-message">該当する回数券がありません</div>;
+                        }
 
                         return Object.entries(groupedPlans).map(([category, plans]) => (
                           <div key={category} className="ticket-category-section">
