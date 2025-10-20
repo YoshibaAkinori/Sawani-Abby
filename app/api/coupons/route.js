@@ -2,7 +2,7 @@
 import { NextResponse } from 'next/server';
 import { getConnection } from '../../../lib/db';
 
-// クーポン一覧取得
+// クーポン一覧取得（N+1問題を解決）
 export async function GET(request) {
   try {
     const pool = await getConnection();
@@ -29,47 +29,86 @@ export async function GET(request) {
       ORDER BY c.created_at DESC`
     );
 
-    // 各クーポンの指定オプションを取得
-    for (let coupon of rows) {
-      const [options] = await pool.execute(
+    if (rows.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: []
+      });
+    }
+
+    // ★改善ポイント1: 全クーポンIDを取得
+    const couponIds = rows.map(c => c.coupon_id);
+
+    // ★改善ポイント2: 指定オプション情報を一括取得
+    const placeholders = couponIds.map(() => '?').join(',');
+    const [allOptions] = await pool.execute(
+      `SELECT 
+        cio.coupon_id,
+        cio.option_id,
+        cio.quantity,
+        o.name as option_name,
+        o.price as option_price,
+        o.duration_minutes
+      FROM coupon_included_options cio
+      JOIN options o ON cio.option_id = o.option_id
+      WHERE cio.coupon_id IN (${placeholders})
+      ORDER BY o.name`,
+      couponIds
+    );
+
+    // ★改善ポイント3: 顧客IDが指定されている場合、使用状況を一括取得
+    let usageMap = new Map();
+    if (customerId) {
+      const [allUsage] = await pool.execute(
         `SELECT 
-          cio.option_id,
-          cio.quantity,
-          o.name as option_name,
-          o.price as option_price,
-          o.duration_minutes
-        FROM coupon_included_options cio
-        JOIN options o ON cio.option_id = o.option_id
-        WHERE cio.coupon_id = ?
-        ORDER BY o.name`,
-        [coupon.coupon_id]
+          coupon_id,
+          COUNT(*) as usage_count 
+        FROM coupon_usage 
+        WHERE coupon_id IN (${placeholders})
+          AND customer_id = ?
+        GROUP BY coupon_id`,
+        [...couponIds, customerId]
       );
-      coupon.included_options = options;
 
-      // ★★★ 顧客IDが指定されている場合、選択可能かチェック ★★★
+      allUsage.forEach(usage => {
+        usageMap.set(usage.coupon_id, usage.usage_count);
+      });
+    }
+
+    // ★改善ポイント4: クーポンごとにオプションをグループ化
+    const optionsMap = new Map();
+    allOptions.forEach(opt => {
+      if (!optionsMap.has(opt.coupon_id)) {
+        optionsMap.set(opt.coupon_id, []);
+      }
+      optionsMap.get(opt.coupon_id).push(opt);
+    });
+
+    // ★改善ポイント5: 各クーポンに関連情報を付与
+    const couponsWithDetails = rows.map(coupon => {
+      const included_options = optionsMap.get(coupon.coupon_id) || [];
+      
+      let is_selectable;
       if (customerId) {
-        // この顧客がこのクーポンを何回使用したか
-        const [usageRows] = await pool.execute(
-          `SELECT COUNT(*) as usage_count 
-           FROM coupon_usage 
-           WHERE coupon_id = ? AND customer_id = ?`,
-          [coupon.coupon_id, customerId]
-        );
-
-        const usageCount = usageRows[0].usage_count;
+        const usageCount = usageMap.get(coupon.coupon_id) || 0;
         const usageLimit = coupon.usage_limit;
-
         // 使用上限がnullなら無制限、ある場合は上限と比較
-        coupon.is_selectable = (usageLimit === null || usageCount < usageLimit) && coupon.is_active;
+        is_selectable = (usageLimit === null || usageCount < usageLimit) && coupon.is_active;
       } else {
         // 顧客IDなしの場合は、単にis_activeで判定
-        coupon.is_selectable = coupon.is_active;
+        is_selectable = coupon.is_active;
       }
-    }
+
+      return {
+        ...coupon,
+        included_options,
+        is_selectable
+      };
+    });
 
     return NextResponse.json({
       success: true,
-      data: rows
+      data: couponsWithDetails
     });
   } catch (error) {
     console.error('クーポン取得エラー:', error);
@@ -79,6 +118,7 @@ export async function GET(request) {
     );
   }
 }
+
 
 // クーポン新規登録
 export async function POST(request) {

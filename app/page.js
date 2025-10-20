@@ -43,6 +43,7 @@ const SalonBoard = () => {
     }
   }, [selectedDate, activeStaff]);
 
+
   const fetchDataForDate = async () => {
     setIsLoading(true);
     try {
@@ -51,18 +52,24 @@ const SalonBoard = () => {
       // ★ マネージャー以外のスタッフのみシフト取得
       const nonManagerStaff = activeStaff.filter(s => s.role !== 'マネージャー');
 
+
       // シフトと予約を並列取得
-      const [shiftsData, bookingsData] = await Promise.all([
-        // シフトデータ取得（マネージャーは除外）
-        Promise.all(nonManagerStaff.map(async (staff) => {
-          const shiftResponse = await fetch(`/api/shifts?staffId=${staff.staff_id}&year=${year}&month=${month}`);
-          const shiftData = await shiftResponse.json();
-          const dayShift = shiftData.data?.shifts?.find(s => s.date.startsWith(selectedDate));
-          return { ...staff, shift: dayShift || null, hasShift: !!dayShift };
-        })),
+      const [shiftsResponse, bookingsData] = await Promise.all([
+        // 複数スタッフのシフトを1回のAPIコールで取得
+        fetch(`/api/shifts?staffIds=${nonManagerStaff.map(s => s.staff_id).join(',')}&year=${year}&month=${month}`),
         // 予約データ取得
         fetch(`/api/bookings?date=${selectedDate}`).then(res => res.json())
       ]);
+
+      const shiftsData = await shiftsResponse.json();
+
+      // 各スタッフのシフト情報を構築
+      const staffShiftsData = nonManagerStaff.map(staff => {
+        const staffShiftList = shiftsData.data?.[staff.staff_id] || [];
+        const dayShift = staffShiftList.find(s => s.date.startsWith(selectedDate));
+        return { ...staff, shift: dayShift || null, hasShift: !!dayShift };
+      });
+
 
       // ★ マネージャーは常にシフトありとして追加
       const managerStaff = activeStaff
@@ -70,7 +77,7 @@ const SalonBoard = () => {
         .map(staff => ({ ...staff, shift: null, hasShift: true }));
 
       // ★ シフトデータで更新（マネージャー + その他スタッフ）
-      setStaffShifts([...managerStaff, ...shiftsData]);
+      setStaffShifts([...managerStaff, ...staffShiftsData]);
 
       // ★ 予約データをフォーマット
       if (bookingsData.success) {
@@ -117,7 +124,7 @@ const SalonBoard = () => {
   };
 
   // ★ ベッドと同じように、activeStaffから直接表示用配列を作成
-  const displayStaff = activeStaff.length > 0 
+  const displayStaff = activeStaff.length > 0
     ? [headerRowData, ...activeStaff]
     : [];
 
@@ -157,11 +164,11 @@ const SalonBoard = () => {
 
   const isSlotInShiftTime = (staff, timeSlot) => {
     if (staff.role === 'マネージャー') return true;
-    
+
     // ★ staffShiftsから該当スタッフのシフト情報を取得
     const staffShift = staffShifts.find(s => s.staff_id === staff.staff_id);
     if (!staffShift || !staffShift.shift || !staffShift.shift.start_time || !staffShift.shift.end_time) return false;
-    
+
     const slotMinutes = timeToMinutes(timeSlot);
     const startMinutes = timeToMinutes(staffShift.shift.start_time);
     const endMinutes = timeToMinutes(staffShift.shift.end_time);
@@ -241,10 +248,10 @@ const SalonBoard = () => {
   // ★ activeStaffが空の場合のみローディング表示
   if (activeStaff.length === 0) {
     return (
-      <div style={{ 
-        display: 'flex', 
-        justifyContent: 'center', 
-        alignItems: 'center', 
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
         height: '100vh',
         fontSize: '1.125rem',
         color: '#6b7280'
@@ -313,11 +320,11 @@ const SalonBoard = () => {
               <div className="salon-board__rows">
                 {displayStaff.map(staff => {
                   const isHeader = staff.id === 'HEADER_ROW';
-                  
+
                   // ★ staffShiftsから該当スタッフのシフト情報を取得
                   const staffShift = staffShifts.find(s => s.staff_id === staff.staff_id);
                   const isHoliday = !isHeader && staff.role !== 'マネージャー' && (!staffShift || !staffShift.hasShift);
-                  
+
                   const rowClassName = `salon-board__row ${isHeader ? 'salon-board__row--is-header' : ''} ${isHoliday ? 'salon-board__row--holiday' : ''}`;
 
                   return (

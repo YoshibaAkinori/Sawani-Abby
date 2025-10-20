@@ -2,7 +2,8 @@
 import { NextResponse } from 'next/server';
 import { getConnection } from '../../../lib/db';
 
-// 予約一覧取得
+
+// 予約一覧取得（N+1問題を解決）
 export async function GET(request) {
   try {
     const pool = await getConnection();
@@ -89,76 +90,110 @@ export async function GET(request) {
 
     const [rows] = await pool.execute(query, params);
 
-    for (let booking of rows) {
-      const [options] = await pool.execute(
-        `SELECT 
-          bo.booking_option_id,
-          o.option_id,
-          o.name as option_name,
-          o.category as option_category,
-          o.price,
-          o.duration_minutes
-        FROM booking_options bo
-        JOIN options o ON bo.option_id = o.option_id
-        WHERE bo.booking_id = ?`,
-        [booking.booking_id]
-      );
-      booking.options = options;
-
-      const [tickets] = await pool.execute(
-        `SELECT 
-          bt.booking_ticket_id,
-          bt.customer_ticket_id,
-          ct.customer_id,
-          tp.name as plan_name,
-          tp.total_sessions,
-          ct.sessions_remaining,
-          ct.expiry_date,
-          s.name as service_name,
-          s.category as service_category,
-          s.duration_minutes,
-          s.price
-        FROM booking_tickets bt
-        JOIN customer_tickets ct ON bt.customer_ticket_id = ct.customer_ticket_id
-        JOIN ticket_plans tp ON ct.plan_id = tp.plan_id
-        JOIN services s ON tp.service_id = s.service_id
-        WHERE bt.booking_id = ?`,
-        [booking.booking_id]
-      );
-      booking.tickets = tickets;
-
-      const [limitedOffers] = await pool.execute(
-        `SELECT 
-          blo.booking_limited_offer_id,
-          blo.offer_id,
-          lo.offer_type,
-          lo.name,
-          lo.description,
-          lo.category,
-          lo.duration_minutes,
-          lo.special_price,
-          lo.total_sessions
-        FROM booking_limited_offers blo
-        JOIN limited_offers lo ON blo.offer_id = lo.offer_id
-        WHERE blo.booking_id = ?`,
-        [booking.booking_id]
-      );
-      booking.limited_offers = limitedOffers;
-
-      if (tickets.length > 0) {
-        const ticketNames = tickets.map(t => t.plan_name).join(' + ');
-        booking.service_name = ticketNames;
-        booking.service_category = '回数券';
-      } else if (limitedOffers.length > 0) {
-        const offerNames = limitedOffers.map(o => o.name).join(' + ');
-        booking.service_name = offerNames;
-        booking.service_category = '期間限定';
-      }
+    // ★改善ポイント1: 全予約IDを取得
+    const bookingIds = rows.map(b => b.booking_id);
+    
+    if (bookingIds.length === 0) {
+      return NextResponse.json({
+        success: true,
+        data: []
+      });
     }
+
+    // ★改善ポイント2: オプション情報を一括取得
+    const placeholders = bookingIds.map(() => '?').join(',');
+    const [allOptions] = await pool.execute(
+      `SELECT 
+        bo.booking_id,
+        bo.booking_option_id,
+        o.option_id,
+        o.name as option_name,
+        o.category as option_category,
+        o.price,
+        o.duration_minutes
+      FROM booking_options bo
+      JOIN options o ON bo.option_id = o.option_id
+      WHERE bo.booking_id IN (${placeholders})`,
+      bookingIds
+    );
+
+    // ★改善ポイント3: チケット情報を一括取得
+    const [allTickets] = await pool.execute(
+      `SELECT 
+        bt.booking_id,
+        bt.booking_ticket_id,
+        bt.customer_ticket_id,
+        ct.customer_id,
+        tp.name as plan_name,
+        tp.total_sessions,
+        ct.sessions_remaining,
+        ct.expiry_date,
+        s.name as service_name,
+        s.category as service_category,
+        s.duration_minutes,
+        s.price
+      FROM booking_tickets bt
+      JOIN customer_tickets ct ON bt.customer_ticket_id = ct.customer_ticket_id
+      JOIN ticket_plans tp ON ct.plan_id = tp.plan_id
+      JOIN services s ON tp.service_id = s.service_id
+      WHERE bt.booking_id IN (${placeholders})`,
+      bookingIds
+    );
+
+    // ★改善ポイント4: 期間限定オファー情報を一括取得
+    const [allLimitedOffers] = await pool.execute(
+      `SELECT 
+        blo.booking_id,
+        blo.booking_limited_offer_id,
+        blo.offer_id,
+        lo.offer_type,
+        lo.name,
+        lo.description,
+        lo.special_price,
+        lo.total_sessions
+      FROM booking_limited_offers blo
+      JOIN limited_offers lo ON blo.offer_id = lo.offer_id
+      WHERE blo.booking_id IN (${placeholders})`,
+      bookingIds
+    );
+
+    // ★改善ポイント5: 予約ごとにグループ化
+    const optionsMap = new Map();
+    const ticketsMap = new Map();
+    const limitedOffersMap = new Map();
+
+    allOptions.forEach(opt => {
+      if (!optionsMap.has(opt.booking_id)) {
+        optionsMap.set(opt.booking_id, []);
+      }
+      optionsMap.get(opt.booking_id).push(opt);
+    });
+
+    allTickets.forEach(ticket => {
+      if (!ticketsMap.has(ticket.booking_id)) {
+        ticketsMap.set(ticket.booking_id, []);
+      }
+      ticketsMap.get(ticket.booking_id).push(ticket);
+    });
+
+    allLimitedOffers.forEach(offer => {
+      if (!limitedOffersMap.has(offer.booking_id)) {
+        limitedOffersMap.set(offer.booking_id, []);
+      }
+      limitedOffersMap.get(offer.booking_id).push(offer);
+    });
+
+    // ★改善ポイント6: 各予約に関連情報を付与
+    const bookingsWithDetails = rows.map(booking => ({
+      ...booking,
+      options: optionsMap.get(booking.booking_id) || [],
+      tickets: ticketsMap.get(booking.booking_id) || [],
+      limitedOffers: limitedOffersMap.get(booking.booking_id) || []
+    }));
 
     return NextResponse.json({
       success: true,
-      data: rows
+      data: bookingsWithDetails
     });
   } catch (error) {
     console.error('予約取得エラー:', error);

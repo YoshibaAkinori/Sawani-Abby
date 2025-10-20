@@ -65,15 +65,25 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
 
     console.log(`ScheduleContext: ${date}のデータを取得`);
     
-    // シフトデータを取得
+    // シフトデータを取得（複数スタッフを1回のAPIコールで取得）
     const [year, month] = date.split('-');
-    const shiftsPromises = activeStaff.map(async (staff) => {
-      const shiftResponse = await fetch(`/api/shifts?staffId=${staff.staff_id}&year=${year}&month=${month}`);
-      const shiftData = await shiftResponse.json();
-      const dayShift = shiftData.data?.shifts?.find((s: any) => s.date.startsWith(date));
-      return { ...staff, shift: dayShift || null, hasShift: !!dayShift };
+    const staffIds = activeStaff.map(staff => staff.staff_id).join(',');
+    
+    const shiftResponse = await fetch(
+      `/api/shifts?staffIds=${staffIds}&year=${year}&month=${month}`
+    );
+    const shiftData = await shiftResponse.json();
+    
+    // 各スタッフのシフト情報を構築
+    const staffShifts = activeStaff.map(staff => {
+      const staffShiftList = shiftData.data?.[staff.staff_id] || [];
+      const dayShift = staffShiftList.find((s: any) => s.date.startsWith(date));
+      return { 
+        ...staff, 
+        shift: dayShift || null, 
+        hasShift: !!dayShift 
+      };
     });
-    const staffShifts = await Promise.all(shiftsPromises);
 
     // 予約データを取得
     const response = await fetch(`/api/bookings?date=${date}`);

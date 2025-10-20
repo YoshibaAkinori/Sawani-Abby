@@ -2,17 +2,80 @@
 import { NextResponse } from 'next/server';
 import { getConnection } from '../../../lib/db';
 
-// シフト一覧取得（月単位）
+// シフト一覧取得（月単位 + 複数スタッフ対応）
 export async function GET(request) {
   try {
     const pool = await getConnection();
     const { searchParams } = new URL(request.url);
     const staffId = searchParams.get('staffId');
+    const staffIds = searchParams.get('staffIds'); // 新規：複数スタッフ（カンマ区切り）
     const year = searchParams.get('year');
     const month = searchParams.get('month');
 
-    //console.log('シフト取得:', { staffId, year, month }); // デバッグ用
+    // 複数スタッフの一括取得
+    if (staffIds && year && month) {
+      const ids = staffIds.split(',').map(id => id.trim());
+      
+      // 1回のクエリで全スタッフのシフトを取得
+      const placeholders = ids.map(() => '?').join(',');
+      const query = `
+        SELECT 
+          shift_id,
+          staff_id,
+          DATE_FORMAT(date, '%Y-%m-%d') as date,
+          TIME_FORMAT(start_time, '%H:%i') as start_time,
+          TIME_FORMAT(end_time, '%H:%i') as end_time,
+          break_minutes,
+          transport_cost,
+          hourly_wage,
+          daily_wage,
+          type,
+          notes
+        FROM shifts
+        WHERE staff_id IN (${placeholders})
+          AND YEAR(date) = ? 
+          AND MONTH(date) = ?
+        ORDER BY staff_id, date ASC
+      `;
+      
+      const [rows] = await pool.execute(query, [...ids, year, month]);
+      
+      // スタッフIDごとにグループ化
+      const shiftsByStaff = {};
+      ids.forEach(id => {
+        shiftsByStaff[id] = [];
+      });
+      
+      rows.forEach(shift => {
+        if (shiftsByStaff[shift.staff_id] !== undefined) {
+          shiftsByStaff[shift.staff_id].push(shift);
+        }
+      });
+      
+      // 各スタッフの給与設定を取得
+      const wageQuery = `
+        SELECT staff_id, hourly_wage, transport_allowance 
+        FROM staff 
+        WHERE staff_id IN (${placeholders})
+      `;
+      const [wageRows] = await pool.execute(wageQuery, ids);
+      
+      const wageSettings = {};
+      wageRows.forEach(row => {
+        wageSettings[row.staff_id] = {
+          hourly_wage: row.hourly_wage,
+          transport_allowance: row.transport_allowance
+        };
+      });
 
+      return NextResponse.json({
+        success: true,
+        data: shiftsByStaff,
+        wageSettings: wageSettings
+      });
+    }
+
+    // 単一スタッフの取得（既存の動作を維持）
     let query = `
       SELECT 
         shift_id,
@@ -45,7 +108,6 @@ export async function GET(request) {
     query += ' ORDER BY date ASC';
 
     const [rows] = await pool.execute(query, params);
-    //console.log('取得したシフト件数:', rows.length); // デバッグ用
 
     // スタッフの給与設定を取得
     let wageSetting = { hourly_wage: 1500, transport_allowance: 900 };
@@ -93,8 +155,6 @@ export async function POST(request) {
       type = 'work',
       notes = ''
     } = body;
-
-    //console.log('シフト登録:', { staff_id, date, start_time, end_time }); // デバッグ用
 
     // バリデーション
     if (!staff_id || !date) {
@@ -185,7 +245,7 @@ export async function PUT(request) {
       shifts
     } = body;
 
-    console.log('一括保存開始:', { staff_id, year, month, shiftsCount: Object.keys(shifts).length }); // デバッグ用
+    console.log('一括保存開始:', { staff_id, year, month, shiftsCount: Object.keys(shifts).length });
 
     if (!staff_id || !year || !month || !shifts) {
       return NextResponse.json(
@@ -210,7 +270,7 @@ export async function PUT(request) {
         'DELETE FROM shifts WHERE staff_id = ? AND YEAR(date) = ? AND MONTH(date) = ?',
         [staff_id, year, month]
       );
-      console.log('削除したシフト件数:', deleteResult[0].affectedRows); // デバッグ用
+      console.log('削除したシフト件数:', deleteResult[0].affectedRows);
 
       // 新しいシフトを挿入（給与計算込み）
       let insertCount = 0;
@@ -236,7 +296,7 @@ export async function PUT(request) {
           insertCount++;
         }
       }
-      console.log('挿入したシフト件数:', insertCount); // デバッグ用
+      console.log('挿入したシフト件数:', insertCount);
 
       await connection.commit();
 
