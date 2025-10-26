@@ -13,8 +13,10 @@ const SalonBoard = () => {
   const [activeModal, setActiveModal] = useState(null);
   const [selectedSlot, setSelectedSlot] = useState(null);
 
+
   // ★ Contextから取得
   const { activeStaff, loading: staffLoading } = useStaff();
+  const [shiftsCache, setShiftsCache] = useState({});
 
   console.log('activeStaff:', activeStaff);
   console.log('staffLoading:', staffLoading);
@@ -43,43 +45,49 @@ const SalonBoard = () => {
     }
   }, [selectedDate, activeStaff]);
 
-
   const fetchDataForDate = async () => {
     setIsLoading(true);
     try {
       const [year, month] = selectedDate.split('-');
+      const cacheKey = `${year}-${month}`;
 
       // ★ マネージャー以外のスタッフのみシフト取得
       const nonManagerStaff = activeStaff.filter(s => s.role !== 'マネージャー');
 
+      // ★ キャッシュチェック：同じ月のシフトデータがあれば再利用
+      let monthShiftsData;
+      if (shiftsCache[cacheKey]) {
+        console.log(`キャッシュを使用: ${cacheKey}`);
+        monthShiftsData = shiftsCache[cacheKey];
+      } else {
+        console.log(`APIから取得: ${cacheKey}`);
+        const response = await fetch(
+          `/api/shifts?staffIds=${nonManagerStaff.map(s => s.staff_id).join(',')}&year=${year}&month=${month}`
+        );
+        const data = await response.json();
+        monthShiftsData = data.data;
 
-      // シフトと予約を並列取得
-      const [shiftsResponse, bookingsData] = await Promise.all([
-        // 複数スタッフのシフトを1回のAPIコールで取得
-        fetch(`/api/shifts?staffIds=${nonManagerStaff.map(s => s.staff_id).join(',')}&year=${year}&month=${month}`),
-        // 予約データ取得
-        fetch(`/api/bookings?date=${selectedDate}`).then(res => res.json())
-      ]);
+        setShiftsCache(prev => ({
+          ...prev,
+          [cacheKey]: monthShiftsData
+        }));
+      }
 
-      const shiftsData = await shiftsResponse.json();
-
-      // 各スタッフのシフト情報を構築
       const staffShiftsData = nonManagerStaff.map(staff => {
-        const staffShiftList = shiftsData.data?.[staff.staff_id] || [];
+        const staffShiftList = monthShiftsData?.[staff.staff_id] || [];
         const dayShift = staffShiftList.find(s => s.date.startsWith(selectedDate));
         return { ...staff, shift: dayShift || null, hasShift: !!dayShift };
       });
 
+      const bookingsResponse = await fetch(`/api/bookings?date=${selectedDate}`);
+      const bookingsData = await bookingsResponse.json();
 
-      // ★ マネージャーは常にシフトありとして追加
       const managerStaff = activeStaff
         .filter(s => s.role === 'マネージャー')
         .map(staff => ({ ...staff, shift: null, hasShift: true }));
 
-      // ★ シフトデータで更新（マネージャー + その他スタッフ）
       setStaffShifts([...managerStaff, ...staffShiftsData]);
 
-      // ★ 予約データをフォーマット
       if (bookingsData.success) {
         const formattedBookings = bookingsData.data.map(b => ({
           id: b.booking_id,
@@ -106,6 +114,7 @@ const SalonBoard = () => {
       setIsLoading(false);
     }
   };
+
 
   const bedCount = 2;
   const beds = Array.from({ length: bedCount }, (_, i) => `ベッド${i + 1}`);
@@ -159,7 +168,16 @@ const SalonBoard = () => {
   const changeDate = (days) => {
     const currentDate = new Date(selectedDate);
     currentDate.setDate(currentDate.getDate() + days);
-    setSelectedDate(currentDate.toISOString().split('T')[0]);
+    const newDate = currentDate.toISOString().split('T')[0];
+
+    const [oldYear, oldMonth] = selectedDate.split('-');
+    const [newYear, newMonth] = newDate.split('-');
+    if (oldYear !== newYear || oldMonth !== newMonth) {
+      console.log('月が変わったのでキャッシュをクリア');
+      setShiftsCache({});
+    }
+
+    setSelectedDate(newDate);
   };
 
   const isSlotInShiftTime = (staff, timeSlot) => {

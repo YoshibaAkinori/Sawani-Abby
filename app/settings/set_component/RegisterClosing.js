@@ -41,7 +41,7 @@ const RegisterClosing = () => {
     cash_amount: 0,      // 実際の現金入金額
     card_amount: 0,      // 実際のカード入金額
     transaction_count: 0,
-    fixed_amount: 50000  // レジ規定額（固定）
+    fixed_amount: 30000  // レジ規定額（固定）
   });
 
   // 支払い登録
@@ -56,14 +56,14 @@ const RegisterClosing = () => {
 
   // 札・硬貨の定義（規定額50,000円の標準枚数付き）
   const denominations = [
-    { key: 'ten_thousand', label: '1万円札', value: 10000, defaultCount: 5 },
-    { key: 'five_thousand', label: '5千円札', value: 5000, defaultCount: 0 },
+    { key: 'ten_thousand', label: '1万円札', value: 10000, defaultCount: 0 },
+    { key: 'five_thousand', label: '5千円札', value: 5000, defaultCount: 3 },
     { key: 'two_thousand', label: '2千円札', value: 2000, defaultCount: 0 },
-    { key: 'one_thousand', label: '千円札', value: 1000, defaultCount: 0 },
-    { key: 'five_hundred', label: '500円玉', value: 500, defaultCount: 0 },
-    { key: 'one_hundred', label: '100円玉', value: 100, defaultCount: 0 },
-    { key: 'fifty', label: '50円玉', value: 50, defaultCount: 0 },
-    { key: 'ten', label: '10円玉', value: 10, defaultCount: 0 },
+    { key: 'one_thousand', label: '千円札', value: 1000, defaultCount: 12 },
+    { key: 'five_hundred', label: '500円玉', value: 500, defaultCount: 3 },
+    { key: 'one_hundred', label: '100円玉', value: 100, defaultCount: 12 },
+    { key: 'fifty', label: '50円玉', value: 50, defaultCount: 5 },
+    { key: 'ten', label: '10円玉', value: 10, defaultCount: 5 },
     { key: 'five', label: '5円玉', value: 5, defaultCount: 0 },
     { key: 'one', label: '1円玉', value: 1, defaultCount: 0 }
   ];
@@ -75,6 +75,12 @@ const RegisterClosing = () => {
   const calculateActualCash = () => {
     return denominations.reduce((sum, denom) => {
       const count = parseInt(cashCount[denom.key]) || 0;
+      return sum + (count * denom.value);
+    }, 0);
+  };
+  const calculateActualCashAfter = () => {
+    return denominations.reduce((sum, denom) => {
+      const count = parseInt(cashCountAfter[denom.key]) || 0;
       return sum + (count * denom.value);
     }, 0);
   };
@@ -176,88 +182,88 @@ const RegisterClosing = () => {
 
   // データ取得（日付変更時）
   // app/settings/set_component/RegisterClosing.js
-// fetchClosingData関数を以下に変更
+  // fetchClosingData関数を以下に変更
 
-const fetchClosingData = async (targetDate) => {
-  setIsLoading(true);
-  try {
-    // 売上データ取得(paymentsテーブルから集計)
-    const salesResponse = await fetch(`/api/register-closing/sales?date=${targetDate}`);
-    if (salesResponse.ok) {
-      const salesResult = await salesResponse.json();
-      setSalesData({
-        ...salesResult.data,
-        fixed_amount: 50000 // 規定額は固定
-      });
-    }
+  const fetchClosingData = async (targetDate) => {
+    setIsLoading(true);
+    try {
+      // 売上データ取得(paymentsテーブルから集計)
+      const salesResponse = await fetch(`/api/register-closing/sales?date=${targetDate}`);
+      if (salesResponse.ok) {
+        const salesResult = await salesResponse.json();
+        setSalesData({
+          ...salesResult.data,
+          fixed_amount: 30000 // 規定額は固定
+        });
+      }
 
-    // 既存のレジ締めデータ取得
-    const closingResponse = await fetch(`/api/register-closing?date=${targetDate}`);
-    if (closingResponse.ok) {
-      const closingResult = await closingResponse.json();
-      
-      // ★★★ デバッグ用ログ ★★★
-      //console.log('=== レジ締めデータ取得結果 ===');
-      //console.log('closingResult:', closingResult);
-      //console.log('closingResult.data:', closingResult.data);
-      //console.log('closingResult.data.payments:', closingResult.data?.payments);
-      //console.log('payments型:', typeof closingResult.data?.payments);
-      
-      if (closingResult.data) {
-        // 締め前のデータを設定
-        setCashCount(closingResult.data.cash_count || {
-          ten_thousand: '', five_thousand: '', two_thousand: '', one_thousand: '',
-          five_hundred: '', one_hundred: '', fifty: '', ten: '', five: '', one: ''
-        });
-        
-        // 締め後のデータを設定
-        setCashCountAfter(closingResult.data.cash_count_after || {
-          ten_thousand: '', five_thousand: '', two_thousand: '', one_thousand: '',
-          five_hundred: '', one_hundred: '', fifty: '', ten: '', five: '', one: ''
-        });
-        
-        // ★★★ 支払いデータを設定（型チェック追加） ★★★
-        let paymentsData = [];
-        
-        if (closingResult.data.payments) {
-          // すでに配列の場合
-          if (Array.isArray(closingResult.data.payments)) {
-            paymentsData = closingResult.data.payments;
-          } 
-          // 文字列の場合（JSONパース失敗時）
-          else if (typeof closingResult.data.payments === 'string') {
-            try {
-              paymentsData = JSON.parse(closingResult.data.payments);
-            } catch (e) {
-              //console.error('JSON parse error:', e);
-              paymentsData = [];
+      // 既存のレジ締めデータ取得
+      const closingResponse = await fetch(`/api/register-closing?date=${targetDate}`);
+      if (closingResponse.ok) {
+        const closingResult = await closingResponse.json();
+
+        // ★★★ デバッグ用ログ ★★★
+        //console.log('=== レジ締めデータ取得結果 ===');
+        //console.log('closingResult:', closingResult);
+        //console.log('closingResult.data:', closingResult.data);
+        //console.log('closingResult.data.payments:', closingResult.data?.payments);
+        //console.log('payments型:', typeof closingResult.data?.payments);
+
+        if (closingResult.data) {
+          // 締め前のデータを設定
+          setCashCount(closingResult.data.cash_count || {
+            ten_thousand: '', five_thousand: '', two_thousand: '', one_thousand: '',
+            five_hundred: '', one_hundred: '', fifty: '', ten: '', five: '', one: ''
+          });
+
+          // 締め後のデータを設定
+          setCashCountAfter(closingResult.data.cash_count_after || {
+            ten_thousand: '', five_thousand: '', two_thousand: '', one_thousand: '',
+            five_hundred: '', one_hundred: '', fifty: '', ten: '', five: '', one: ''
+          });
+
+          // ★★★ 支払いデータを設定（型チェック追加） ★★★
+          let paymentsData = [];
+
+          if (closingResult.data.payments) {
+            // すでに配列の場合
+            if (Array.isArray(closingResult.data.payments)) {
+              paymentsData = closingResult.data.payments;
+            }
+            // 文字列の場合（JSONパース失敗時）
+            else if (typeof closingResult.data.payments === 'string') {
+              try {
+                paymentsData = JSON.parse(closingResult.data.payments);
+              } catch (e) {
+                //console.error('JSON parse error:', e);
+                paymentsData = [];
+              }
             }
           }
+
+          //console.log('最終的なpaymentsData:', paymentsData);
+          setPayments(paymentsData);
+          setIsSaved(true);
+        } else {
+          // データがない場合は空にする
+          setCashCount({
+            ten_thousand: '', five_thousand: '', two_thousand: '', one_thousand: '',
+            five_hundred: '', one_hundred: '', fifty: '', ten: '', five: '', one: ''
+          });
+          setCashCountAfter({
+            ten_thousand: '', five_thousand: '', two_thousand: '', one_thousand: '',
+            five_hundred: '', one_hundred: '', fifty: '', ten: '', five: '', one: ''
+          });
+          setPayments([]);
+          setIsSaved(false);
         }
-        
-        //console.log('最終的なpaymentsData:', paymentsData);
-        setPayments(paymentsData);
-        setIsSaved(true);
-      } else {
-        // データがない場合は空にする
-        setCashCount({
-          ten_thousand: '', five_thousand: '', two_thousand: '', one_thousand: '',
-          five_hundred: '', one_hundred: '', fifty: '', ten: '', five: '', one: ''
-        });
-        setCashCountAfter({
-          ten_thousand: '', five_thousand: '', two_thousand: '', one_thousand: '',
-          five_hundred: '', one_hundred: '', fifty: '', ten: '', five: '', one: ''
-        });
-        setPayments([]);
-        setIsSaved(false);
       }
+    } catch (error) {
+      //console.error('データ取得エラー:', error);
+    } finally {
+      setIsLoading(false);
     }
-  } catch (error) {
-    //console.error('データ取得エラー:', error);
-  } finally {
-    setIsLoading(false);
-  }
-};
+  };
 
   // 日付変更時にデータ取得
   useEffect(() => {
@@ -416,8 +422,8 @@ const fetchClosingData = async (targetDate) => {
         </div>
 
         <div className={`register-closing__discrepancy ${discrepancy === 0 ? 'register-closing__discrepancy--zero' :
-            discrepancy > 0 ? 'register-closing__discrepancy--plus' :
-              'register-closing__discrepancy--minus'
+          discrepancy > 0 ? 'register-closing__discrepancy--plus' :
+            'register-closing__discrepancy--minus'
           }`}>
           <div>
             <div style={{ fontSize: '14px', marginBottom: '4px', opacity: 0.8 }}>
@@ -512,6 +518,16 @@ const fetchClosingData = async (targetDate) => {
               <td></td>
               <td className="register-closing__expected-total">
                 ¥{salesData.fixed_amount.toLocaleString()}
+              </td>
+            </tr>
+            <tr className="register-closing__total-row">
+              <td>締め後合計</td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td></td>
+              <td className="register-closing__actual-total">
+                ¥{calculateActualCashAfter().toLocaleString()}
               </td>
             </tr>
             <tr className="register-closing__total-row">

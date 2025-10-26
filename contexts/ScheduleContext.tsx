@@ -48,6 +48,7 @@ const ScheduleContext = createContext<ScheduleContextType | undefined>(undefined
 export function ScheduleProvider({ children }: { children: React.ReactNode }) {
   const { activeStaff } = useStaff();
   const [cache, setCache] = useState<ScheduleCache>({});
+  const [shiftsCache, setShiftsCache] = useState<any>({}); // ★月単位のシフトキャッシュ
   
   const CACHE_DURATION = 5 * 60 * 1000; // 5分
 
@@ -65,18 +66,33 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
 
     console.log(`ScheduleContext: ${date}のデータを取得`);
     
-    // シフトデータを取得（複数スタッフを1回のAPIコールで取得）
+    // シフトデータを取得（月単位でキャッシュ）
     const [year, month] = date.split('-');
+    const cacheKey = `${year}-${month}`;
     const staffIds = activeStaff.map(staff => staff.staff_id).join(',');
     
-    const shiftResponse = await fetch(
-      `/api/shifts?staffIds=${staffIds}&year=${year}&month=${month}`
-    );
-    const shiftData = await shiftResponse.json();
+    let monthShiftsData;
+    if (shiftsCache[cacheKey]) {
+      console.log(`シフトキャッシュを使用: ${cacheKey}`);
+      monthShiftsData = shiftsCache[cacheKey];
+    } else {
+      console.log(`シフトAPIから取得: ${cacheKey}`);
+      const shiftResponse = await fetch(
+        `/api/shifts?staffIds=${staffIds}&year=${year}&month=${month}`
+      );
+      const shiftData = await shiftResponse.json();
+      monthShiftsData = shiftData.data;
+      
+      // シフトキャッシュに保存
+      setShiftsCache((prev: any) => ({
+        ...prev,
+        [cacheKey]: monthShiftsData
+      }));
+    }
     
     // 各スタッフのシフト情報を構築
     const staffShifts = activeStaff.map(staff => {
-      const staffShiftList = shiftData.data?.[staff.staff_id] || [];
+      const staffShiftList = monthShiftsData?.[staff.staff_id] || [];
       const dayShift = staffShiftList.find((s: any) => s.date.startsWith(date));
       return { 
         ...staff, 
@@ -123,6 +139,7 @@ export function ScheduleProvider({ children }: { children: React.ReactNode }) {
   const clearCache = useCallback(() => {
     console.log('ScheduleContext: キャッシュをクリア');
     setCache({});
+    setShiftsCache({}); // ★シフトキャッシュもクリア
   }, []);
 
   return (

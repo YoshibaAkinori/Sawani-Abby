@@ -1,8 +1,9 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CreditCard, Users, Package, Calculator as CalcIcon, Check, AlertCircle, Sparkles, X, UserPlus } from 'lucide-react';
+import { ArrowLeft, CreditCard, Users, Package, Check, AlertCircle, Sparkles, X, UserPlus } from 'lucide-react';
 import './register.css';
+import NumericKeypad from './Numerickeypad';
 
 const RegisterPage = () => {
   // 顧客選択
@@ -60,10 +61,11 @@ const RegisterPage = () => {
   const [discountAmount, setDiscountAmount] = useState('');
   const [receivedAmount, setReceivedAmount] = useState('');
 
-  // 電卓
-  const [calcDisplay, setCalcDisplay] = useState('0');
-  const [calcMemory, setCalcMemory] = useState(null);
-  const [calcOperator, setCalcOperator] = useState(null);
+  // 10キーモーダル
+  const [showKeypad, setShowKeypad] = useState(false);
+  const [keypadTarget, setKeypadTarget] = useState(null);
+  const [keypadPosition, setKeypadPosition] = useState({ top: 0, left: 0 });
+  const inputRefs = useRef({});
 
   // UI
   const [isLoading, setIsLoading] = useState(false);
@@ -772,38 +774,54 @@ const RegisterPage = () => {
     return total;
   };
 
-  // 電卓機能
-  const handleCalcInput = (value) => {
-    if (value === 'C') {
-      setCalcDisplay('0');
-      setCalcMemory(null);
-      setCalcOperator(null);
-    } else if (value === '=') {
-      if (calcMemory !== null && calcOperator) {
-        const current = parseFloat(calcDisplay);
-        let result = 0;
-        switch (calcOperator) {
-          case '+': result = calcMemory + current; break;
-          case '-': result = calcMemory - current; break;
-          case '×': result = calcMemory * current; break;
-          case '÷': result = calcMemory / current; break;
-        }
-        setCalcDisplay(result.toString());
-        setCalcMemory(null);
-        setCalcOperator(null);
-      }
-    } else if (['+', '-', '×', '÷'].includes(value)) {
-      setCalcMemory(parseFloat(calcDisplay));
-      setCalcOperator(value);
-      setCalcDisplay('0');
-    } else {
-      setCalcDisplay(prev => prev === '0' ? value : prev + value);
-    }
+  // 10キーモーダル表示
+  const handleShowKeypad = (target, event) => {
+    const rect = event.target.getBoundingClientRect();
+    setKeypadPosition({
+      top: rect.bottom + window.scrollY,
+      left: rect.left + (rect.width / 2) + window.scrollX,
+    });
+    setKeypadTarget(target);
+    setShowKeypad(true);
   };
 
-  // 電卓の値を支払い金額に入力
-  const handleSetReceivedAmount = () => {
-    setReceivedAmount(calcDisplay);
+  // 10キーモーダル値変更
+  const handleKeypadChange = (value) => {
+    switch (keypadTarget) {
+      case 'cashAmount':
+        setCashAmount(value);
+        break;
+      case 'cardAmount':
+        setCardAmount(value);
+        break;
+      case 'discountAmount':
+        setDiscountAmount(value);
+        break;
+      case 'receivedAmount':
+        setReceivedAmount(value);
+        break;
+      default:
+        // 回数券カスタム価格の処理
+        if (keypadTarget && keypadTarget.startsWith('ticket-price-')) {
+          const ticketId = keypadTarget.replace('ticket-price-', '');
+          setTicketCustomPrices(prev => ({
+            ...prev,
+            [ticketId]: value
+          }));
+        }
+        // 回数券支払い金額の処理
+        else if (keypadTarget && keypadTarget.startsWith('ticket-payment-')) {
+          const ticketId = keypadTarget.replace('ticket-payment-', '');
+          setTicketPurchaseList(prev =>
+            prev.map(t =>
+              t.id.toString() === ticketId
+                ? { ...t, payment_amount: parseInt(value) || 0 }
+                : t
+            )
+          );
+        }
+        break;
+    }
   };
 
   // お会計処理
@@ -1759,6 +1777,7 @@ const RegisterPage = () => {
                                   <input
                                     type="number"
                                     value={ticketCustomPrices[ticket.id] || ''}
+                                    onFocus={(e) => handleShowKeypad(`ticket-price-${ticket.id}`, e)}
                                     onChange={(e) => handleTicketPriceChange(ticket.id, e.target.value)}
                                     className="price-input"
                                     placeholder={(ticket.price || 0).toString()}
@@ -1788,6 +1807,7 @@ const RegisterPage = () => {
                                 type="number"
                                 className="form-input"
                                 value={ticket.payment_amount}
+                                onFocus={(e) => handleShowKeypad(`ticket-payment-${ticket.id}`, e)}
                                 onChange={(e) => handleUpdateTicketPayment(ticket.id, e.target.value)}
                                 placeholder={(ticketCustomPrices[ticket.id] || ticket.price || 0).toString()}
                                 max={ticketCustomPrices[ticket.id] || ticket.price || 0}
@@ -1862,6 +1882,7 @@ const RegisterPage = () => {
                                 type="number"
                                 className="form-input"
                                 value={ticket.payment_amount}
+                                onFocus={(e) => handleShowKeypad(`ticket-payment-${ticket.id}`, e)}
                                 onChange={(e) => handleUpdateTicketPayment(ticket.id, e.target.value)}
                                 placeholder={(ticket.remaining_payment || 0).toString()}
                                 max={ticket.remaining_payment || 0}
@@ -1896,6 +1917,7 @@ const RegisterPage = () => {
                       type="number"
                       className="form-input"
                       value={discountAmount}
+                      onFocus={(e) => handleShowKeypad('discountAmount', e)}
                       onChange={(e) => setDiscountAmount(e.target.value)}
                       placeholder="0"
                     />
@@ -1906,22 +1928,14 @@ const RegisterPage = () => {
                 {(selectedMenu || ticketPurchaseList.length > 0 || ticketUseList.length > 0) && paymentMethod === 'cash' && (
                   <div className="form-group" style={{ marginTop: '1rem' }}>
                     <label>お預かり金額</label>
-                    <div className="received-amount-input">
-                      <input
-                        type="number"
-                        className="form-input"
-                        value={receivedAmount}
-                        onChange={(e) => setReceivedAmount(e.target.value)}
-                        placeholder="0"
-                      />
-                      <button
-                        className="calc-to-input-btn"
-                        onClick={handleSetReceivedAmount}
-                        type="button"
-                      >
-                        電卓から入力
-                      </button>
-                    </div>
+                    <input
+                      type="number"
+                      className="form-input"
+                      value={receivedAmount}
+                      onFocus={(e) => handleShowKeypad('receivedAmount', e)}
+                      onChange={(e) => setReceivedAmount(e.target.value)}
+                      placeholder="0"
+                    />
                   </div>
                 )}
               </div>
@@ -1963,6 +1977,7 @@ const RegisterPage = () => {
                         type="number"
                         className="form-input"
                         value={cashAmount}
+                        onFocus={(e) => handleShowKeypad('cashAmount', e)}
                         onChange={(e) => setCashAmount(e.target.value)}
                         placeholder="0"
                       />
@@ -1973,50 +1988,13 @@ const RegisterPage = () => {
                         type="number"
                         className="form-input"
                         value={cardAmount}
+                        onFocus={(e) => handleShowKeypad('cardAmount', e)}
                         onChange={(e) => setCardAmount(e.target.value)}
                         placeholder="0"
                       />
                     </div>
                   </div>
                 )}
-              </div>
-            </div>
-
-            {/* 電卓 */}
-            <div className="register-section">
-              <div className="register-section__header">
-                <CalcIcon size={18} />
-                <h3 className="register-section__title">電卓</h3>
-              </div>
-              <div className="register-section__content">
-                <div className="calculator">
-                  <div className="calculator__display">{calcDisplay}</div>
-                  <div className="calculator__buttons">
-                    {['7', '8', '9', '÷'].map(btn => (
-                      <button key={btn} className="calculator__btn" onClick={() => handleCalcInput(btn)}>
-                        {btn}
-                      </button>
-                    ))}
-                    {['4', '5', '6', '×'].map(btn => (
-                      <button key={btn} className="calculator__btn" onClick={() => handleCalcInput(btn)}>
-                        {btn}
-                      </button>
-                    ))}
-                    {['1', '2', '3', '-'].map(btn => (
-                      <button key={btn} className="calculator__btn" onClick={() => handleCalcInput(btn)}>
-                        {btn}
-                      </button>
-                    ))}
-                    {['0', '.', '=', '+'].map(btn => (
-                      <button key={btn} className="calculator__btn" onClick={() => handleCalcInput(btn)}>
-                        {btn}
-                      </button>
-                    ))}
-                    <button className="calculator__btn calculator__btn--clear" onClick={() => handleCalcInput('C')}>
-                      C
-                    </button>
-                  </div>
-                </div>
               </div>
             </div>
 
@@ -2114,6 +2092,26 @@ const RegisterPage = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 10キーモーダル */}
+      {showKeypad && (
+        <NumericKeypad
+          value={
+            keypadTarget === 'cashAmount' ? cashAmount :
+            keypadTarget === 'cardAmount' ? cardAmount :
+            keypadTarget === 'discountAmount' ? discountAmount :
+            keypadTarget === 'receivedAmount' ? receivedAmount :
+            keypadTarget && keypadTarget.startsWith('ticket-price-') ? 
+              ticketCustomPrices[keypadTarget.replace('ticket-price-', '')] || '' :
+            keypadTarget && keypadTarget.startsWith('ticket-payment-') ?
+              ticketPurchaseList.find(t => t.id.toString() === keypadTarget.replace('ticket-payment-', ''))?.payment_amount?.toString() || '' :
+            ''
+          }
+          onChange={handleKeypadChange}
+          onClose={() => setShowKeypad(false)}
+          position={keypadPosition}
+        />
       )}
     </div>
   );

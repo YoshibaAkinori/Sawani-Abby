@@ -3,7 +3,7 @@ import { StaffProvider } from '../contexts/StaffContext';
 import { ScheduleProvider } from '../contexts/ScheduleContext';
 
 export const metadata = {
-  title: "Sawani Abby",
+  title: "Sowani Abby",
   description: "スタッフとベッド管理",
 };
 
