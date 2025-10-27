@@ -1,17 +1,28 @@
-// app/api/bookings/route.js
+// app/api/bookings/route.js (本番環境用 - パス修正版)
 import { NextResponse } from 'next/server';
 import { getConnection } from '../../../lib/db';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import path from 'path';
 
+const execAsync = promisify(exec);
 
-// 予約一覧取得（N+1問題を解決）
+// ★本番環境用: プロジェクトルートからスクリプトパスを取得
+const getScriptPath = () => {
+  const projectRoot = process.cwd();
+  return path.join(projectRoot, 'scripts', 'update_excel.py');
+};
+
+// 予約一覧取得
 export async function GET(request) {
   try {
     const pool = await getConnection();
     const { searchParams } = new URL(request.url);
+    
+    const bookingId = searchParams.get('id');
     const date = searchParams.get('date');
     const staffId = searchParams.get('staffId');
     const customerId = searchParams.get('customerId');
-    const bookingId = searchParams.get('id');
 
     let query = `
       SELECT 
@@ -19,9 +30,6 @@ export async function GET(request) {
         b.customer_id,
         b.staff_id,
         b.service_id,
-        b.customer_ticket_id,
-        b.coupon_id,
-        b.limited_offer_id,
         b.date,
         b.start_time,
         b.end_time,
@@ -34,34 +42,15 @@ export async function GET(request) {
         c.first_name,
         s.name as staff_name,
         s.color as staff_color,
-        sv_direct.name as direct_service_name,
-        sv_direct.category as direct_service_category,
-        tp.name as ticket_plan_name,
-        sv_ticket.category as ticket_service_category,
-        cp.name as coupon_name,
-        cp.description as coupon_description,
-        cp.total_price as coupon_price,
-        lo.name as limited_offer_name,
-        lo.description as limited_offer_description,
-        lo.special_price as limited_offer_price,
-        lo.total_sessions as limited_offer_sessions,
-        COALESCE(cp.name, lo.name, tp.name, sv_direct.name) as service_name,
-        CASE
-          WHEN cp.coupon_id IS NOT NULL THEN 'クーポン'
-          WHEN lo.offer_id IS NOT NULL THEN '期間限定'
-          ELSE COALESCE(sv_direct.category, sv_ticket.category)
-        END as service_category
+        sv.name as service_name,
+        sv.category as service_category,
+        sv.duration_minutes,
+        sv.price as service_price
       FROM bookings b
       LEFT JOIN customers c ON b.customer_id = c.customer_id
       LEFT JOIN staff s ON b.staff_id = s.staff_id
-      LEFT JOIN services sv_direct ON b.service_id = sv_direct.service_id
-      LEFT JOIN customer_tickets ct ON b.customer_ticket_id = ct.customer_ticket_id
-      LEFT JOIN ticket_plans tp ON ct.plan_id = tp.plan_id
-      LEFT JOIN services sv_ticket ON tp.service_id = sv_ticket.service_id
-      LEFT JOIN coupons cp ON b.coupon_id = cp.coupon_id
-      LEFT JOIN limited_offers lo ON b.limited_offer_id = lo.offer_id
+      LEFT JOIN services sv ON b.service_id = sv.service_id
       WHERE 1=1
-      AND b.status NOT IN ('cancelled', 'no_show')
     `;
 
     const params = [];
@@ -90,7 +79,6 @@ export async function GET(request) {
 
     const [rows] = await pool.execute(query, params);
 
-    // ★改善ポイント1: 全予約IDを取得
     const bookingIds = rows.map(b => b.booking_id);
     
     if (bookingIds.length === 0) {
@@ -100,7 +88,7 @@ export async function GET(request) {
       });
     }
 
-    // ★改善ポイント2: オプション情報を一括取得
+    // オプション情報を一括取得
     const placeholders = bookingIds.map(() => '?').join(',');
     const [allOptions] = await pool.execute(
       `SELECT 
@@ -117,7 +105,7 @@ export async function GET(request) {
       bookingIds
     );
 
-    // ★改善ポイント3: チケット情報を一括取得
+    // チケット情報を一括取得
     const [allTickets] = await pool.execute(
       `SELECT 
         bt.booking_id,
@@ -140,7 +128,7 @@ export async function GET(request) {
       bookingIds
     );
 
-    // ★改善ポイント4: 期間限定オファー情報を一括取得
+    // 期間限定オファー情報を一括取得
     const [allLimitedOffers] = await pool.execute(
       `SELECT 
         blo.booking_id,
@@ -157,7 +145,7 @@ export async function GET(request) {
       bookingIds
     );
 
-    // ★改善ポイント5: 予約ごとにグループ化
+    // グループ化
     const optionsMap = new Map();
     const ticketsMap = new Map();
     const limitedOffersMap = new Map();
@@ -183,7 +171,6 @@ export async function GET(request) {
       limitedOffersMap.get(offer.booking_id).push(offer);
     });
 
-    // ★改善ポイント6: 各予約に関連情報を付与
     const bookingsWithDetails = rows.map(booking => ({
       ...booking,
       options: optionsMap.get(booking.booking_id) || [],
@@ -229,73 +216,22 @@ export async function POST(request) {
       option_ids = []
     } = body;
 
-    if (type === 'schedule') {
-      if (!staff_id || !date || !start_time || !end_time) {
-        return NextResponse.json(
-          { success: false, error: 'スタッフと日時を入力してください' },
-          { status: 400 }
-        );
-      }
-    } else {
-      if (!staff_id || !date || !start_time || !end_time) {
-        return NextResponse.json(
-          { success: false, error: '必須項目を入力してください' },
-          { status: 400 }
-        );
-      }
-
-      if (!customer_id && !body.last_name && !body.first_name) {
-        return NextResponse.json(
-          { success: false, error: '顧客情報を入力してください' },
-          { status: 400 }
-        );
-      }
-
-      const hasTickets = customer_ticket_ids && customer_ticket_ids.length > 0;
-      const hasLimitedOffers = limited_offer_ids && limited_offer_ids.length > 0;
-
-      if (!service_id && !hasTickets && !coupon_id && !hasLimitedOffers) {
-        return NextResponse.json(
-          { success: false, error: '施術メニューを選択してください' },
-          { status: 400 }
-        );
-      }
+    if (!staff_id || !date || !start_time || !end_time) {
+      return NextResponse.json(
+        { success: false, error: '必須項目が不足しています' },
+        { status: 400 }
+      );
     }
 
     await connection.beginTransaction();
 
     let finalCustomerId = customer_id;
 
-    if (type === 'booking' && !customer_id && body.last_name && body.first_name) {
-      await connection.execute(
-        `INSERT INTO customers (
-          customer_id,
-          last_name,
-          first_name,
-          last_name_kana,
-          first_name_kana,
-          phone_number,
-          email,
-          birth_date,
-          gender
-        ) VALUES (UUID(), ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          body.last_name,
-          body.first_name,
-          body.last_name_kana || '',
-          body.first_name_kana || '',
-          body.phone_number || '',
-          body.email || '',
-          body.birth_date || null,
-          body.gender || 'not_specified'
-        ]
+    if (type === 'booking' && !customer_id) {
+      return NextResponse.json(
+        { success: false, error: '予約には顧客情報が必要です' },
+        { status: 400 }
       );
-
-      const [customerRow] = await connection.execute(
-        'SELECT customer_id FROM customers WHERE phone_number = ? ORDER BY created_at DESC LIMIT 1',
-        [body.phone_number]
-      );
-      finalCustomerId = customerRow[0].customer_id;
     }
 
     await connection.execute(
@@ -306,7 +242,7 @@ export async function POST(request) {
         service_id,
         customer_ticket_id,
         coupon_id,
-        limited_offer_id,
+        limited_ticket_id,
         date,
         start_time,
         end_time,
@@ -378,6 +314,55 @@ export async function POST(request) {
 
     await connection.commit();
 
+    // ★Excel更新処理（本番環境用パス）
+    if (type === 'booking' && finalCustomerId) {
+      try {
+        const [bookingDetail] = await connection.execute(
+          `SELECT 
+            b.date,
+            c.last_name,
+            c.first_name,
+            c.base_visit_count,
+            s.name as staff_name
+          FROM bookings b
+          LEFT JOIN customers c ON b.customer_id = c.customer_id
+          LEFT JOIN staff s ON b.staff_id = s.staff_id
+          WHERE b.booking_id = ?`,
+          [bookingId]
+        );
+
+        if (bookingDetail.length > 0) {
+          const booking = bookingDetail[0];
+
+          const [visitCountRows] = await connection.execute(
+            `SELECT COUNT(DISTINCT DATE(payment_date)) as actual_visit_count 
+             FROM payments 
+             WHERE customer_id = ? AND is_cancelled = FALSE`,
+            [finalCustomerId]
+          );
+          
+          const actualVisitCount = visitCountRows[0].actual_visit_count || 0;
+          const baseVisitCount = booking.base_visit_count || 0;
+          const totalVisitCount = baseVisitCount + actualVisitCount + 1;
+
+          const bookingData = {
+            date: booking.date,
+            customer_name: `${booking.last_name} ${booking.first_name}`,
+            staff_name: booking.staff_name || '未設定',
+            visit_count: totalVisitCount
+          };
+
+          // ★本番環境用: 動的にスクリプトパスを取得
+          const scriptPath = getScriptPath();
+          const command = `python3 "${scriptPath}" '${JSON.stringify(bookingData)}'`;
+          
+          await execAsync(command);
+        }
+      } catch (excelError) {
+        console.error('Excel更新エラー（予約は登録済み）:', excelError);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       message: type === 'schedule' ? '予定を登録しました' : '予約を登録しました',
@@ -399,6 +384,7 @@ export async function POST(request) {
     }
   }
 }
+
 
 // 予約更新
 export async function PUT(request) {
@@ -562,23 +548,21 @@ export async function DELETE(request) {
     const cancelStatus = cancelType === 'no_contact' ? 'no_show' : 'cancelled';
 
     await connection.execute(
-      `UPDATE bookings SET status = ? WHERE booking_id = ?`,
+      'UPDATE bookings SET status = ? WHERE booking_id = ?',
       [cancelStatus, bookingId]
     );
 
     await connection.commit();
 
-    const message = cancelType === 'no_contact'
-      ? '予約をキャンセルしました(無断キャンセル)'
-      : '予約をキャンセルしました';
-
     return NextResponse.json({
       success: true,
-      message
+      message: cancelType === 'no_contact' 
+        ? '無断キャンセルとして記録しました' 
+        : 'キャンセルしました'
     });
   } catch (error) {
     await connection.rollback();
-    console.error('予約削除エラー:', error);
+    console.error('キャンセルエラー:', error);
     return NextResponse.json(
       { success: false, error: 'データベースエラー' },
       { status: 500 }

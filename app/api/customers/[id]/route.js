@@ -1,3 +1,4 @@
+// app/api/customers/[id]/route.js
 import { NextResponse } from 'next/server';
 import { getConnection } from '../../../../lib/db';
 
@@ -8,7 +9,7 @@ export async function GET(request, { params }) {
     const { id } = await params;
     const customerId = id;
 
-    // 顧客基本情報を取得（genderを追加）
+    // 顧客基本情報を取得
     const [customerRows] = await pool.execute(
       `SELECT 
         customer_id,
@@ -39,37 +40,36 @@ export async function GET(request, { params }) {
 
     const customer = customerRows[0];
 
-    // 来店回数を計算（base_visit_count + 実際の来店回数）
+    // ★修正: paymentsテーブルから来店回数を計算
     const [visitCountRows] = await pool.execute(
-      `SELECT COUNT(*) as actual_visit_count 
-       FROM bookings 
-       WHERE customer_id = ? AND status = 'completed'`,
+      `SELECT COUNT(DISTINCT DATE(payment_date)) as actual_visit_count 
+       FROM payments 
+       WHERE customer_id = ? AND is_cancelled = FALSE`,
       [customerId]
     );
     const actualVisitCount = visitCountRows[0].actual_visit_count || 0;
     const baseVisitCount = customer.base_visit_count || 0;
     customer.visit_count = baseVisitCount + actualVisitCount;
 
-    // 最終来店日を取得
+    // ★修正: paymentsテーブルから最終来店日を取得
     const [lastVisitRows] = await pool.execute(
-      `SELECT MAX(date) as last_visit_date 
-       FROM bookings 
-       WHERE customer_id = ? AND status = 'completed'`,
+      `SELECT MAX(DATE(payment_date)) as last_visit_date 
+       FROM payments 
+       WHERE customer_id = ? AND is_cancelled = FALSE`,
       [customerId]
     );
     customer.last_visit_date = lastVisitRows[0].last_visit_date || null;
 
-    // 合計支払額を計算（paymentsテーブルがある場合）
+    // 合計支払額を計算
     try {
       const [totalSpentRows] = await pool.execute(
         `SELECT SUM(total_amount) as total_spent 
          FROM payments 
-         WHERE customer_id = ?`,
+         WHERE customer_id = ? AND is_cancelled = FALSE`,
         [customerId]
       );
       customer.total_spent = totalSpentRows[0].total_spent || 0;
     } catch (err) {
-      // paymentsテーブルがない場合はスキップ
       customer.total_spent = 0;
     }
 
@@ -107,8 +107,6 @@ export async function PUT(request, { params }) {
       base_visit_count,
       line_user_id
     } = body;
-
-    console.log('受信データ:', { gender, ...body }); // デバッグ用
 
     // バリデーション
     if (!last_name || !first_name || !phone_number) {
@@ -148,8 +146,6 @@ export async function PUT(request, { params }) {
         customerId
       ]
     );
-
-    console.log('更新成功 - customer_id:', customerId, 'gender:', gender); // デバッグ用
 
     return NextResponse.json({
       success: true,
